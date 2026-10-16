@@ -28,7 +28,6 @@ unsigned long find_pid(const char* process_name){
 
 int main(void){
     if (!Injection(find_pid("Notepad.exe"), DLL, sizeof(DLL))){
-        printf("[-] Injection failed: %d\n", GetLastError());
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;

@@ -1,6 +1,14 @@
 #include<windows.h>
+
 #define DLL L"D:\\Mal\\Learn\\ProcessInjection\\DLL Injection\\payload2.dll"
 #define STATUS_SUCCESS ((NTSTATUS)0x00000000L)
+
+typedef struct _UNICODE_STRING
+{
+    USHORT Length;                                                          //0x0
+    USHORT MaximumLength;                                                   //0x2
+    PWSTR Buffer;                                                           //0x8
+} _UNICODE_STRING, *PUNICODE_STRING;
 
 typedef struct _OBJECT_ATTRIBUTES
 {
@@ -12,11 +20,20 @@ typedef struct _OBJECT_ATTRIBUTES
     VOID* SecurityQualityOfService;                                         //0x28
 } _OBJECT_ATTRIBUTES, *POBJECT_ATTRIBUTES;
 
+#define InitializeObjectAttributes(p, n, a, r, s) { \
+    (p)->Length = sizeof(OBJECT_ATTRIBUTES); \
+    (p)->RootDirectory = r; \
+    (p)->Attributes = a; \
+    (p)->ObjectName = n; \
+    (p)->SecurityDescriptor = s; \
+    (p)->SecurityQualityOfService = NULL; \
+    }
+
 typedef struct _CLIENT_ID
 {
     HANDLE UniqueProcess;
-    HANDLE UniqueThread;
-} CLIENT_ID, *PCLIENT_ID;
+    HANDLE UniqueThread;    
+} _CLIENT_ID, *PCLIENT_ID;
 
 typedef struct _PS_ATTRIBUTE
 {
@@ -74,6 +91,49 @@ typedef NTSTATUS(NTAPI* fn_NtCreateThreadEx)(
     _In_ SIZE_T MaximumStackSize,
     _In_opt_ PPS_ATTRIBUTE_LIST AttributeList
 );
+
+typedef NTSTATUS(NTAPI* fn_NtWaitForSingleObject)(
+    _In_ HANDLE Handle,
+    _In_ BOOLEAN Alertable,
+    _In_opt_ PLARGE_INTEGER Timeout
+);
+
+typedef NTSTATUS(NTAPI* fn_NtClose)(
+    _In_ _Post_ptr_invalid_ HANDLE Handle
+);
+
+typedef NTSTATUS(NTAPI* fn_NtFreeVirtualMemory)(
+    _In_ HANDLE ProcessHandle,
+    _Inout_ __drv_freesMem(Mem) PVOID *BaseAddress,
+    _Inout_ PSIZE_T RegionSize,
+    _In_ ULONG FreeType
+);
+
+// Get base address of ntddll.dll directly from PEB
+typedef struct _PEB_LDR_DATA{
+    BYTE Reserved1[8];
+    PVOID Reserved2[3];
+    LIST_ENTRY InMemoryOrderModuleList;
+} PEB_LDR_DATA, *PPEB_LDR_DATA;
+
+typedef struct _LDR_DATA_TABLE_ENTRY{
+    PVOID Reserved1[2];
+    LIST_ENTRY InMemoryOrderLinks;
+    PVOID Reserved2[2];
+    PVOID DllBase; // <--- this is what we need (Base Address of the module(ntdll.dll))
+    PVOID Reserved3[2];
+    PUNICODE_STRING FullDllName;
+    // ... other fields, but we don't need them for this purpose
+} LDR_DATA_TABLE_ENTRY, *PLDR_DATA_TABLE_ENTRY;
+
+typedef struct _PEB{
+    BYTE Reserved1[2];
+    BYTE BeingDebugged;
+    BYTE Reserved2[1];
+    PVOID Reserved3[2];
+    PPEB_LDR_DATA Ldr; // <--- this is what we need (Pointer to the PEB_LDR_DATA structure)
+    // ... other fields, but we don't need them for this purpose
+} PEB, *PPEB;
 
 /*!
 * @brief
