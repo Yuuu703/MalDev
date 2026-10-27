@@ -1,4 +1,4 @@
-# Malware Developments & Windows Internals
+# Malware Developments
 
 > Personal study repository documenting my progress in Windows internals, malware behavior, and malware techniques. This is a learning portfolio aimed at building the foundations needed for a malware analysis and development career.
 
