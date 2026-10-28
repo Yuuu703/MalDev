@@ -19,6 +19,8 @@ These exercises are developed and tested on Windows 11 x64, 26H2.
 | `Learn/Shellcode Injection/` | A study exercise around shellcode execution and related Windows behavior. |
 | `Learn/DLL Injection/` | DLL-related exercises, with a separate `Reflective DLL Injection/` study folder and its supporting `sRDI/` files from the sRDI project. |
 | `Learn/NTAPI Injection/` | A research on NtAPI usage in injection techniques. Exercises grouped into `partial/` and `Full NTAPI/` implementations. |
+| `Learn/Syscall/` | In progress. |
+| `Learn/Process Hollowing/` | In progress. |
 | `Final/` | Consolidated experiments and learning projects. |
 | `Detours/` | Microsoft Detours source and local build artifacts used by some experiments. |
 
