@@ -2,6 +2,7 @@
 
 #define DLL L"D:\\Mal\\Learn\\ProcessInjection\\DLL Injection\\payload2.dll"
 #define STATUS_SUCCESS ((NTSTATUS)0x00000000L)
+#define STATUS_FAILED ((NTSTATUS)0xC0000001L)
 
 typedef struct _UNICODE_STRING
 {
@@ -78,6 +79,13 @@ typedef NTSTATUS(NTAPI* fn_NtWriteVirtualMemory)(
     _Out_opt_ PSIZE_T NumberOfBytesWritten
 );
 
+typedef NTSTATUS(NTAPI* fn_LdrLoadDll)(
+    _In_opt_ PCWSTR DllPath,
+    _In_opt_ PULONG DllCharacteristics,
+    PUNICODE_STRING DllName,
+    _Out_ PVOID *DllHandle
+);
+
 typedef NTSTATUS(NTAPI* fn_NtCreateThreadEx)(
     _Out_ PHANDLE ThreadHandle,
     _In_ ACCESS_MASK DesiredAccess,
@@ -135,17 +143,45 @@ typedef struct _PEB{
     // ... other fields, but we don't need them for this purpose
 } PEB, *PPEB;
 
+typedef struct _SYSTEM_PROCESS_INFORMATION {
+    ULONG NextEntryOffset;      // Offset to the next process information structure in the buffer. If this is 0, it indicates that this is the last entry.
+    ULONG NumberOfThreads;
+    BYTE Reserved1[48];         // Contains fields like WorkingSetPrivateSize, CycleTime, CreateTime, UserTime, KernelTime...
+    _UNICODE_STRING ImageName;   // Name of the process (NOT including .exe)
+    ULONG BasePriority;
+    ULONG Reserved2;
+    HANDLE UniqueProcessId;     // <--- This is the PID we need
+} SYSTEM_PROCESS_INFORMATION, *PSYSTEM_PROCESS_INFORMATION;
+
+typedef NTSTATUS (NTAPI *fn_NtQuerySystemInformation)(
+    IN ULONG SystemInformationClass,
+    IN OUT PVOID SystemInformation,
+    IN ULONG SystemInformationLength,
+    OUT PULONG ReturnLength OPTIONAL
+);
 /*!
-* @brief
-* A wrapper function for GetModuleHandleW()
-*
-* @param lpMoudleName 
-* The name of the module to retrieve a handle for
-*
-* @return
-* A handle to the specified module, or NULL if the function fails
-*/
-HMODULE GetModule(LPCWSTR lpModuleName);
+ * @brief
+ *  Retrieves the base address of the ntdll.dll module.
+ *
+ * @param hModule
+ *  Module name from which to retrieve the address
+ * 
+ * @param dwTargetHash
+ * The hash of the target function name
+ * 
+ * @return
+ *  The base address of the module.
+ */
+PVOID GetProcAddressByHash(HMODULE hModule, DWORD dwTargetHash);
+
+/*!
+ * @brief
+ *  Retrieves the base address of the ntdll.dll module.
+ *
+ * @return
+ *  The base address of the ntdll.dll.
+ */
+PVOID GetNtDllBaseAddress(void);
 
 /*!
  * @brief
