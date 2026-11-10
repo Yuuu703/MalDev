@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MD-MZ Modern Malware &amp; Persistence Codex Overview</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="space-y-6">
+        <div id="mdmz-overview" class="p-4 sm:p-6 rounded-2xl bg-[#0c1022] border border-[#212b54] text-white space-y-3 shadow-2xl scroll-mt-24">
+            <div class="flex items-center gap-2 text-[var(--accent)] font-bold text-xs sm:text-sm uppercase tracking-wider">
+                <i data-lucide="book-open-check" class="w-5 h-5"></i>
+                <h2 id="mdmz-title-heading" class="text-xs sm:text-sm font-bold text-[var(--accent)] inline">Modern Malware Development &amp; Persistence Codex (MD-MZ 2nd Edition Digest)</h2>
+            </div>
+            <p class="text-xs sm:text-sm text-[#e2e8f0] leading-relaxed">
+                Comprehensive practical handbook compiled from <strong>MD-MZ (Malware Development Tricks, Cryptography &amp; Linux Malware) 2nd Edition (November 2024)</strong> by Zhassulan Zhussupov (@cocomelonc).
+            </p>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 pt-2">
+                <div class="p-3 rounded-xl bg-[#070b1c] border border-[#212b54]">
+                    <div class="text-[10px] text-[#cbd5e1] uppercase font-bold">Research Notes</div>
+                    <div class="text-sm sm:text-base font-bold text-[var(--accent)]">57 Topics</div>
+                </div>
+                <div class="p-3 rounded-xl bg-[#070b1c] border border-[#212b54]">
+                    <div class="text-[10px] text-[#cbd5e1] uppercase font-bold">Persistence Techniques</div>
+                    <div class="text-sm sm:text-base font-bold text-[#43d17a]">27 Methods</div>
+                </div>
+                <div class="p-3 rounded-xl bg-[#070b1c] border border-[#212b54]">
+                    <div class="text-[10px] text-[#cbd5e1] uppercase font-bold">Native API &amp; Injection</div>
+                    <div class="text-sm sm:text-base font-bold text-[var(--accent2)]">12 Implementations</div>
+                </div>
+                <div class="p-3 rounded-xl bg-[#070b1c] border border-[#212b54]">
+                    <div class="text-[10px] text-[#cbd5e1] uppercase font-bold">Ciphers &amp; Linux</div>
+                    <div class="text-sm sm:text-base font-bold text-[#ff9ed6]">Crypto + Kernel</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="mdmz-volumes" class="space-y-4 scroll-mt-24">
+            <h2 id="mdmz-volumes-heading" class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                <i data-lucide="layers" class="w-5 h-5 text-[var(--accent)]"></i>
+                <span>Volumes &amp; Knowledge Pillars</span>
+            </h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
+                <div class="p-3 rounded-xl bg-[#0d132b] border border-[#212b54] space-y-1">
+                    <div class="text-[var(--accent)] font-bold">Volume 1: Foundations &amp; Shellcoding</div>
+                    <div class="text-[#cbd5e1]">Reverse Shells, PEB parsing in ASM, Finding kernel32.dll base, Windows &amp; Linux shellcoding.</div>
+                </div>
+                <div class="p-3 rounded-xl bg-[#0d132b] border border-[#212b54] space-y-1">
+                    <div class="text-[#43d17a] font-bold">Volume 2: Process &amp; Native API Injection</div>
+                    <div class="text-[#cbd5e1]">NtCreateThreadEx, NtAllocateVirtualMemory, ZwQueueApcThread, Memory Sections &amp; RWX hunting.</div>
+                </div>
+                <div class="p-3 rounded-xl bg-[#0d132b] border border-[#212b54] space-y-1">
+                    <div class="text-[#ffd79a] font-bold">Volume 3: C2 &amp; Exfiltration</div>
+                    <div class="text-[#cbd5e1]">Telegram Bot C2, VirusTotal API, Discord Bot Command &amp; Control, Alternate Data Streams (ADS).</div>
+                </div>
+                <div class="p-3 rounded-xl bg-[#0d132b] border border-[#212b54] space-y-1">
+                    <div class="text-[#ff9ed6] font-bold">Volume 4: AV/VM Evasion &amp; Encoding</div>
+                    <div class="text-[#cbd5e1]">Z85 algorithm encoding, Base64 encryption, API Hammering, Sandbox checks &amp; Registry heuristics.</div>
+                </div>
+                <div class="p-3 rounded-xl bg-[#0d132b] border border-[#212b54] sm:col-span-2 space-y-1">
+                    <div class="text-[var(--accent2)] font-bold">Volume 5: Complete Persistence Encyclopedia (27 Practical Methods)</div>
+                    <div class="text-[#cbd5e1]">Registry Run Keys, Screensaver Hijacking, COM DLL Hijack, Windows Services, Netsh Helpers, Winlogon, Port Monitors, IFEO, PowerShell Profiles, Event Viewer, Disk Cleanup, StartupApproved, Symlinks.</div>
+                </div>
+                <div class="p-3 rounded-xl bg-[#0d132b] border border-[#212b54] space-y-1">
+                    <div class="text-[#c9b6ff] font-bold">Volume 6: Cryptographic Ciphers</div>
+                    <div class="text-[#cbd5e1]">LOKI, Khufu, CAST-128, FEAL-8, Lucifer &amp; DFC custom cipher implementations in C.</div>
+                </div>
+                <div class="p-3 rounded-xl bg-[#0d132b] border border-[#212b54] space-y-1">
+                    <div class="text-[#9ff0d0] font-bold">Volume 7: Linux Malware Engineering</div>
+                    <div class="text-[#cbd5e1]">Linux Kernel Hacking Intro, Find PID by Name in /proc, Linux Process Injection with ptrace.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </main></body></html>

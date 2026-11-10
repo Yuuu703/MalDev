@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Syscalls - Hell&#39;s Gate</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+        <div id="syscalls-hell-s-gate" class="scroll-mt-24 pt-6 sm:pt-8 pb-3 border-b border-[#212b54] mt-8 sm:mt-12 mb-4 sm:mb-6 flex items-center justify-between group">
+            <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5 sm:gap-3">
+                <i data-lucide="terminal" class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent2)] flex-shrink-0"></i>
+                <span>Syscalls - Hell's Gate</span>
+            </h2>
+            <a href="#syscalls-hell-s-gate" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition" class="opacity-0 group-hover:opacity-100 text-[#cbd5e1] hover:text-[var(--accent)] text-xs flex items-center gap-1 font-mono transition p-1.5 rounded hover:bg-[var(--accent-soft)]" title="Copy link">
+                <i data-lucide="link" class="w-4 h-4"></i>
+            </a>
+        </div><h3 id="introduction" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Introduction</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Recall that using direct syscalls is a way to circumvent userland hooks by manually executing the assembly instructions of a syscall. Hell&#x27;s Gate is another technique used to perform direct syscalls. By reading through <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ntdll.dll</code>, Hell&#x27;s Gate can dynamically find syscalls and then execute them from the binary.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The Hell&#x27;s Gate paper is available <a href="https://vxug.fakedoma.in/papers/VXUG/Exclusive/HellsGate.pdf" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">here</a>.</p><h3 id="how-hell-s-gate-works" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>How Hell's Gate Works</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Previous modules demonstrated direct syscalls using SysWhispers. The SSN was either hard coded or found using the sorting by system call address method to determine the SSN at runtime. Hell&#x27;s Gate, on the other hand, uses a different approach to finding the SSN.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Hell&#x27;s Gate&#x27;s approach works by searching for the SSN from within the hooked syscall&#x27;s opcodes which are then called in its assembly functions.</p><h3 id="hell-s-gate-breakdown" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Hell's Gate Breakdown</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The complexity of the code requires the explanation to be broken into smaller subsections for easier understanding.</p><h3 id="syscall-structure" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Syscall Structure</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Hell&#x27;s Gate code starts by defining the <a href="https://github.com/am0nsec/HellsGate/blob/master/HellsGate/main.c#L8" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">VX_TABLE_ENTRY</a> structure. This structure represents a syscall and contains the address, the hash value of the syscall name and the SSN. The structure is shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">ASM / x64</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-nasm">typedef struct _VX_TABLE_ENTRY {
+	PVOID   pAddress;             // The address of a syscall function
+	DWORD64 dwHash;               // The hash value of the syscall name
+	WORD    wSystemCall;          // The SSN of the syscall
+} VX_TABLE_ENTRY, * PVX_TABLE_ENTRY;</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">For example, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtAllocateVirtualMemory</code> would be represented as <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">VX_TABLE_ENTRY NtAllocateVirtualMemory</code>.</p><h3 id="syscalls-table" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Syscalls Table</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The syscalls that are being used are kept inside another structure, <a href="https://github.com/am0nsec/HellsGate/blob/master/HellsGate/main.c#L14" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">VX_TABLE</a>. Since each member within <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">VX_TABLE</code> is a syscall, then each member will be of type <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">VX_TABLE_ENTRY</code>.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef struct _VX_TABLE {
+	VX_TABLE_ENTRY NtAllocateVirtualMemory;
+	VX_TABLE_ENTRY NtProtectVirtualMemory;
+	VX_TABLE_ENTRY NtCreateThreadEx;
+	VX_TABLE_ENTRY NtWaitForSingleObject;
+} VX_TABLE, * PVX_TABLE;</code></pre>
+        </div><h3 id="main-function" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Main Function</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The main function starts by calling the <a href="https://github.com/am0nsec/HellsGate/blob/master/HellsGate/main.c#L50" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">RtlGetThreadEnvironmentBlock</a> function that is used to get the TEB. This is required to retrieve <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ntdll.dll</code>&#x27;s base address via the PEB (recall the PEB is located within the TEB). Next, the export directory of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ntdll.dll</code> is fetched using <a href="https://github.com/am0nsec/HellsGate/blob/master/HellsGate/main.c#L60" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">GetImageExportDirectory</a>. The export directory is found by parsing the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">DOS</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Nt</code> headers, as demonstrated in previous modules.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Next, for each syscall the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">dwHash</code> member is initialized (e.g. <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtAllocateVirtualMemory.dwHash</code>) with its corresponding hash value. With each initialization, the <a href="https://github.com/am0nsec/HellsGate/blob/master/HellsGate/main.c#L65" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">GetVxTableEntry</a> function is called, which is shown below. The function has been split into several parts to simplify the explanation process.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>GetVxTableEntry - Part 1</strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL GetVxTableEntry(PVOID pModuleBase, PIMAGE_EXPORT_DIRECTORY pImageExportDirectory, PVX_TABLE_ENTRY pVxTableEntry) {
+	PDWORD pdwAddressOfFunctions    = (PDWORD)((PBYTE)pModuleBase + pImageExportDirectory-&gt;AddressOfFunctions);
+	PDWORD pdwAddressOfNames        = (PDWORD)((PBYTE)pModuleBase + pImageExportDirectory-&gt;AddressOfNames);
+	PWORD pwAddressOfNameOrdinales  = (PWORD)((PBYTE)pModuleBase + pImageExportDirectory-&gt;AddressOfNameOrdinals);
+
+	for (WORD cx = 0; cx &lt; pImageExportDirectory-&gt;NumberOfNames; cx++) {
+		PCHAR pczFunctionName  = (PCHAR)((PBYTE)pModuleBase + pdwAddressOfNames[cx]);
+		PVOID pFunctionAddress = (PBYTE)pModuleBase + pdwAddressOfFunctions[pwAddressOfNameOrdinales[cx]];
+
+		if (djb2(pczFunctionName) == pVxTableEntry-&gt;dwHash) {
+			pVxTableEntry-&gt;pAddress = pFunctionAddress;
+
+			// ...
+		}
+	}
+
+	return TRUE;
+}</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Part one of the function searches for a Djb2 hash value equal to the syscall&#x27;s hash, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">pVxTableEntry-&gt;dwHash</code>. Once there is a match then the address of the syscall will be saved to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">pVxTableEntry-&gt;pAddress</code>. The second part of the function is where the Hell&#x27;s Gate trick resides.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>GetVxTableEntry - Part 2</strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">ASM / x64</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-nasm">// Quick and dirty fix in case the function has been hooked
+			WORD cw = 0;
+			while (TRUE) {
+				// check if syscall, in this case we are too far
+				if (*((PBYTE)pFunctionAddress + cw) == 0x0f &amp;&amp; *((PBYTE)pFunctionAddress + cw + 1) == 0x05)
+					return FALSE;
+
+				// check if ret, in this case we are also probably too far
+				if (*((PBYTE)pFunctionAddress + cw) == 0xc3)
+					return FALSE;
+
+				// First opcodes should be :
+				//    MOV R10, RCX
+				//    MOV RCX, &lt;syscall&gt;
+				if (*((PBYTE)pFunctionAddress + cw) == 0x4c
+					&amp;&amp; *((PBYTE)pFunctionAddress + 1 + cw) == 0x8b
+					&amp;&amp; *((PBYTE)pFunctionAddress + 2 + cw) == 0xd1
+					&amp;&amp; *((PBYTE)pFunctionAddress + 3 + cw) == 0xb8
+					&amp;&amp; *((PBYTE)pFunctionAddress + 6 + cw) == 0x00
+					&amp;&amp; *((PBYTE)pFunctionAddress + 7 + cw) == 0x00) {
+					BYTE high = *((PBYTE)pFunctionAddress + 5 + cw);
+					BYTE low = *((PBYTE)pFunctionAddress + 4 + cw);
+					pVxTableEntry-&gt;wSystemCall = (high &lt;&lt; 8) | low;
+					break;
+				}
+
+				cw++;
+			};</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The second part begins with a while loop after finding the syscall address, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">pFunctionAddress</code>. The while loop searches for the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">0x4c, 0x8b, 0xd1, 0xb8</code> bytes which are opcodes for the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">mov r10, rcx</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">mov rcx, ssn</code>, being the start of an unhooked syscall.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In the case where the syscall is hooked, the opcodes may not match due to the hook being added by security solutions prior to the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">syscall</code> instruction. To address this, Hell&#x27;s Gate attempts to match the opcodes, and if no match is found, the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">cw</code> variable is incremented, which adds to the address of the syscall on the subsequent loop iteration. This progression continues, moving down one byte at a time until the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">mov r10, rcx</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">mov rcx, ssn</code> instructions are reached. The image below illustrates how Hell&#x27;s Gate finds the opcodes by traversing over the hook.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/hellsgate-114089998-966e34f8-c59b-4b3a-8c84-8d6014001a19.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="boundary-check" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Boundary Check</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">To prevent itself from searching too far and obtaining a different SSN for a different syscall, two if-statements are made at the beginning of the while loop to check for the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">syscall</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ret</code> instructions located at the end of the syscall. If the search reaches one of these instructions and the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">0x4c, 0x8b, 0xd1, 0xb8</code> opcodes have not been identified, resolving the SSN will fail.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">ASM / x64</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-nasm">// check if syscall, in this case we are too far
+if (*((PBYTE)pFunctionAddress + cw) == 0x0f &amp;&amp; *((PBYTE)pFunctionAddress + cw + 1) == 0x05)
+	return FALSE;
+
+// check if ret, in this case we are also probably too far
+if (*((PBYTE)pFunctionAddress + cw) == 0xc3)
+	return FALSE;</code></pre>
+        </div><h3 id="calculating-saving-the-ssn" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Calculating & Saving The SSN</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">On the other hand, if there is a successful match for the opcodes, Hell&#x27;s Gate will calculate the syscall number and save it to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">pVxTableEntry-&gt;wSystemCall</code>. It is not necessary to understand the calculation, which requires knowledge of bitwise operators, however, those comfortable with the concept can continue reading this section.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The function first uses the left shift operator (<code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">&lt;&lt;</code>) to shift the bits of the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">high</code> variable to the left by 8 times. It then uses the bitwise OR operator (<code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">|</code>) to compare each bit of the first operand (being <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">high &lt;&lt; 8</code>) to the corresponding bit of the second operand (being <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">low</code>).</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">pVxTableEntry-&gt;wSystemCall = (high &lt;&lt; 8) | low;</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">To better understand this, the following is an example using <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtProtectVirtualMemory</code> syscall to demonstrate the Hell&#x27;s Gate approach in calculating the SSN.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/hellsgate-214097117-16ca9e20-17b3-427c-b0b0-b0e7ec78191c.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The image above is simplified to the snippet below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">ASM / x64</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-nasm">00007FFCC42C4570 | 4C:8BD1                          | mov r10,rcx                                    |
+00007FFCC42C4573 | B8 50000000                      | mov eax,50                                     | 50:&#x27;P&#x27;
+00007FFCC42C4582 | 0F05                             | syscall                                        |
+00007FFCC42C4584 | C3                               | ret                                            |</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">C4C:8BD1 B8 50000000</code> bytes correspond to the following offsets:</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">4C</code> is offset 0, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">8B</code> is offset 1 and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">D1</code> is offset 2, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">B8</code> is offset 3, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">50</code> is offset 4, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">00</code> is offset 5 and so on. The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetVxTableEntry</code> function specifies that the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">high</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">low</code> variables have an offset of 5 and 4, respectively.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BYTE high = *((PBYTE)pFunctionAddress + 5 + cw); // Offset 5
+BYTE low = *((PBYTE)pFunctionAddress + 4 + cw); // Offset 4</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Checking the value at offset 5 reveals that it is <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">0x00</code>, while the offset at 4 is <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">0x50</code>. This means that the value of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">high</code> is <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">0x00</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">low</code> is <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">0x50</code>. Therefore, the SSN is equal to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">(0x00 &lt;&lt; 8) | 0x50</code>.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/hellsgate-314099314-0029aee9-f8c2-4436-a740-4c2964a952be.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The result of the bitwise operation matches the SSN number of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtProtectVirtualMemory</code>, which is 50 in hex.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/hellsgate-414099901-48434135-7e83-4cd5-aea6-94d1ef75f652.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="calling-the-syscall" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Calling The Syscall</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Now that Hell&#x27;s Gate has fully initialized the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">VX_TABLE_ENTRY</code> structure of the target syscall, it can now call it. To do this, Hell&#x27;s Gate uses two 64-bit assembly functions: <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">HellsGate</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">HellDescent</code>, shown in the <a href="https://github.com/am0nsec/HellsGate/blob/master/HellsGate/hellsgate.asm" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">hellsgate.asm</a> file.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">ASM / x64</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-nasm">data
+	wSystemCall DWORD 000h              ; this is a global variable used to keep the SSN of a syscall
+
+.code
+	HellsGate PROC
+		mov wSystemCall, 000h
+		mov wSystemCall, ecx            ; updating the &#x27;wSystemCall&#x27; variable with input argument (ecx register&#x27;s value)
+		ret
+	HellsGate ENDP
+
+	HellDescent PROC
+		mov r10, rcx
+		mov eax, wSystemCall            ; `wSystemCall` is the SSN of the syscall to call
+		syscall
+		ret
+	HellDescent ENDP
+end</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">To call a syscall, first, the syscall number needs to be passed to the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">HellsGate</code> function. This saves it to the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">wSystemCall</code> global variable for future use. Next, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">HellDescent</code> is used to call the syscall by passing the syscall&#x27;s parameters. This is demonstrated in the <a href="https://github.com/am0nsec/HellsGate/blob/master/HellsGate/main.c#L166" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">Payload</a> function.</p><h3 id="conclusion" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Conclusion</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">It&#x27;s been shown that bypassing userland hooks is possible through the use of direct syscalls, the SysWhispers tool and Hell&#x27;s Gate technique. In upcoming modules, the process injection techniques previously implemented will be modified to utilize syscalls instead of WinAPIs.</p></main></body></html>

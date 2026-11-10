@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Process Enumeration - NtQuerySystemInformation</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+        <div id="process-enumeration-ntquerysysteminformation" class="scroll-mt-24 pt-6 sm:pt-8 pb-3 border-b border-[#212b54] mt-8 sm:mt-12 mb-4 sm:mb-6 flex items-center justify-between group">
+            <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5 sm:gap-3">
+                <i data-lucide="cpu" class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent2)] flex-shrink-0"></i>
+                <span>Process Enumeration - NtQuerySystemInformation</span>
+            </h2>
+            <a href="#process-enumeration-ntquerysysteminformation" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition" class="opacity-0 group-hover:opacity-100 text-[#cbd5e1] hover:text-[var(--accent)] text-xs flex items-center gap-1 font-mono transition p-1.5 rounded hover:bg-[var(--accent-soft)]" title="Copy link">
+                <i data-lucide="link" class="w-4 h-4"></i>
+            </a>
+        </div><h3 id="introduction" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Introduction</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This module discusses a more unique way of performing process enumeration using <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtQuerySystemInformation</code>, which is a <strong>syscall</strong> (more on syscalls later). <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtQuerySystemInformation</code> is exported from the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ntdll.dll</code> module and therefore it will require the use of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetModuleHandle</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetProcAddress</code>.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><a href="https://learn.microsoft.com/en-us/windows/win32/api/winternl/nf-winternl-ntquerysysteminformation" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">Microsoft&#x27;s documentation</a> on <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtQuerySystemInformation</code> shows that it is capable of returning a lot of information about the system. The focus of this module will be on using it to perform process enumeration.</p><h3 id="retrieve-ntquerysysteminformation-s-address" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Retrieve NtQuerySystemInformation's Address</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As previously mentioned, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetProcAddress</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetModuleHandle</code> are needed to retrieve <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtQuerySystemInformation</code>&#x27;s address from <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ntdll.dll</code>.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">// Function pointer
+typedef NTSTATUS (NTAPI* fnNtQuerySystemInformation)(
+	SYSTEM_INFORMATION_CLASS SystemInformationClass,
+	PVOID                    SystemInformation,
+	ULONG                    SystemInformationLength,
+	PULONG                   ReturnLength
+);
+
+fnNtQuerySystemInformation pNtQuerySystemInformation = NULL;
+
+// Getting NtQuerySystemInformation&#x27;s address
+pNtQuerySystemInformation = (fnNtQuerySystemInformation)GetProcAddress(GetModuleHandle(L&quot;NTDLL.DLL&quot;), &quot;NtQuerySystemInformation&quot;);
+if (pNtQuerySystemInformation == NULL) {
+	printf(&quot;[!] GetProcAddress Failed With Error : %d\n&quot;, GetLastError());
+	return FALSE;
+}</code></pre>
+        </div><h3 id="ntquerysysteminformation-parameters" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>NtQuerySystemInformation Parameters</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtQuerySystemInformation</code>&#x27;s parameters are shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">__kernel_entry NTSTATUS NtQuerySystemInformation(
+  [in]            SYSTEM_INFORMATION_CLASS SystemInformationClass,
+  [in, out]       PVOID                    SystemInformation,
+  [in]            ULONG                    SystemInformationLength,
+  [out, optional] PULONG                   ReturnLength
+);</code></pre>
+        </div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SystemInformationClass</code> - Decides what type of system information the function returns.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SystemInformation</code> - A pointer to a buffer that will receive the requested information. The returned information will be in a form of a structure of type specified according to the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SystemInformationClass</code> parameter.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SystemInformationLength</code> - The size of the buffer pointed to by the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SystemInformation</code> parameter, in bytes.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ReturnLength</code> - A pointer to a ULONG variable that will receive the actual size of the information written to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SystemInformation</code>.</span></div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Since the objective is process enumeration, the <a href="https://learn.microsoft.com/en-us/windows/win32/api/winternl/nf-winternl-ntquerysysteminformation#systemprocessinformation" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">SystemProcessInformation</a> flag will be used. Using this flag will make the function return an array of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SYSTEM_PROCESS_INFORMATION</code> structures (via the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SystemInformation</code> parameter), one for each process running in the system.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/nt-108508463-27e8a0b8-4d4e-4391-bf1d-8d75ad2567d3.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="system-process-information-structure" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>SYSTEM_PROCESS_INFORMATION Structure</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The next step is to review <a href="https://learn.microsoft.com/en-us/windows/win32/api/winternl/nf-winternl-ntquerysysteminformation#system_process_information" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">Microsoft&#x27;s documentation</a> to understand what the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SYSTEM_PROCESS_INFORMATION</code> structure looks like.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef struct _SYSTEM_PROCESS_INFORMATION {
+    ULONG NextEntryOffset;
+    ULONG NumberOfThreads;
+    BYTE Reserved1[48];
+    UNICODE_STRING ImageName;
+    KPRIORITY BasePriority;
+    HANDLE UniqueProcessId;
+    PVOID Reserved2;
+    ULONG HandleCount;
+    ULONG SessionId;
+    PVOID Reserved3;
+    SIZE_T PeakVirtualSize;
+    SIZE_T VirtualSize;
+    ULONG Reserved4;
+    SIZE_T PeakWorkingSetSize;
+    SIZE_T WorkingSetSize;
+    PVOID Reserved5;
+    SIZE_T QuotaPagedPoolUsage;
+    PVOID Reserved6;
+    SIZE_T QuotaNonPagedPoolUsage;
+    SIZE_T PagefileUsage;
+    SIZE_T PeakPagefileUsage;
+    SIZE_T PrivatePageCount;
+    LARGE_INTEGER Reserved7[6];
+} SYSTEM_PROCESS_INFORMATION;</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The focus will be on <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">UNICODE_STRING ImageName</code> which contains the process name and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">UniqueProcessId</code> which is the process ID. Additionally, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NextEntryOffset</code> will be used to move into the next element in the returned array.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Since calling <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtQuerySystemInformation</code> with the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SystemProcessInformation</code> flag will return an array of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SYSTEM_PROCESS_INFORMATION</code> of unknown size, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtQuerySystemInformation</code> will need to be called twice. The first call will retrieve the array size, which is used to allocate a buffer, and then the second call will use the allocated buffer.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">It&#x27;s expected that the first <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtQuerySystemInformation</code> call will fail with a <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">STATUS_INFO_LENGTH_MISMATCH</code> (<a href="https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/596a1078-e883-4972-9bbc-49e60bebca55" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">0xC0000004</a>) error since invalid parameters are being passed simply to retrieve the array size.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">ULONG                        uReturnLen1    = NULL,
+                             uReturnLen2    = NULL;
+PSYSTEM_PROCESS_INFORMATION  SystemProcInfo = NULL;
+NTSTATUS                     STATUS         = NULL;
+
+// First NtQuerySystemInformation call
+// This will fail with STATUS_INFO_LENGTH_MISMATCH
+// But it will provide information about how much memory to allocate (uReturnLen1)
+pNtQuerySystemInformation(SystemProcessInformation, NULL, NULL, &amp;uReturnLen1);
+
+// Allocating enough buffer for the returned array of `SYSTEM_PROCESS_INFORMATION` struct
+SystemProcInfo = (PSYSTEM_PROCESS_INFORMATION) HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (SIZE_T)uReturnLen1);
+if (SystemProcInfo == NULL) {
+	printf(&quot;[!] HeapAlloc Failed With Error : %d\n&quot;, GetLastError());
+	return FALSE;
+}
+
+// Second NtQuerySystemInformation call
+// Calling NtQuerySystemInformation with the correct arguments, the output will be saved to &#x27;SystemProcInfo&#x27;
+STATUS = pNtQuerySystemInformation(SystemProcessInformation, SystemProcInfo, uReturnLen1, &amp;uReturnLen2);
+if (STATUS != 0x0) {
+	printf(&quot;[!] NtQuerySystemInformation Failed With Error : 0x%0.8X \n&quot;, STATUS);
+	return FALSE;
+}</code></pre>
+        </div><h3 id="iterating-through-processes" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Iterating Through Processes</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Now that the array has been successfully retrieved, the next step is to loop through it and access <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ImageName.Buffer</code>, which holds the process name. Every iteration will compare the process name to the target process name.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">To access each element of type <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SYSTEM_PROCESS_INFORMATION</code> in the array, the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NextEntryOffset</code> member must be used. To find the address of the next element, add the address of the previous element to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NextEntryOffset</code>. This is demonstrated in the snippet below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">// &#x27;SystemProcInfo&#x27; will now represent a new element in the array
+SystemProcInfo = (PSYSTEM_PROCESS_INFORMATION)((ULONG_PTR)SystemProcInfo + SystemProcInfo-&gt;NextEntryOffset);</code></pre>
+        </div><h3 id="freeing-allocated-memory" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Freeing allocated Memory</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Before moving <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SystemProcInfo</code> to the new element in the array, the initial address of the allocated memory needs to be saved in order to be freed later. Therefore, right before the loop begins, the address needs to be saved to a temporary variable.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">// Since we will modify &#x27;SystemProcInfo&#x27;, we will save its initial value before the while loop to free it later
+pValueToFree = SystemProcInfo;</code></pre>
+        </div><h3 id="ntquerysysteminformation-process-enumeration" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>NtQuerySystemInformation Process Enumeration</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The complete code to perform process enumeration using <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtQuerySystemInformation</code> is shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL GetRemoteProcessHandle(LPCWSTR szProcName, DWORD* pdwPid, HANDLE* phProcess) {
+
+	fnNtQuerySystemInformation   pNtQuerySystemInformation = NULL;
+	ULONG                        uReturnLen1               = NULL,
+                                 uReturnLen2               = NULL;
+    PSYSTEM_PROCESS_INFORMATION  SystemProcInfo            = NULL;
+    NTSTATUS                     STATUS                    = NULL;
+	PVOID                        pValueToFree              = NULL;
+
+	pNtQuerySystemInformation = (fnNtQuerySystemInformation)GetProcAddress(GetModuleHandle(L&quot;NTDLL.DLL&quot;), &quot;NtQuerySystemInformation&quot;);
+	if (pNtQuerySystemInformation == NULL) {
+		printf(&quot;[!] GetProcAddress Failed With Error : %d\n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	pNtQuerySystemInformation(SystemProcessInformation, NULL, NULL, &amp;uReturnLen1);
+
+	SystemProcInfo = (PSYSTEM_PROCESS_INFORMATION)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (SIZE_T)uReturnLen1);
+	if (SystemProcInfo == NULL) {
+		printf(&quot;[!] HeapAlloc Failed With Error : %d\n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	// Since we will modify &#x27;SystemProcInfo&#x27;, we will save its initial value before the while loop to free it later
+	pValueToFree = SystemProcInfo;
+
+	STATUS = pNtQuerySystemInformation(SystemProcessInformation, SystemProcInfo, uReturnLen1, &amp;uReturnLen2);
+	if (STATUS != 0x0) {
+		printf(&quot;[!] NtQuerySystemInformation Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	while (TRUE) {
+
+		// Check the process&#x27;s name size
+		// Comparing the enumerated process name to the intended target process
+		if (SystemProcInfo-&gt;ImageName.Length &amp;&amp; wcscmp(SystemProcInfo-&gt;ImageName.Buffer, szProcName) == 0) {
+
+			// Opening a handle to the target process, saving it, and then breaking
+			*pdwPid		= (DWORD)SystemProcInfo-&gt;UniqueProcessId;
+			*phProcess	= OpenProcess(PROCESS_ALL_ACCESS, FALSE, (DWORD)SystemProcInfo-&gt;UniqueProcessId);
+			break;
+		}
+
+		// If NextEntryOffset is 0, we reached the end of the array
+		if (!SystemProcInfo-&gt;NextEntryOffset)
+			break;
+
+		// Move to the next element in the array
+		SystemProcInfo = (PSYSTEM_PROCESS_INFORMATION)((ULONG_PTR)SystemProcInfo + SystemProcInfo-&gt;NextEntryOffset);
+	}
+
+	// Free using the initial address
+	HeapFree(GetProcessHeap(), 0, pValueToFree);
+
+	// Check if we successfully got the target process handle
+	if (*pdwPid == NULL || *phProcess == NULL)
+		return FALSE;
+	else
+		return TRUE;
+}</code></pre>
+        </div><h3 id="undocumented-part-of-ntquerysysteminformation" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Undocumented Part of NtQuerySystemInformation</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtQuerySystemInformation</code> remains largely undocumented and a large portion of it is still unknown. For example, notice the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Reserved</code> members in <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SYSTEM_PROCESS_INFORMATION</code>.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/nt-208666134-5c070d23-50f4-4e1d-978f-11122892a9c3.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The code provided in this module uses a different version of the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SYSTEM_PROCESS_INFORMATION</code> structure. Regardless, both Microsoft&#x27;s version and the version used in the module&#x27;s code lead to the same output. The main difference is the structure that&#x27;s used in this module contains more information rather than Microsoft&#x27;s limited version which contains several <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Reserved</code> members. Furthermore, another version of the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SYSTEM_INFORMATION_CLASS</code> structure was used which is also more documented than Microsoft&#x27;s version. Both structures can be viewed via the links below.</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SYSTEM_PROCESS_INFORMATION</code> from <a href="https://doxygen.reactos.org/da/df4/struct__SYSTEM__PROCESS__INFORMATION.html" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">ReactOS Documentation</a></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SYSTEM_INFORMATION_CLASS</code> from <a href="https://github.com/winsiderss/systeminformer/blob/master/phnt/include/ntexapi.h#L1345" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">System Informer Documentation</a></span></div><h3 id="demo" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Demo</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The image below shows the output after compiling and running the code presented in this module. The target process is <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Notepad.exe</code>.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/nt-308665154-9c8bdf73-bfb4-40b5-a39f-3b6ee2044076.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div></main></body></html>

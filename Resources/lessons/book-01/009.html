@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Portable Executable Format</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+        <div id="portable-executable-format" class="scroll-mt-24 pt-6 sm:pt-8 pb-3 border-b border-[#212b54] mt-8 sm:mt-12 mb-4 sm:mb-6 flex items-center justify-between group">
+            <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5 sm:gap-3">
+                <i data-lucide="sparkles" class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent)] flex-shrink-0"></i>
+                <span>Portable Executable Format</span>
+            </h2>
+            <a href="#portable-executable-format" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition" class="opacity-0 group-hover:opacity-100 text-[#cbd5e1] hover:text-[var(--accent)] text-xs flex items-center gap-1 font-mono transition p-1.5 rounded hover:bg-[var(--accent-soft)]" title="Copy link">
+                <i data-lucide="link" class="w-4 h-4"></i>
+            </a>
+        </div><h3 id="introduction" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Introduction</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Portable Executable (PE) is the file format for executables on Windows. A few examples of PE file extensions are <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">.exe</code>, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">.dll</code>, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">.sys</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">.scr</code>. This module discusses the PE structure which is important to know when building or reverse engineering malware.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Note that this module and future modules will often interchangeably refer to executables (e.g. EXEs, DLLs) as &quot;Images&quot;.</p><h3 id="pe-structure" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>PE Structure</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The diagram below shows a simplified structure of a Portable Executable. Every header shown in the image is defined as a data structure that holds information about the PE file. Each data structure will be explained in detail in this module.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/pe-structure.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="dos-header-image-dos-header" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>DOS Header (IMAGE_DOS_HEADER)</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This first header of a PE file is always prefixed with two bytes, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">0x4D</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">0x5A</code>, commonly referred to as <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">MZ</code>. These bytes represent the DOS header signature, which is used to confirm that the file being parsed or inspected is a valid PE file. The DOS header is a data structure, defined as follows:</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef struct _IMAGE_DOS_HEADER {      // DOS .EXE header
+    WORD   e_magic;                     // Magic number
+    WORD   e_cblp;                      // Bytes on last page of file
+    WORD   e_cp;                        // Pages in file
+    WORD   e_crlc;                      // Relocations
+    WORD   e_cparhdr;                   // Size of header in paragraphs
+    WORD   e_minalloc;                  // Minimum extra paragraphs needed
+    WORD   e_maxalloc;                  // Maximum extra paragraphs needed
+    WORD   e_ss;                        // Initial (relative) SS value
+    WORD   e_sp;                        // Initial SP value
+    WORD   e_csum;                      // Checksum
+    WORD   e_ip;                        // Initial IP value
+    WORD   e_cs;                        // Initial (relative) CS value
+    WORD   e_lfarlc;                    // File address of relocation table
+    WORD   e_ovno;                      // Overlay number
+    WORD   e_res[4];                    // Reserved words
+    WORD   e_oemid;                     // OEM identifier (for e_oeminfo)
+    WORD   e_oeminfo;                   // OEM information; e_oemid specific
+    WORD   e_res2[10];                  // Reserved words
+    LONG   e_lfanew;                    // Offset to the NT header
+  } IMAGE_DOS_HEADER, *PIMAGE_DOS_HEADER;</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The most important members of the struct are <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">e_magic</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">e_lfanew</code>.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">e_magic</code> is 2 bytes with a fixed value of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">0x5A4D</code> or <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">MZ</code>.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">e_lfanew</code> is a 4-byte value that holds an offset to the start of the NT Header. Note that <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">e_lfanew</code> is always located at an offset of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">0x3C</code>.</p><h3 id="dos-stub" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>DOS Stub</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Before moving on to the NT header structure, there is the DOS stub which is an error message that prints &quot;This program cannot be run in DOS mode&quot; in case the program is loaded in <a href="https://en.wikipedia.org/wiki/DOS" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">DOS mode</a> or &quot;Disk Operating Mode&quot;. It is worth noting that the error message can be changed by the programmer at compile time. This is not a PE header, but it&#x27;s good to be aware of it.</p><h3 id="nt-header-image-nt-headers" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>NT Header (IMAGE_NT_HEADERS)</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The NT header is essential as it incorporates two other image headers: <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">FileHeader</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">OptionalHeader</code>, which include a large amount of information about the PE file. Similarly to the DOS header, the NT header contains a signature member that is used to verify it. Usually, the signature element is equal to the &quot;PE&quot; string, which is represented by the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">0x50</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">0x45</code> bytes. But since the signature is of data type <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">DWORD</code>, the signature will be represented as <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">0x50450000</code>, which is still &quot;PE&quot;, except that it is padded with two null bytes. The NT header can be reached using the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">e_lfanew</code> member inside of the DOS Header.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The NT header structure varies depending on the machine&#x27;s architecture.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>32-bit Version:</strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef struct _IMAGE_NT_HEADERS {
+  DWORD                   Signature;
+  IMAGE_FILE_HEADER       FileHeader;
+  IMAGE_OPTIONAL_HEADER32 OptionalHeader;
+} IMAGE_NT_HEADERS32, *PIMAGE_NT_HEADERS32;</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>64-bit Version:</strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef struct _IMAGE_NT_HEADERS64 {
+    DWORD                   Signature;
+    IMAGE_FILE_HEADER       FileHeader;
+    IMAGE_OPTIONAL_HEADER64 OptionalHeader;
+} IMAGE_NT_HEADERS64, *PIMAGE_NT_HEADERS64;</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The only difference is the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">OptionalHeader</code> data structure, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">IMAGE_OPTIONAL_HEADER32</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">IMAGE_OPTIONAL_HEADER64</code>.</p><h3 id="file-header-image-file-header" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>File Header (IMAGE_FILE_HEADER)</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Moving on to the next header, which can be accessed from the previous NT Header data structure</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef struct _IMAGE_FILE_HEADER {
+  WORD  Machine;
+  WORD  NumberOfSections;
+  DWORD TimeDateStamp;
+  DWORD PointerToSymbolTable;
+  DWORD NumberOfSymbols;
+  WORD  SizeOfOptionalHeader;
+  WORD  Characteristics;
+} IMAGE_FILE_HEADER, *PIMAGE_FILE_HEADER;</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The most important struct members are:</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NumberOfSections</code> - The number of sections in the PE file (discussed later).</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Characteristics</code> - Flags that specify certain attributes about the executable file, such as whether it is a dynamic-link library (DLL) or a console application.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SizeOfOptionalHeader</code> - The size of the following optional header</span></div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Additional information about the file header can be found on the <a href="https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_file_header" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">official documentation page</a>.</p><h3 id="optional-header-image-optional-header" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Optional Header (IMAGE_OPTIONAL_HEADER)</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The optional header is important and although it&#x27;s called &quot;optional&quot;, it&#x27;s essential for the execution of the PE file. It is referred to as optional because some file types do not have it.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The optional header has two versions, a version for 32-bit and 64-bit systems. Both versions have nearly identical members in their data structure with the main difference being the size of some members. <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ULONGLONG</code> is used in the 64-bit version and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">DWORD</code> in the 32-bit version. Additionally, the 32-bit version has some members which are not found in the 64-bit version.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>32-bit Version:</strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef struct _IMAGE_OPTIONAL_HEADER {
+  WORD                 Magic;
+  BYTE                 MajorLinkerVersion;
+  BYTE                 MinorLinkerVersion;
+  DWORD                SizeOfCode;
+  DWORD                SizeOfInitializedData;
+  DWORD                SizeOfUninitializedData;
+  DWORD                AddressOfEntryPoint;
+  DWORD                BaseOfCode;
+  DWORD                BaseOfData;
+  DWORD                ImageBase;
+  DWORD                SectionAlignment;
+  DWORD                FileAlignment;
+  WORD                 MajorOperatingSystemVersion;
+  WORD                 MinorOperatingSystemVersion;
+  WORD                 MajorImageVersion;
+  WORD                 MinorImageVersion;
+  WORD                 MajorSubsystemVersion;
+  WORD                 MinorSubsystemVersion;
+  DWORD                Win32VersionValue;
+  DWORD                SizeOfImage;
+  DWORD                SizeOfHeaders;
+  DWORD                CheckSum;
+  WORD                 Subsystem;
+  WORD                 DllCharacteristics;
+  DWORD                SizeOfStackReserve;
+  DWORD                SizeOfStackCommit;
+  DWORD                SizeOfHeapReserve;
+  DWORD                SizeOfHeapCommit;
+  DWORD                LoaderFlags;
+  DWORD                NumberOfRvaAndSizes;
+  IMAGE_DATA_DIRECTORY DataDirectory[IMAGE_NUMBEROF_DIRECTORY_ENTRIES];
+} IMAGE_OPTIONAL_HEADER32, *PIMAGE_OPTIONAL_HEADER32;</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>64-bit Version:</strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef struct _IMAGE_OPTIONAL_HEADER64 {
+  WORD                 Magic;
+  BYTE                 MajorLinkerVersion;
+  BYTE                 MinorLinkerVersion;
+  DWORD                SizeOfCode;
+  DWORD                SizeOfInitializedData;
+  DWORD                SizeOfUninitializedData;
+  DWORD                AddressOfEntryPoint;
+  DWORD                BaseOfCode;
+  ULONGLONG            ImageBase;
+  DWORD                SectionAlignment;
+  DWORD                FileAlignment;
+  WORD                 MajorOperatingSystemVersion;
+  WORD                 MinorOperatingSystemVersion;
+  WORD                 MajorImageVersion;
+  WORD                 MinorImageVersion;
+  WORD                 MajorSubsystemVersion;
+  WORD                 MinorSubsystemVersion;
+  DWORD                Win32VersionValue;
+  DWORD                SizeOfImage;
+  DWORD                SizeOfHeaders;
+  DWORD                CheckSum;
+  WORD                 Subsystem;
+  WORD                 DllCharacteristics;
+  ULONGLONG            SizeOfStackReserve;
+  ULONGLONG            SizeOfStackCommit;
+  ULONGLONG            SizeOfHeapReserve;
+  ULONGLONG            SizeOfHeapCommit;
+  DWORD                LoaderFlags;
+  DWORD                NumberOfRvaAndSizes;
+  IMAGE_DATA_DIRECTORY DataDirectory[IMAGE_NUMBEROF_DIRECTORY_ENTRIES];
+} IMAGE_OPTIONAL_HEADER64, *PIMAGE_OPTIONAL_HEADER64;</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The optional header contains a ton of information that can be used. Below are some of the struct members that are commonly used:</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Magic</code> - Describes the state of the image file (32 or 64-bit image)</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">MajorOperatingSystemVersion</code> - The major version number of the required operating system (e.g. 11, 10)</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">MinorOperatingSystemVersion</code> - The minor version number of the required operating system (e.g. 1511, 1507, 1607)</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SizeOfCode</code> - The size of the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">.text</code> section (Discussed later)</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">AddressOfEntryPoint</code> - Offset to the entry point of the file (Typically the <em>main</em> function)</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">BaseOfCode</code> - Offset to the start of the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">.text</code> section</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SizeOfImage</code> - The size of the image file in bytes</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ImageBase</code> - It specifies the preferred address at which the application is to be loaded into memory when it is executed. However, due to Window&#x27;s memory protection mechanisms like Address Space Layout Randomization (ASLR), it&#x27;s rare to see an image mapped to its preferred address because the Windows PE Loader maps the file to a different address. This random allocation done by the Windows PE loader will cause issues in the implementation of future techniques because some addresses that are considered constant were changed. The Windows PE loader will then go through <em>PE relocation</em> to fix these addresses.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">DataDirectory</code> - One of the most important members in the optional header. This is an array of <a href="https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_data_directory" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">IMAGE_DATA_DIRECTORY</a>, which contains the directories in a PE file (discussed below).</span></div><h3 id="data-directory" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Data Directory</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The Data Directory can be accessed from the optional&#x27;s header last member. This is an array of data type <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">IMAGE_DATA_DIRECTORY</code> which has the following data structure:</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef struct _IMAGE_DATA_DIRECTORY {
+    DWORD   VirtualAddress;
+    DWORD   Size;
+} IMAGE_DATA_DIRECTORY, *PIMAGE_DATA_DIRECTORY;</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The Data Directory array is of size <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">IMAGE_NUMBEROF_DIRECTORY_ENTRIES</code> which is a constant value of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">16</code>. Each element in the array represents a specific data directory which includes some data about a PE section or a Data Table (the place where specific information about the PE is saved).</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">A specific data directory can be accessed using its index in the array.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">#define IMAGE_DIRECTORY_ENTRY_EXPORT          0   // Export Directory
+#define IMAGE_DIRECTORY_ENTRY_IMPORT          1   // Import Directory
+#define IMAGE_DIRECTORY_ENTRY_RESOURCE        2   // Resource Directory
+#define IMAGE_DIRECTORY_ENTRY_EXCEPTION       3   // Exception Directory
+#define IMAGE_DIRECTORY_ENTRY_SECURITY        4   // Security Directory
+#define IMAGE_DIRECTORY_ENTRY_BASERELOC       5   // Base Relocation Table
+#define IMAGE_DIRECTORY_ENTRY_DEBUG           6   // Debug Directory
+#define IMAGE_DIRECTORY_ENTRY_ARCHITECTURE    7   // Architecture Specific Data
+#define IMAGE_DIRECTORY_ENTRY_GLOBALPTR       8   // RVA of GP
+#define IMAGE_DIRECTORY_ENTRY_TLS             9   // TLS Directory
+#define IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG    10   // Load Configuration Directory
+#define IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT   11   // Bound Import Directory in headers
+#define IMAGE_DIRECTORY_ENTRY_IAT            12   // Import Address Table
+#define IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT   13   // Delay Load Import Descriptors
+#define IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR 14   // COM Runtime descriptor</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The two sections below will briefly mention two important data directories, the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Export Directory</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Import Address Table</code>.</p><h3 id="export-directory" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Export Directory</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">A PE&#x27;s export directory is a data structure that contains information about functions and variables that are exported from the executable. It contains the addresses of the exported functions and variables, which can be used by other executable files to access the functions and data. The export directory is generally found in DLLs that export functions (e.g. <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">kernel32.dll</code> exporting <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CreateFileA</code>).</p><h3 id="import-address-table" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Import Address Table</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The import address table is a data structure in a PE that contains information about the addresses of functions imported from other executable files. The addresses are used to access the functions and data in the other executables (e.g. <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Application.exe</code> importing <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CreateFileA</code> from <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">kernel32.dll</code>).</p><h3 id="pe-sections" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>PE Sections</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">PE sections contain the code and data used to create an executable program. Each PE section is given a unique name and typically contains executable code, data, or resource information. There is no constant number of PE sections because different compilers can add, remove or merge sections depending on the configuration. Some sections can also be added later on manually, therefore it is dynamic and the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">IMAGE_FILE_HEADER.NumberOfSections</code> helps determine that number.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The following PE sections are the most important ones and exist in almost every PE.</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">.text</code> - Contains the executable code which is the written code.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">.data</code> - Contains initialized data which are variables initialized in the code.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">.rdata</code> - Contains read-only data. These are constant variables prefixed with <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">const</code>.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">.idata</code> - Contains the import tables. These are tables of information related to the functions called using the code. This is used by the Windows PE Loader to determine which DLL files to load to the process, along with what functions are being used from each DLL.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">.reloc</code> - Contains information on how to fix up memory addresses so that the program can be loaded into memory without any errors.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">.rsrc</code> - Used to store resources such as icons and bitmaps</span></div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Each PE section has an <a href="https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_section_header" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">IMAGE_SECTION_HEADER</a> data structure that contains valuable information about it. These structures are saved under the NT headers in a PE file and are stacked above each other where each structure represents a section.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Recall, the IMAGE_SECTION_HEADER structure is as follows:</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef struct _IMAGE_SECTION_HEADER {
+  BYTE  Name[IMAGE_SIZEOF_SHORT_NAME];
+  union {
+    DWORD PhysicalAddress;
+    DWORD VirtualSize;
+  } Misc;
+  DWORD VirtualAddress;
+  DWORD SizeOfRawData;
+  DWORD PointerToRawData;
+  DWORD PointerToRelocations;
+  DWORD PointerToLinenumbers;
+  WORD  NumberOfRelocations;
+  WORD  NumberOfLinenumbers;
+  DWORD Characteristics;
+} IMAGE_SECTION_HEADER, *PIMAGE_SECTION_HEADER;</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">looking at the elements, every single one is highly valuable and important:</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Name</code> - The name of the section. (e.g. .text, .data, .rdata).</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PhysicalAddress</code> or <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">VirtualSize</code> - The size of the section when it is in memory.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">VirtualAddress</code> - Offset of the start of the section in memory.</span></div><h3 id="additional-references" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Additional References</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In case further clarification is required on certain sections, the following blog posts on <a href="https://0xrick.github.io/" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">0xRick&#x27;s Blog</a> are highly recommended.</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>PE Overview - <a href="https://0xrick.github.io/win-internals/pe2/" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">https://0xrick.github.io/win-internals/pe2/</a></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>DOS Header, DOS Stub and Rich Header - <a href="https://0xrick.github.io/win-internals/pe3/" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">https://0xrick.github.io/win-internals/pe3/</a></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>NT Headers - <a href="https://0xrick.github.io/win-internals/pe4/" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">https://0xrick.github.io/win-internals/pe4/</a></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Data Directories, Section Headers and Sections - <a href="https://0xrick.github.io/win-internals/pe5/" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">https://0xrick.github.io/win-internals/pe5/</a></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>PE Imports (Import Directory Table, ILT, IAT) - <a href="https://0xrick.github.io/win-internals/pe6/" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">https://0xrick.github.io/win-internals/pe6/</a></span></div><h3 id="conclusion" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Conclusion</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Understanding PE headers might be challenging the first time they are encountered. Luckily, none of the basic modules require an in-depth understanding of the PE structure. However, to make the malware perform more complex techniques, it will require a better understanding as some of the code requires parsing the PE file&#x27;s headers and sections. This will likely be seen in intermediate and advanced modules.</p></main></body></html>

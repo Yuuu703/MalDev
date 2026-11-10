@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Linux malware development 2: find process ID by name. Simple</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #55</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">Linux malware development 2: find process ID by name. Simple</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">C example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">I promised to shed light on programming rootkits and other interesting and evil things when programming malware for Linux, but before we start, let’s try to do simple things. Some of my readers have no idea how to do, for example, code injections into Linux processes. Those who have been reading me for a very long time remember such an interesting and simple example of finding the process identifier in Windows for injection purposes.</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s implement similar logic for Linux. Everything is very simple:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Nim Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-nim">/*
+* hack.c
+* linux hacking part 2:
+* find process ID by name
+* author @cocomelonc
+* https://cocomelonc.github.io/linux/2024/09/16/linux-hacking-2.html
+*/
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;dirent.h&gt;
+#include &lt;ctype.h&gt;
+int find_process_by_name(const char *proc_name) {
+DIR *dir;
+struct dirent *entry;
+
+int pid = -1;
+dir = opendir("/proc");
+if (dir == NULL) {
+perror("opendir /proc failed");
+return -1;
+}
+while ((entry = readdir(dir)) != NULL) {
+if (isdigit(*entry-&gt;d_name)) {
+char path[512];
+snprintf(path, sizeof(path), "/proc/%s/comm", entry-&gt;d_name);
+FILE *fp = fopen(path, "r");
+if (fp) {
+char comm[512];
+if (fgets(comm, sizeof(comm), fp) != NULL) {
+// remove trailing newline from comm
+comm[strcspn(comm, "\r\n")] = 0;
+if (strcmp(comm, proc_name) == 0) {
+pid = atoi(entry-&gt;d_name);
+fclose(fp);
+break;
+}
+}
+fclose(fp);
+}
+}
+}
+closedir(dir);
+return pid;
+}
+int main(int argc, char *argv[]) {
+if (argc != 2) {
+fprintf(stderr, "usage: %s &lt;process_name&gt;\n", argv[0]);
+return 1;
+}
+int pid = find_process_by_name(argv[1]);
+if (pid != -1) {
+printf("found pid: %d\n", pid);
+} else {
+printf("process '%s' not found.\n", argv[1]);
+}
+
+return 0;
+}
+My code demonstrates how to search for a running process by its name in Linux by
+scanning the /proc directory. It reads the process names stored in /proc/[pid]/comm,
+and if it finds a match, it retrieves the process ID (PID) of the target process.
+As you can see there are only two functions here. First of all, we implemented
+find_process_by_name function. This function is responsible for searching for the
+process by name within the /proc directory.
+It takes a process name (proc_name) as input and returns the PID of the found process
+or -1 if the process is not found.
+The function uses the opendir() function to open the /proc directory. This directory
+contains information about running processes, with each subdirectory named after a
+process ID (PID).
+Then, iterate through entries in /proc:
+while ((entry = readdir(dir)) != NULL) {
+the readdir() function is used to iterate through all entries in the /proc directory,
+each entry represents either a running process (if the entry name is a number) or other
+system files.
+Then checks whether the entry name represents a number (i.e., a process ID). Only
+directories named with digits are valid process directories in /proc:
+if (isdigit(*entry-&gt;d_name)) {
+Note that, the comm file inside each /proc/[pid] directory contains the name of the
+executable associated with that process:
+snprintf(path, sizeof(path), "/proc/%s/comm", entry-&gt;d_name);
+that means, we constructs the full path to the comm file by combining /proc/, the
+process ID (d_name), and /comm.</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Finally, we open comm file, read process name and compare it: FILE *fp = fopen(path, "r");</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">if (fp) {
+char comm[512];
+if (fgets(comm, sizeof(comm), fp) != NULL) {
+// remove trailing newline from comm
+comm[strcspn(comm, "\r\n")] = 0;
+if (strcmp(comm, proc_name) == 0) {
+pid = atoi(entry-&gt;d_name);
+fclose(fp);
+break;
+}
+
+}
+Then, of course, close the directory and return.
+The second function is the main function:
+int main(int argc, char *argv[]) {
+if (argc != 2) {
+fprintf(stderr, "usage: %s &lt;process_name&gt;\n", argv[0]);
+return 1;
+}
+int pid = find_process_by_name(argv[1]);
+if (pid != -1) {
+printf("found pid: %d\n", pid);
+} else {
+printf("process '%s' not found.\n", argv[1]);
+}
+return 0;
+}
+Just check command-line args and run process finding logic.
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s check everything in action. Compile it:</p>
+
+            <div class="my-4 rounded-xl overflow-hidden border border-[#212b54] bg-[#070a15] font-mono text-xs shadow-md">
+                <div class="px-3.5 py-1.5 bg-[#0d132b] text-[10px] text-[#cbd5e1] font-bold uppercase flex items-center gap-1.5 border-b border-[#1c243f]">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                    <span>Terminal / Compilation Command</span>
+                </div>
+                <pre class="p-3.5 text-[#9ff0d0] overflow-x-auto leading-relaxed"><code class="language-bash">gcc -z execstack hack.c -o hack</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then run it in linux machine: .\hack [process_name]</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, everything is wokred perfectly. We found Telegram ID (75678) in my case! =.. = It all seems very easy, doesn’t it? But there is a caveat. If we try to run it for processes like firefox in my example: .\hack firefox we got:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The issue we’re facing may stem from the fact that some processes, like firefox, might spawn child processes or multiple threads, which might not all use the comm file to store their process name. The /proc/[pid]/comm file stores the executable name without the full path and may not reflect all instances of the process, especially if there are multiple threads or subprocesses under the same parent. So possible issues in my opinion are:</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>different process names in /proc/[pid]/comm: child processes or threads could</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">use different naming conventions or might not be listed under /proc/[pid]/comm as firefox.</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>zombies or orphan processes: some processes might not show up correctly if they are</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">in a zombie or orphaned state.</p>
+
+            <div id="practical-example-2" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example 2</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Instead of reading the comm file, we can check the /proc/[pid]/cmdline file, which contains the full command used to start the process (including the process name, full path, and arguments). This file is more reliable for processes that spawn multiple instances like firefox. For this reason I just created another version (hack2.c):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Nim Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-nim">/*
+* hack2.c
+* linux hacking part 2:
+* find processes ID by name
+* author @cocomelonc
+* https://cocomelonc.github.io/linux/2024/09/16/linux-hacking-2.html
+*/
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;dirent.h&gt;
+#include &lt;ctype.h&gt;
+void find_processes_by_name(const char *proc_name) {
+DIR *dir;
+struct dirent *entry;
+int found = 0;
+dir = opendir("/proc");
+if (dir == NULL) {
+perror("opendir /proc failed");
+return;
+}
+while ((entry = readdir(dir)) != NULL) {
+if (isdigit(*entry-&gt;d_name)) {
+char path[512];
+snprintf(path, sizeof(path), "/proc/%s/cmdline", entry-&gt;d_name);
+FILE *fp = fopen(path, "r");
+if (fp) {
+char cmdline[512];
+if (fgets(cmdline, sizeof(cmdline), fp) != NULL) {
+// command line arguments are separated by '\0',
+// we only need the first argument (the program name)
+cmdline[strcspn(cmdline, "\0")] = 0;
+// perform case-insensitive comparison
+
+// of the base process name
+const char *base_name = strrchr(cmdline, '/');
+base_name = base_name ? base_name + 1 : cmdline;
+if (strcasecmp(base_name, proc_name) == 0) {
+printf("found process: %s with PID: %s\n", base_name,
+entry-&gt;d_name);
+found = 1;
+}
+}
+fclose(fp);
+}
+}
+}
+if (!found) {
+printf("no processes found with the name '%s'.\n", proc_name);
+}
+closedir(dir);
+}
+int main(int argc, char *argv[]) {
+if (argc != 2) {
+fprintf(stderr, "usage: %s &lt;process_name&gt;\n", argv[0]);
+return 1;
+}
+find_processes_by_name(argv[1]);
+return 0;
+}
+As you can see, this is an updated version of the code that reads from /proc/[pid]/cmdline
+instead.
+But the file /proc/[pid]/cmdline or /proc/[pid]/status may not always show
+all subprocesses or threads correctly.
+demo 2</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s check second example in action. Compile it:</p>
+
+            <div class="my-4 rounded-xl overflow-hidden border border-[#212b54] bg-[#070a15] font-mono text-xs shadow-md">
+                <div class="px-3.5 py-1.5 bg-[#0d132b] text-[10px] text-[#cbd5e1] font-bold uppercase flex items-center gap-1.5 border-b border-[#1c243f]">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                    <span>Terminal / Compilation Command</span>
+                </div>
+                <pre class="p-3.5 text-[#9ff0d0] overflow-x-auto leading-relaxed"><code class="language-bash">gcc -z execstack hack2.c -o hack2</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then run it in linux machine: .\hack [process_name]</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, it’s correct. I hope this post with practical example is useful for malware researchers, linux programmers and everyone who interested on linux kernel programming and code injection techniques. Find process ID by name. Windows version source code in github</p></main></body></html>

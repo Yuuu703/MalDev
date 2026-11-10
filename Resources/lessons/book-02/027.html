@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Malware AV/VM evasion - part 12 (part 16 on blog): WinAPI</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #26</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">Malware AV/VM evasion - part 12 (part 16 on blog): WinAPI</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetProcAddress</code> implementation. Simple C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This post is the result of my own research on try to evasion AV engines via another popular trick: WinAPI <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetProcAddress</code> implementation. <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetProcAddress</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetProcAddress</code> is a Windows API function that retrieves the address of an exported function or variable from the specified DLL. This function is useful when you want to load a function from a DLL at runtime, which is also known as dynamic linking or runtime linking: FARPROC <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetProcAddress</code>( HMODULE hModule, LPCSTR lpProcName );</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>hModule - A handle to the DLL module that contains the function or variable.</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">LoadLibrary</code> or LoadLibraryEx function returns this handle.</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>lpProcName - The function or variable name as a null-terminated string, or the</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">function’s ordinal value. If this parameter is an ordinal value, it must be in the low-order word, and the high-order word must be zero. If the function succeeds, the return value is the address of the exported function or variable, if the function fails, the return value is NULL.</p>
+
+            <div id="practical-example-custom-implementation-of-getprocaddress" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example. custom implementation of GetProcAddress</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Like a previous post creating my simplest implementation of <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetProcAddress</code> using Process Environment Block (<code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">PEB</code>) also can help avoid antivirus (AV) detection in certain scenarios.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">FARPROC myGetProcAddress(HMODULE hModule, LPCSTR lpProcName) { PIMAGE_DOS_HEADER dosHeader = (PIMAGE_DOS_HEADER)hModule; PIMAGE_NT_HEADERS ntHeaders = (PIMAGE_NT_HEADERS)((BYTE*)hModule + dosHeader->e_lfanew); PIMAGE_EXPORT_DIRECTORY exportDirectory = (PIMAGE_EXPORT_DIRECTORY)((BYTE*)hModule + ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT]. VirtualAddress); DWORD* addressOfFunctions = (DWORD*)((BYTE*)hModule + exportDirectory->AddressOfFunctions); WORD* addressOfNameOrdinals = (WORD*)((BYTE*)hModule + exportDirectory->AddressOfNameOrdinals); DWORD* addressOfNames = (DWORD*)((BYTE*)hModule + exportDirectory->AddressOfNames);</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">for (DWORD i = 0; i &lt; exportDirectory-&gt;NumberOfNames; ++i) {
+if (strcmp(lpProcName, (const char*)hModule + addressOfNames[i]) == 0) {
+return (FARPROC)((BYTE*)hModule + addressOfFunctions[addressOfNameOrdinals[i]]);
+}
+}
+return NULL;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Here’s a step-by-step explanation of this code:</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>get DOS and NT headers: Cast the base address of the module (hModule) to a</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">PIMAGE_DOS_HEADER pointer and use it to locate the PIMAGE_NT_HEADERS structure by adding the e_lfanew field to the base address.</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>locate the export directory: Use the OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Vi</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">field from the PIMAGE_NT_HEADERS structure to find the PIMAGE_EXPORT_DIRECTORY structure.</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>get pointers to export tables: Obtain pointers to the AddressOfFunctions,</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">AddressOfNameOrdinals, and AddressOfNames tables using the respective fields of the PIMAGE_EXPORT_DIRECTORY structure and the base address of the module.</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>iterate through the names: Loop through the AddressOfNames table up to</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">NumberOfNames times, and compare each function name with the target function name (lpProcName) using strcmp.</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>find the function address: If the function name matches, find the function’s ordinal</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">by indexing the AddressOfNameOrdinals table, and use the ordinal to index the AddressOfFunctions table. Calculate the absolute function address by adding</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">the module’s base address to the relative virtual address (RVA) of the function. AV evasion “malware” Ok, what about the “malware” example? For this, I just updated the code from my previous post. Add my implementation of WinAPI <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetProcAddress</code>. The full source code is:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>x64 Assembly</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-nasm">/*
+* hack.cpp - GetProcAddress implementation. C++ implementation
+* @cocomelonc
+* https://cocomelonc.github.io/tutorial/2023/04/16/malware-av-evasion-16.html
+*/
+#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;windows.h&gt;
+#include &lt;winternl.h&gt;
+#include &lt;shlwapi.h&gt;
+#include &lt;string.h&gt;
+#pragma comment(lib, "Shlwapi.lib")
+int cmpUnicodeStr(WCHAR substr[], WCHAR mystr[]) {
+_wcslwr_s(substr, MAX_PATH);
+_wcslwr_s(mystr, MAX_PATH);
+int result = 0;
+if (StrStrW(mystr, substr) != NULL) {
+result = 1;
+}
+return result;
+}
+typedef UINT(CALLBACK* fnMessageBoxA)(
+HWND
+hWnd,
+LPCSTR lpText,
+LPCSTR lpCaption,
+UINT
+uType
+);
+// custom implementation
+HMODULE myGetModuleHandle(LPCWSTR lModuleName) {
+// obtaining the offset of PPEB from the beginning of TEB
+PEB* pPeb = (PEB*)__readgsqword(0x60);
+
+// for x86
+// PEB* pPeb = (PEB*)__readgsqword(0x30);
+// obtaining the address of the head node in a linked list
+// which represents all the models that are loaded into the process.
+PEB_LDR_DATA* Ldr = pPeb-&gt;Ldr;
+LIST_ENTRY* ModuleList = &amp;Ldr-&gt;InMemoryOrderModuleList;
+// iterating to the next node. this will be our starting point.
+LIST_ENTRY* pStartListEntry = ModuleList-&gt;Flink;
+// iterating through the linked list.
+WCHAR mystr[MAX_PATH] = { 0 };
+WCHAR substr[MAX_PATH] = { 0 };
+for (LIST_ENTRY* pListEntry = pStartListEntry; pListEntry != ModuleList;
+pListEntry = pListEntry-&gt;Flink) {
+// getting the address of current LDR_DATA_TABLE_ENTRY (which represents the DLL).
+LDR_DATA_TABLE_ENTRY* pEntry =
+(LDR_DATA_TABLE_ENTRY*)((BYTE*)pListEntry - sizeof(LIST_ENTRY));
+// checking if this is the DLL we are looking for
+memset(mystr, 0, MAX_PATH * sizeof(WCHAR));
+memset(substr, 0, MAX_PATH * sizeof(WCHAR));
+wcscpy_s(mystr, MAX_PATH, pEntry-&gt;FullDllName.Buffer);
+wcscpy_s(substr, MAX_PATH, lModuleName);
+if (cmpUnicodeStr(substr, mystr)) {
+// returning the DLL base address.
+return (HMODULE)pEntry-&gt;DllBase;
+}
+}
+// the needed DLL wasn't found
+printf("failed to get a handle to %s\n", lModuleName);
+return NULL;
+}
+FARPROC myGetProcAddress(HMODULE hModule, LPCSTR lpProcName) {
+PIMAGE_DOS_HEADER dosHeader = (PIMAGE_DOS_HEADER)hModule;
+PIMAGE_NT_HEADERS ntHeaders = (PIMAGE_NT_HEADERS)((BYTE*)hModule +
+dosHeader-&gt;e_lfanew);
+PIMAGE_EXPORT_DIRECTORY exportDirectory =
+(PIMAGE_EXPORT_DIRECTORY)((BYTE*)hModule +
+ntHeaders-&gt;OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].
+VirtualAddress);
+
+DWORD* addressOfFunctions = (DWORD*)((BYTE*)hModule +
+exportDirectory-&gt;AddressOfFunctions);
+WORD* addressOfNameOrdinals = (WORD*)((BYTE*)hModule +
+exportDirectory-&gt;AddressOfNameOrdinals);
+DWORD* addressOfNames = (DWORD*)((BYTE*)hModule +
+exportDirectory-&gt;AddressOfNames);
+for (DWORD i = 0; i &lt; exportDirectory-&gt;NumberOfNames; ++i) {
+if (strcmp(lpProcName, (const char*)hModule + addressOfNames[i]) == 0) {
+return (FARPROC)((BYTE*)hModule + addressOfFunctions[addressOfNameOrdinals[i]]);
+}
+}
+return NULL;
+}
+
+// encrypted function name (MessageBoxA)
+unsigned char s_mb[] = { 0x20, 0x1c, 0x0, 0x6, 0x11, 0x2, 0x17, 0x31, 0xa,
+0x1b, 0x33 };
+// encrypted module name (user32.dll)
+unsigned char s_dll[] = { 0x18, 0xa, 0x16, 0x7, 0x43, 0x57, 0x5c, 0x17, 0x9,
+0xf };
+// key
+char s_key[] = "mysupersecretkey";
+// XOR decrypt
+void XOR(char * data, size_t data_len, char * key, size_t key_len) {
+int j;
+j = 0;
+for (int i = 0; i &lt; data_len; i++) {
+if (j == key_len - 1) j = 0;
+data[i] = data[i] ^ key[j];
+j++;
+}
+}
+
+int main(int argc, char* argv[]) {
+XOR((char *) s_dll, sizeof(s_dll), s_key, sizeof(s_key));
+XOR((char *) s_mb, sizeof(s_mb), s_key, sizeof(s_key));
+wchar_t wtext[20];
+
+mbstowcs(wtext, s_dll, strlen(s_dll)+1); //plus null
+LPWSTR user_dll = wtext;
+HMODULE mod = myGetModuleHandle(user_dll);
+if (NULL == mod) {
+return -2;
+} else {
+printf("meow");
+}
+fnMessageBoxA myMessageBoxA =
+(fnMessageBoxA)myGetProcAddress(mod, (LPCSTR)s_mb);
+myMessageBoxA(NULL, "Meow-meow!","=^..^=", MB_OK);
+return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, the only difference is new function myGetProcAddress.</p>
+
+            <div id="demo" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Demo</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action. First of all compile our “malware”: x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe \ -I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And run at the victim’s machine (Windows 10 x64): .\hack.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, as result, <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetProcAddress</code> WinAPI hidden: bypass AV engines in certain scenarios. Note that manually implementing <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetProcAddress</code> using the <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">PEB</code> is a difficult and potentially error-prone task, but handling the inner workings of the Windows module loading mechanism can be useful for advanced tasks such as reverse engineering and malware analysis. I hope this post spreads awareness to the blue teamers of this interesting evasion technique, and adds a weapon to the red teamers arsenal. MITRE ATT&CK: T1027 AV evasion: part 1 AV evasion: part 2 AV evasion: part 4 <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetModuleHandle</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetProcAddress</code> source code in github</p></main></body></html>

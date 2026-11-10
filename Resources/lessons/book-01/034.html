@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Process Enumeration - EnumProcesses</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+        <div id="process-enumeration-enumprocesses" class="scroll-mt-24 pt-6 sm:pt-8 pb-3 border-b border-[#212b54] mt-8 sm:mt-12 mb-4 sm:mb-6 flex items-center justify-between group">
+            <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5 sm:gap-3">
+                <i data-lucide="cpu" class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent2)] flex-shrink-0"></i>
+                <span>Process Enumeration - EnumProcesses</span>
+            </h2>
+            <a href="#process-enumeration-enumprocesses" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition" class="opacity-0 group-hover:opacity-100 text-[#cbd5e1] hover:text-[var(--accent)] text-xs flex items-center gap-1 font-mono transition p-1.5 rounded hover:bg-[var(--accent-soft)]" title="Copy link">
+                <i data-lucide="link" class="w-4 h-4"></i>
+            </a>
+        </div><h3 id="introduction" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Introduction</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">One way to perform process enumeration was previously demonstrated in the process injection module that used <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CreateToolHelp32Snapshot</code>. This module will demonstrate another way to perform process enumeration using <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">EnumProcesses</code>.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">It&#x27;s important for malware authors to be able to implement a technique within their malware in several ways to remain unpredictable in their actions.</p><h3 id="enumprocesses" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>EnumProcesses</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Start by reviewing Microsoft&#x27;s documentation on <a href="https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-enumprocesses" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">EnumProcesses</a>. Notice that the function returns the Process IDs (PIDs) as an array, without the associated process names. The problem is that only having PIDs without the associated process names makes it difficult to identify the process from a human perspective.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The solution is to use the <a href="https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-openprocess" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">OpenProcess</a>, <a href="https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-getmodulebasenamew" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">GetModuleBaseName</a> and <a href="https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-enumprocessmodules" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">EnumProcessModules</a> WinAPIs.</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">OpenProcess</code> will be used to open a handle to a PID with <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PROCESS_QUERY_INFORMATION</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PROCESS_VM_READ</code> access rights.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">EnumProcessModules</code> will be used to enumerate all the modules within the opened process. This is required for step 3.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetModuleBaseName</code> will determine the name of the process, given the enumerated process modules from step 2.</span></div><h3 id="enumprocesses-advantage" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>EnumProcesses Advantage</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Using the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CreateToolhelp32Snapshot</code> process enumeration method, a snapshot is created and a string comparison is performed to determine whether the process name matches the intended target process. The issue with that method is when there are multiple instances of a process running at different privilege levels, there&#x27;s no way to differentiate them during the string comparison. For example, some <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">svchost.exe</code> processes run with normal user privileges whereas others run with elevated privileges. There is no way to determine the privilege level of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">svchost.exe</code> during the string comparison. Therefore the only indicator as to whether it&#x27;s privileged is if the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">OpenProcess</code> call fails (assuming that the implementation is running with normal user privileges).</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">On the other hand, using the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">EnumProcesses</code> process enumeration method provides the PID and handle to the process, and the objective is to obtain the process name. This method is guaranteed to be successful since a handle to the process already exists.</p><h3 id="code-walkthrough" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Code Walkthrough</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This section will explain code snippets that are based on <a href="https://learn.microsoft.com/en-us/windows/win32/psapi/enumerating-all-processes" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">Microsoft&#x27;s example</a> of process enumeration.</p><h3 id="printprocesses-function" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>PrintProcesses Function</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PrintProcesses</code> is a custom function that prints the process name and PID of the enumerated processes. Only processes running with the same privileges as the implementation can have their information retrieved. Information about elevated processes cannot be retrieved, again, assuming the implementation is running with normal user privileges. Attempts to open a handle to high-privileged processes using <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">OpenProcess</code> will result in <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ERROR_ACCESS_DENIED</code> error.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">It&#x27;s possible to use <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">OpenProcess</code>&#x27;s response as an indicator to determine if the process can be targeted. Processes that cannot have a handle open to them cannot be targeted whereas the ones with a handle successfully opened can be targeted.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL PrintProcesses() {
+
+	DWORD		adwProcesses	[1024 * 2],
+			    dwReturnLen1		= NULL,
+			    dwReturnLen2		= NULL,
+			    dwNmbrOfPids		= NULL;
+
+	HANDLE		hProcess		= NULL;
+	HMODULE		hModule			= NULL;
+
+	WCHAR		szProc			[MAX_PATH];
+
+	// Get the array of PIDs
+	if (!EnumProcesses(adwProcesses, sizeof(adwProcesses), &amp;dwReturnLen1)) {
+		printf(&quot;[!] EnumProcesses Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	// Calculating the number of elements in the array
+	dwNmbrOfPids = dwReturnLen1 / sizeof(DWORD);
+
+	printf(&quot;[i] Number Of Processes Detected : %d \n&quot;, dwNmbrOfPids);
+
+	for (int i = 0; i &lt; dwNmbrOfPids; i++) {
+
+		// If process is not NULL
+		if (adwProcesses[i] != NULL) {
+
+			// Open a process handle
+			if ((hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, adwProcesses[i])) != NULL) {
+
+				// If handle is valid
+				// Get a handle of a module in the process &#x27;hProcess&#x27;
+				// The module handle is needed for &#x27;GetModuleBaseName&#x27;
+				if (!EnumProcessModules(hProcess, &amp;hModule, sizeof(HMODULE), &amp;dwReturnLen2)) {
+					printf(&quot;[!] EnumProcessModules Failed [ At Pid: %d ] With Error : %d \n&quot;, adwProcesses[i], GetLastError());
+				}
+				else {
+					// If EnumProcessModules succeeded
+					// Get the name of &#x27;hProcess&#x27; and save it in the &#x27;szProc&#x27; variable
+					if (!GetModuleBaseName(hProcess, hModule, szProc, sizeof(szProc) / sizeof(WCHAR))) {
+						printf(&quot;[!] GetModuleBaseName Failed [ At Pid: %d ] With Error : %d \n&quot;, adwProcesses[i], GetLastError());
+					}
+					else {
+						// Printing the process name &amp; its PID
+						wprintf(L&quot;[%0.3d] Process \&quot;%s\&quot; - Of Pid : %d \n&quot;, i, szProc, adwProcesses[i]);
+					}
+				}
+
+				// Close process handle
+				CloseHandle(hProcess);
+			}
+		}
+
+		// Iterate through the PIDs array
+	}
+
+	return TRUE;
+}</code></pre>
+        </div><h3 id="getremoteprocesshandle-function" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>GetRemoteProcessHandle Function</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The code snippet below is an update to the previous <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PrintProcesses</code> function. <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetRemoteProcessHandle</code> will perform the same tasks as <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PrintProcesses</code> except it will return a handle to the specified process.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The updated function uses <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">wcscmp</code> to verify the target process. Furthermore, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">OpenProcess</code>&#x27;s access control is changed from <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PROCESS_QUERY_INFORMATION | PROCESS_VM_READ</code> to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PROCESS_ALL_ACCESS</code> to provide more access to the returned process object.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL GetRemoteProcessHandle(LPCWSTR szProcName, DWORD* pdwPid, HANDLE* phProcess) {
+
+	DWORD		adwProcesses	[1024 * 2],
+			    dwReturnLen1		= NULL,
+			    dwReturnLen2		= NULL,
+			    dwNmbrOfPids		= NULL;
+
+	HANDLE		hProcess		= NULL;
+	HMODULE		hModule			= NULL;
+
+	WCHAR		szProc			[MAX_PATH];
+
+	// Get the array of PIDs
+	if (!EnumProcesses(adwProcesses, sizeof(adwProcesses), &amp;dwReturnLen1)) {
+		printf(&quot;[!] EnumProcesses Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	// Calculating the number of elements in the array
+	dwNmbrOfPids = dwReturnLen1 / sizeof(DWORD);
+
+	printf(&quot;[i] Number Of Processes Detected : %d \n&quot;, dwNmbrOfPids);
+
+	for (int i = 0; i &lt; dwNmbrOfPids; i++) {
+
+		// If process is not NULL
+		if (adwProcesses[i] != NULL) {
+
+			// Open a process handle
+			if ((hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, adwProcesses[i])) != NULL) {
+
+				// If handle is valid
+				// Get a handle of a module in the process &#x27;hProcess&#x27;.
+				// The module handle is needed for &#x27;GetModuleBaseName&#x27;
+				if (!EnumProcessModules(hProcess, &amp;hModule, sizeof(HMODULE), &amp;dwReturnLen2)) {
+					printf(&quot;[!] EnumProcessModules Failed [ At Pid: %d ] With Error : %d \n&quot;, adwProcesses[i], GetLastError());
+				}
+				else {
+					// If EnumProcessModules succeeded
+					// Get the name of &#x27;hProcess&#x27; and save it in the &#x27;szProc&#x27; variable
+					if (!GetModuleBaseName(hProcess, hModule, szProc, sizeof(szProc) / sizeof(WCHAR))) {
+						printf(&quot;[!] GetModuleBaseName Failed [ At Pid: %d ] With Error : %d \n&quot;, adwProcesses[i], GetLastError());
+					}
+					else {
+						// Perform the comparison logic
+						if (wcscmp(szProcName, szProc) == 0) {
+							wprintf(L&quot;[+] FOUND \&quot;%s\&quot; - Of Pid : %d \n&quot;, szProc, adwProcesses[i]);
+							// Return by reference
+							*pdwPid		= adwProcesses[i];
+							*phProcess	= hProcess;
+							break;
+						}
+					}
+				}
+
+				CloseHandle(hProcess);
+			}
+		}
+	}
+
+	// Check if pdwPid or phProcess are NULL
+	if (*pdwPid == NULL || *phProcess == NULL)
+		return FALSE;
+	else
+		return TRUE;
+}</code></pre>
+        </div><h3 id="printprocesses-example" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>PrintProcesses - Example</span></h3>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/enumprocesses-108501303-c0dfa0d8-5e73-431e-9f5f-3cea0bb217be.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong><strong>GetRemoteProcessHandle - Example</strong></strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/enumprocesses-208500959-341d233b-4852-463e-8108-6d6e4c109416.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div></main></body></html>

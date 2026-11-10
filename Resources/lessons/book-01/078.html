@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Brute Force Decryption</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+        <div id="brute-force-decryption" class="scroll-mt-24 pt-6 sm:pt-8 pb-3 border-b border-[#212b54] mt-8 sm:mt-12 mb-4 sm:mb-6 flex items-center justify-between group">
+            <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5 sm:gap-3">
+                <i data-lucide="sparkles" class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent)] flex-shrink-0"></i>
+                <span>Brute Force Decryption</span>
+            </h2>
+            <a href="#brute-force-decryption" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition" class="opacity-0 group-hover:opacity-100 text-[#cbd5e1] hover:text-[var(--accent)] text-xs flex items-center gap-1 font-mono transition p-1.5 rounded hover:bg-[var(--accent-soft)]" title="Copy link">
+                <i data-lucide="link" class="w-4 h-4"></i>
+            </a>
+        </div><h3 id="introduction" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Introduction</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In the beginner modules, payload encryption and decryption were demonstrated and a warning was mentioned about saving the encryption key within the binary. Recall that if the encryption key is saved in plaintext within the binary it can be trivially retrieved. One solution is to encrypt the key with another key and decrypt it at runtime. To avoid hardcoding the key inside the binary, the key is brute-forced.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This module will demonstrate an XOR decryption algorithm where the program has to guess the key through brute forcing.</p><h3 id="key-encryption-process" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Key Encryption Process</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">To perform a key brute force, the encryption and decryption functions require a <em>hint byte</em>. Knowing one byte&#x27;s value before and after the encryption process makes the decryption process possible. In this case, the first byte has been selected as the hint byte.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">For example, if the hint byte is <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">BA</code> and when encrypted it becomes <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">71</code>, then the decryption process will brute force that value until it is reverted to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">BA</code>, indicating the correct key was used.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/bruteforce-decryption-115958551-66287afd-396c-4beb-8255-0c330764cde5.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="key-encryption-function" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Key Encryption Function</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GenerateProtectedKey</code> function takes a hint byte and prepends it as the first byte of the plaintext key. It then uses an XOR encryption algorithm to encrypt the key using a randomly generated key at runtime.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Note that the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PrintHex</code> is a function that prints the input buffer as a hex array, and it is being used to print the plaintext generated key.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">/*
+  - HintByte: is the hint byte that will be saved as the key&#x27;s first byte
+  - sKey: the size of the key to generate
+  - ppProtectedKey: pointer to a PBYTE buffer that will recieve the encrypted key
+*/
+
+VOID GenerateProtectedKey(IN BYTE HintByte, IN SIZE_T sKey, OUT PBYTE* ppProtectedKey) {
+
+	// Genereting a seed
+	srand(time(NULL));
+
+	// &#x27;b&#x27; is used as the key of the key encryption algorithm
+	BYTE        b                = rand() % 0xFF;
+
+	// &#x27;pKey&#x27; is where the original key will be generated to
+	PBYTE       pKey             = (PBYTE)malloc(sKey);
+
+	// &#x27;pProtectedKey&#x27; is the encrypted version of &#x27;pKey&#x27; using &#x27;b&#x27;
+	PBYTE       pProtectedKey    = (PBYTE)malloc(sKey);
+
+	if (!pKey || !pProtectedKey)
+		return;
+
+	// Genereting another seed
+	srand(time(NULL) * 2);
+
+	// The key starts with the hint byte
+	pKey[0] = HintByte;
+	// generating the rest of the key
+	for (int i = 1; i &lt; sKey; i++){
+		pKey[i] = (BYTE)rand() % 0xFF;
+	}
+
+
+	printf(&quot;[+] Generated Key Byte : 0x%0.2X \n\n&quot;, b);
+	printf(&quot;[+] Original Key : &quot;);
+	PrintHex(pKey, sKey);
+
+	// Encrypting the key using a xor encryption algorithm
+	// Using &#x27;b&#x27; as the key
+	for (int i = 0; i &lt; sKey; i++){
+		pProtectedKey[i] = (BYTE)((pKey[i] + i) ^ b);
+	}
+
+	// Saving the encrypted key by pointer
+	*ppProtectedKey = pProtectedKey;
+
+	// Freeing the raw key buffer
+	free(pKey);
+}</code></pre>
+        </div><h3 id="key-decryption-process" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Key Decryption Process</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Since the encryption key used to encrypt the key was not stored anywhere, the decryption function must be able to guess the value of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">b</code> shown in the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GenerateProtectedKey</code> function. To do so, the decryption function will XOR the first byte of the key, which is the hint byte, with different keys until the resulting byte is the original key&#x27;s hint byte. When that happens, the function will know that the correct <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">b</code> value was selected. The code snippet below shows this logic.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">if (((EncryptedKey[0] ^ b) - 0) == HintByte)
+  // Then b&#x27;s value is the xor encryption key
+else
+  // Then b&#x27;s value is not the xor encryption key, try with a different b value</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Continuing from the previous example, when <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">71</code> becomes <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">BA</code> then the correct <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">b</code> value has been guessed.</p><h3 id="key-decryption-function" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Key Decryption Function</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">BruteForceDecryption</code> function needs the same hint byte that was passed to the encryption function.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">/*
+	- HintByte : is the same hint byte that was used in the key generating function
+	- pProtectedKey : the encrypted key
+	- sKey : the key size
+	- ppRealKey : pointer to a PBYTE buffer that will recieve the decrypted key
+*/
+
+BYTE BruteForceDecryption(IN BYTE HintByte, IN PBYTE pProtectedKey, IN SIZE_T sKey, OUT PBYTE* ppRealKey) {
+
+	BYTE      b         = 0;
+	PBYTE     pRealKey  = (PBYTE)malloc(sKey);
+
+	if (!pRealKey)
+		return NULL;
+
+	while (1){
+
+		// Using the hint byte, if this is equal, then we found the &#x27;b&#x27; value needed to decrypt the key
+		if (((pProtectedKey[0] ^ b) - 0) == HintByte)
+			break;
+		// else, increment &#x27;b&#x27; and try again
+		else
+			b++;
+	}
+
+        // The reverse algorithm of the xor encryption, since &#x27;b&#x27; now is known
+	for (int i = 0; i &lt; sKey; i++){
+		pRealKey[i] = (BYTE)((pProtectedKey[i] ^ b) - i);
+	}
+
+        // Saving the decrypted key by pointer
+	*ppRealKey = pRealKey;
+
+	return b;
+}</code></pre>
+        </div><h3 id="demo" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Demo</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The image below shows the generation of the XOR-encrypted key. The arrows point to the code that generates the respective console output.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/bruteforce-decryption-215972490-3457c0b5-833b-477d-a95d-ead9522e32be.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The image below shows the successful brute force and decryption.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/bruteforce-decryption-315973990-7836fe71-fbb0-49a1-82e0-dbca3bccedbd.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="conclusion" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Conclusion</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Although this brute-forcing approach is simple, it can be used to prevent malware analysts and researchers from dumping the key from the binary file. This forces them to debug the binary to understand how the key is generated which is where the anti-analysis techniques come in handy.</p><div class="mt-8 sm:mt-12 pt-6 border-t border-[#212b54] space-y-4"><h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2"><i data-lucide="video" class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent)]"></i><span>Practical Lab Demonstration</span></h3>
+    <div class="my-6 sm:my-8 rounded-2xl border border-[#212b54] bg-[#0c1022] p-4 sm:p-5 space-y-3 sm:space-y-4 shadow-2xl transition-all duration-300 hover:border-[var(--accent)]">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#1c243f] pb-3">
+            <div class="flex items-center gap-2 min-w-0">
+                <i data-lucide="clapperboard" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                <h4 class="text-xs sm:text-sm font-bold text-white tracking-wide truncate">Field Lab Demo: hbp1 demo</h4>
+            </div>
+            <span class="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-mono font-semibold bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]">Live Lab</span>
+        </div>
+        <div class="rounded-xl overflow-hidden bg-black border border-[#1c243f] shadow-inner">
+            <video controls preload="metadata" class="w-full max-h-[320px] sm:max-h-[480px] bg-black">
+                <source src="videos/hbp1-demo.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-[#cbd5e1] font-mono pt-1">
+            <span class="flex items-center gap-1.5 truncate max-w-[200px] sm:max-w-xs"><i data-lucide="file-video" class="w-3.5 h-3.5 text-[var(--accent)] flex-shrink-0"></i><span class="truncate">hbp1-demo.mp4</span></span>
+            <a href="videos/hbp1-demo.mp4" download class="text-[#cbd5e1] hover:text-[var(--accent)] font-semibold flex items-center gap-1 transition"><i data-lucide="download" class="w-3.5 h-3.5"></i><span>Download MP4</span></a>
+        </div>
+    </div>
+    <div class="my-6 sm:my-8 rounded-2xl border border-[#212b54] bg-[#0c1022] p-4 sm:p-5 space-y-3 sm:space-y-4 shadow-2xl transition-all duration-300 hover:border-[var(--accent)]">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#1c243f] pb-3">
+            <div class="flex items-center gap-2 min-w-0">
+                <i data-lucide="clapperboard" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                <h4 class="text-xs sm:text-sm font-bold text-white tracking-wide truncate">Field Lab Demo: setting breakpoints demo</h4>
+            </div>
+            <span class="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-mono font-semibold bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]">Live Lab</span>
+        </div>
+        <div class="rounded-xl overflow-hidden bg-black border border-[#1c243f] shadow-inner">
+            <video controls preload="metadata" class="w-full max-h-[320px] sm:max-h-[480px] bg-black">
+                <source src="videos/setting-breakpoints-demo.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-[#cbd5e1] font-mono pt-1">
+            <span class="flex items-center gap-1.5 truncate max-w-[200px] sm:max-w-xs"><i data-lucide="file-video" class="w-3.5 h-3.5 text-[var(--accent)] flex-shrink-0"></i><span class="truncate">setting-breakpoints-demo.mp4</span></span>
+            <a href="videos/setting-breakpoints-demo.mp4" download class="text-[#cbd5e1] hover:text-[var(--accent)] font-semibold flex items-center gap-1 transition"><i data-lucide="download" class="w-3.5 h-3.5"></i><span>Download MP4</span></a>
+        </div>
+    </div></div></main></body></html>

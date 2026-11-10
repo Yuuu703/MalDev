@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Block DLL Policy</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+        <div id="block-dll-policy" class="scroll-mt-24 pt-6 sm:pt-8 pb-3 border-b border-[#212b54] mt-8 sm:mt-12 mb-4 sm:mb-6 flex items-center justify-between group">
+            <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5 sm:gap-3">
+                <i data-lucide="sparkles" class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent)] flex-shrink-0"></i>
+                <span>Block DLL Policy</span>
+            </h2>
+            <a href="#block-dll-policy" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition" class="opacity-0 group-hover:opacity-100 text-[#cbd5e1] hover:text-[var(--accent)] text-xs flex items-center gap-1 font-mono transition p-1.5 rounded hover:bg-[var(--accent-soft)]" title="Copy link">
+                <i data-lucide="link" class="w-4 h-4"></i>
+            </a>
+        </div><h3 id="introduction" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Introduction</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This module introduces a technique that blocks security products from installing hooks into the local and remote processes using a special process creation flag. The process creation flag blocks non-Microsoft signed DLLs from being loaded into the created process, therefore, blocking them from installing hooks and performing other security mitigations, that would get the implementation detected during runtime.</p><h3 id="the-flag" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>The Flag</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The special process creation flag is <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PROCESS_CREATION_MITIGATION_POLICY_BLOCK_NON_MICROSOFT_BINARIES_ALWAYS_ON</code> and can be set on a newly created process using the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">UpdateProcThreadAttribute</code> WinAPI. This flag belongs to a family of other <em>mitigation policies</em> that Microsoft created to prevent various types of attacks against the calling process. These mitigation policies are mostly related to exploitation but have other purposes as well. Two examples of mitigation policies are <a href="https://learn.microsoft.com/en-us/windows/win32/memory/data-execution-prevention" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">Data Execution Prevention</a> and <a href="https://learn.microsoft.com/en-us/windows/win32/secbp/control-flow-guard" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">Control Flow Guard</a>.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">UpdateProcThreadAttribute</code> WinAPI was previously used in the <em>Spoofing PPID</em> module where an attribute was initialized using <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">InitializeProcThreadAttributeList</code> and then added to the attribute list of the process being created.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The same approach will be used to block non-Microsoft signed DLLs with the main difference being the flag used is <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PROCESS_CREATION_MITIGATION_POLICY_BLOCK_NON_MICROSOFT_BINARIES_ALWAYS_ON</code>.</p><h3 id="block-dll-policy-on-remote-process" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Block DLL Policy On Remote Process</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Recall from the <em>Spoofing PPID</em> module that it&#x27;s necessary to call <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">InitializeProcThreadAttributeList</code> twice, the first time to obtain the required size of the attribute to allocate enough memory and the second time with the correct parameters. Additionally, the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">STARTUPINFOEX</code> structure needs to be used rather than <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">STARTUPINFO</code> to update the attributes list.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CreateProcessWithBlockDllPolicy</code> is a custom-built function that takes the path to a remote executable (<code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">lpProcessPath</code>) and creates the process with the block DLL policy enabled.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Unfortunately, this implementation only benefits the child process since the implementation will not have this policy enabled, rather only its spawned child processes will. This means that the local process will remain hooked, as the policy of blocking the injection of non-Microsoft signed DLLs into the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">implementation.exe</code> process was not enabled when the process was created.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/block-dll-119432594-98c5ac96-6827-4bd5-b1bd-8101251cf1ef.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The following <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CreateProcessWithBlockDllPolicy</code> function creates a process with the block DLLs policy enabled. The function takes 4 arguments:</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">lpProcessPath</code> - The name of the process to create.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">dwProcessId</code> - A pointer to a DWORD that receives the newly created process&#x27;s PID.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">hProcess</code> - A pointer to a HANDLE that receives a handle to the newly created process.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">hThread</code> - A pointer to a HANDLE that receives a handle to the newly created process&#x27;s thread.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL CreateProcessWithBlockDllPolicy(IN LPCSTR lpProcessPath, OUT DWORD* dwProcessId, OUT HANDLE* hProcess, OUT HANDLE* hThread) {
+
+
+	STARTUPINFOEXA        SiEx        = { 0 };
+	PROCESS_INFORMATION   Pi          = { 0 };
+	SIZE_T                sAttrSize   = NULL;
+	PVOID                 pAttrBuf    = NULL;
+
+	if (lpProcessPath == NULL)
+		return FALSE;
+
+	// Cleaning the structs by setting the member values to 0
+	RtlSecureZeroMemory(&amp;SiEx, sizeof(STARTUPINFOEXA));
+	RtlSecureZeroMemory(&amp;Pi, sizeof(PROCESS_INFORMATION));
+
+	// Setting the size of the structure
+	SiEx.StartupInfo.cb       = sizeof(STARTUPINFOEXA);
+	SiEx.StartupInfo.dwFlags  = EXTENDED_STARTUPINFO_PRESENT;
+
+//-------------------------------------------------------------------------------
+
+	// Get the size of our PROC_THREAD_ATTRIBUTE_LIST to be allocated
+	InitializeProcThreadAttributeList(NULL, 1, NULL, &amp;sAttrSize);
+	pAttrBuf = (LPPROC_THREAD_ATTRIBUTE_LIST)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sAttrSize);
+
+	// Initialise our list
+	if (!InitializeProcThreadAttributeList(pAttrBuf, 1, NULL, &amp;sAttrSize)) {
+		printf(&quot;[!] InitializeProcThreadAttributeList Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	// Enable blocking of non-Microsoft signed DLLs
+	DWORD64 dwPolicy = PROCESS_CREATION_MITIGATION_POLICY_BLOCK_NON_MICROSOFT_BINARIES_ALWAYS_ON;
+
+	// Assign our attribute
+	if (!UpdateProcThreadAttribute(pAttrBuf, NULL, PROC_THREAD_ATTRIBUTE_MITIGATION_POLICY, &amp;dwPolicy, sizeof(DWORD64), NULL, NULL)) {
+		printf(&quot;[!] UpdateProcThreadAttribute Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	SiEx.lpAttributeList = (LPPROC_THREAD_ATTRIBUTE_LIST)pAttrBuf;
+
+//-------------------------------------------------------------------------------
+
+	if (!CreateProcessA(
+		NULL,
+		lpProcessPath,
+		NULL,
+		NULL,
+		FALSE,
+		EXTENDED_STARTUPINFO_PRESENT,
+		NULL,
+		NULL,
+		&amp;SiEx.StartupInfo,
+		&amp;Pi)) {
+		printf(&quot;[!] CreateProcessA Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+
+	*dwProcessId  = Pi.dwProcessId;
+	*hProcess     = Pi.hProcess;
+	*hThread      = Pi.hThread;
+
+	// Cleaning up
+	DeleteProcThreadAttributeList(pAttrBuf);
+	HeapFree(GetProcessHeap(), 0, pAttrBuf);
+
+	if (*dwProcessId != NULL &amp;&amp; *hProcess != NULL &amp;&amp; *hThread != NULL)
+		return TRUE;
+	else
+		return FALSE;
+}</code></pre>
+        </div><h3 id="block-dll-policy-on-local-process" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Block DLL Policy On Local Process</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">To enable this policy on the local process, a Linux-style fork implementation will be used, whereby the local process creates another process of itself with this mitigation policy enabled. To prevent this cycle from continuing indefinitely, an argument will be passed to the second instance of the process to indicate that it should stop running the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CreateProcessWithBlockDllPolicy</code> function and instead execute the payload. The pseudocode below demonstrates the logic that will be employed in the code.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">int main (int argc, char* argv[]){
+
+  if (argc == 2 &amp;&amp; (strcmp(argv[1], STOP_ARG) == 0)) {
+    //  PROCESS_CREATION_MITIGATION_POLICY_BLOCK_NON_MICROSOFT_BINARIES_ALWAYS_ON is enabled
+    //  Running the payload injection code for example
+  }
+  else {
+    // &#x27;STOP_ARG&#x27; is not passed to the process, so we create another copy of the local process with the block dll policy
+    // The &#x27;STOP_ARG&#x27; argument will be passed in to the another process, making the above if-statement valid, so no more processes will be created
+  }
+}</code></pre>
+        </div><h3 id="the-code" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>The Code</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The function below includes preprocessor code to determine if the implementation will enable the block DLL policy remotely or locally. Additionally, the function performs the following:</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>If <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">LOCAL_BLOCKDLLPOLICY</code> is not enabled then the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CreateProcessWithBlockDllPolicy</code> function is called with the path of the remote executable to run with the block DLL policy enabled.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>If the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">LOCAL_BLOCKDLLPOLICY</code> is defined, an if-else statement checks if the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">STOP_ARG</code> argument is present. If <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">STOP_ARG</code> is not found, then the process has not enabled the block DLL policy, so the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CreateProcessWithBlockDllPolicy</code> function is called to re-run the local executable with the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">STOP_ARG</code> argument.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>The next time the process is executed, it will have the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">STOP_ARG</code> argument, indicating that the block DLL policy is enabled. This will result in the main function proceeding to execute the payload.</span></div>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">// Comment to create a remote process with block dll policy enabled
+//
+#define LOCAL_BLOCKDLLPOLICY#ifdef LOCAL_BLOCKDLLPOLICY#define STOP_ARG &quot;MalDevAcad&quot;#endif // LOCAL_BLOCKDLLPOLICY//...
+
+int main(int argc, char* argv[]) {
+
+	DWORD   dwProcessId   = NULL;
+	HANDLE  hProcess      = NULL,
+            hThread       = NULL;
+
+#ifdef LOCAL_BLOCKDLLPOLICYif (argc == 2 &amp;&amp; (strcmp(argv[1], STOP_ARG) == 0)) {
+		/*
+			the real implementation code
+		*/
+		printf(&quot;[+] Process Is Now Protected With The Block Dll Policy \n&quot;);
+
+		WaitForSingleObject((HANDLE)-1, INFINITE);
+	}
+	else {
+
+		printf(&quot;[!] Local Process Is Not Protected With The Block Dll Policy \n&quot;);
+
+		// getting the local process path + name
+		CHAR pcFilename[MAX_PATH * 2];
+		if (!GetModuleFileNameA(NULL, &amp;pcFilename, MAX_PATH * 2)) {
+			printf(&quot;[!] GetModuleFileNameA Failed With Error : %d \n&quot;, GetLastError());
+			return -1;
+		}
+
+		// re-creating local process, so we add the process argument
+		// &#x27;pcBuffer&#x27; = &#x27;pcFilename&#x27; + &#x27;STOP_ARG&#x27;
+
+		DWORD dwBufferSize	= (DWORD)(lstrlenA(pcFilename) + lstrlenA(STOP_ARG) + 0xFF);
+		CHAR* pcBuffer		= (CHAR*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, dwBufferSize);
+		if (!pcBuffer)
+			return FALSE;
+
+		sprintf_s(pcBuffer, dwBufferSize, &quot;%s %s&quot;, pcFilename, STOP_ARG);
+
+		// fork with block dll policy
+		if (!CreateProcessWithBlockDllPolicy(pcBuffer, &amp;dwProcessId, &amp;hProcess, &amp;hThread)) {
+			return -1;
+		}
+
+		HeapFree(GetProcessHeap(), 0, pcBuffer);
+
+		printf(&quot;[i] Process Created With Pid %d \n&quot;, dwProcessId);
+
+
+	}
+#endif // LOCAL_BLOCKDLLPOLICY#ifndef LOCAL_BLOCKDLLPOLICY// if LOCAL_BLOCKDLLPOLICY is not defined
+	if (!CreateProcessWithBlockDllPolicy(&quot;C:\\Windows\\System32\\RuntimeBroker.exe&quot;, &amp;dwProcessId, &amp;hProcess, &amp;hThread)) {
+		return -1;
+	}
+	printf(&quot;[i] Process Created With Pid %d \n&quot;, dwProcessId);
+
+#endif // !LOCAL_BLOCKDLLPOLICYreturn 0;
+
+}</code></pre>
+        </div><h3 id="setting-block-dll-policy-at-runtime" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Setting Block DLL Policy At runtime</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">There are alternative methods to activate the mitigation policy at the local level, aside from using CreateProcess, such as using the <a href="https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-setprocessmitigationpolicy" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">SetMitigationPolicy</a> WinAPI with the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ProcessSignaturePolicy</code> flag during runtime. This can be implemented within the following function.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">While this approach may require less effort, it is important to note that executing <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SetProcessMitigationPolicy</code> may raise suspicion as it occurs after EDRs have already injected their DLLs meaning the DLLs will remain injected even after the policy is enabled.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">int main() {
+
+    // block dll policy is disabled
+
+	PROCESS_MITIGATION_BINARY_SIGNATURE_POLICY Struct = { 0 };
+
+	Struct.MicrosoftSignedOnly = 1;
+
+	if (!SetProcessMitigationPolicy(ProcessSignaturePolicy, &amp;Struct, sizeof(Struct))) {
+		printf(&quot;[!] SetProcessMitigationPolicy Failed With Error : %d \n&quot;, GetLastError());
+	}
+
+    // local process now have block dll mitigation policy enabled - but hooks remain installed
+}</code></pre>
+        </div><h3 id="conclusion" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Conclusion</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Unfortunately, this method will be ineffective against EDRs that have their files digitally signed by Microsoft, since their DLLs are allowed to be injected even with the block DLL policy enabled.</p><h3 id="demo" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Demo</span></h3><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Enabling the block DLL policy on a remote process.
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/block-dll-219450935-66de904e-890a-40f4-87ef-d521b44ab53d.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">• Enabling the block DLL policy on the local process.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/block-dll-319450939-a6401c36-a633-4068-871e-6e3ea6768da4.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div></span></div><div class="mt-8 sm:mt-12 pt-6 border-t border-[#212b54] space-y-4"><h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2"><i data-lucide="video" class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent)]"></i><span>Practical Lab Demonstration</span></h3>
+    <div class="my-6 sm:my-8 rounded-2xl border border-[#212b54] bg-[#0c1022] p-4 sm:p-5 space-y-3 sm:space-y-4 shadow-2xl transition-all duration-300 hover:border-[var(--accent)]">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#1c243f] pb-3">
+            <div class="flex items-center gap-2 min-w-0">
+                <i data-lucide="clapperboard" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                <h4 class="text-xs sm:text-sm font-bold text-white tracking-wide truncate">Field Lab Demo: BYOVD Demo</h4>
+            </div>
+            <span class="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-mono font-semibold bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]">Live Lab</span>
+        </div>
+        <div class="rounded-xl overflow-hidden bg-black border border-[#1c243f] shadow-inner">
+            <video controls preload="metadata" class="w-full max-h-[320px] sm:max-h-[480px] bg-black">
+                <source src="videos/BYOVD-Demo.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-[#cbd5e1] font-mono pt-1">
+            <span class="flex items-center gap-1.5 truncate max-w-[200px] sm:max-w-xs"><i data-lucide="file-video" class="w-3.5 h-3.5 text-[var(--accent)] flex-shrink-0"></i><span class="truncate">BYOVD-Demo.mp4</span></span>
+            <a href="videos/BYOVD-Demo.mp4" download class="text-[#cbd5e1] hover:text-[var(--accent)] font-semibold flex items-center gap-1 transition"><i data-lucide="download" class="w-3.5 h-3.5"></i><span>Download MP4</span></a>
+        </div>
+    </div></div></main></body></html>

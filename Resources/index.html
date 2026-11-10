@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Offline Lesson Library</title>
+    <link rel="stylesheet" href="app.css" />
+    <script src="catalog.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <h1>Offline Lesson Library</h1>
+        <span id="lessonCount"></span>
+      </div>
+      <label class="field">
+        <span>Book</span>
+        <select id="bookSelect" aria-label="Choose a book"></select>
+      </label>
+      <label class="field search-field">
+        <span>Filter lessons</span>
+        <input id="filterInput" type="search" placeholder="Search titles or modules" autocomplete="off" />
+      </label>
+    </header>
+
+    <main class="layout">
+      <aside class="navigation" aria-label="Lesson list">
+        <div id="lessonList" class="lesson-list"></div>
+      </aside>
+      <section class="reading" aria-label="Selected lesson">
+        <header class="lesson-heading">
+          <h2 id="activeTitle">Loading lessons…</h2>
+          <p id="activeMeta"></p>
+        </header>
+        <iframe id="contentFrame" title="Lesson content" loading="eager"></iframe>
+      </section>
+    </main>
+  </body>
+</html>

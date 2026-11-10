@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Syscalls - SysWhispers</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+        <div id="syscalls-syswhispers" class="scroll-mt-24 pt-6 sm:pt-8 pb-3 border-b border-[#212b54] mt-8 sm:mt-12 mb-4 sm:mb-6 flex items-center justify-between group">
+            <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5 sm:gap-3">
+                <i data-lucide="terminal" class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent2)] flex-shrink-0"></i>
+                <span>Syscalls - SysWhispers</span>
+            </h2>
+            <a href="#syscalls-syswhispers" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition" class="opacity-0 group-hover:opacity-100 text-[#cbd5e1] hover:text-[var(--accent)] text-xs flex items-center gap-1 font-mono transition p-1.5 rounded hover:bg-[var(--accent-soft)]" title="Copy link">
+                <i data-lucide="link" class="w-4 h-4"></i>
+            </a>
+        </div><h3 id="introduction" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Introduction</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">SysWhispers is a tool that evades syscalls hooking via direct syscalls. There are several versions of SysWhispers which have different features. The difference between the versions will be discussed in this module.</p><h3 id="syswhispers" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>SysWhispers</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><a href="https://github.com/jthuraisamy/SysWhispers" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">SysWhispers</a> generates header/ASM file implants to enable direct system calls on 64-bit systems. It supports syscalls from Windows XP to Windows 10 19042 (20H2). The supported Windows versions are limited since the syscall number (SSN) can be altered with each Windows update. Therefore, a direct syscall implementation for a particular syscall on Windows 10 1903 may not be compatible with the same syscall on Windows 10 1909, and vice versa.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Since the same syscalls may have different SSNs on different versions of Windows, SysWhispers checks the Windows version of the target system at runtime and sets the SSN manually to the correct version.</p><h3 id="syswhispers-ntmapviewofsection-example" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>SysWhispers - NtMapViewOfSection Example</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">SysWhispers uses a Python script to generate two files (<a href="https://github.com/jthuraisamy/SysWhispers/tree/master/example-output" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">example</a>). The SSNs are derived from the <a href="https://j00ru.vexillium.org/syscalls/nt/64/" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">Windows X86-64 System Call Table</a> and are hardcoded into the created assembly file. The assembly functions then determine which SSN to use.</p><h3 id="syswhispers-sample-output" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>SysWhispers Sample Output</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The assembly functions below are derived when SysWhispers is used to generate direct syscalls for <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtMapViewOfSection</code>.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">ASM / x64</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-nasm">// ...
+
+NtMapViewOfSection PROC
+	mov rax, gs:[60h]                             ; Load PEB into RAX.
+NtMapViewOfSection_Check_X_X_XXXX:                ; Check major version.
+	cmp dword ptr [rax+118h], 5
+	je  NtMapViewOfSection_SystemCall_5_X_XXXX
+	cmp dword ptr [rax+118h], 6
+	je  NtMapViewOfSection_Check_6_X_XXXX
+	cmp dword ptr [rax+118h], 10
+	je  NtMapViewOfSection_Check_10_0_XXXX
+	jmp NtMapViewOfSection_SystemCall_Unknown
+NtMapViewOfSection_Check_6_X_XXXX:               ; Check minor version for Windows Vista/7/8.
+	cmp dword ptr [rax+11ch], 0
+	je  NtMapViewOfSection_Check_6_0_XXXX
+	cmp dword ptr [rax+11ch], 1
+	je  NtMapViewOfSection_Check_6_1_XXXX
+	cmp dword ptr [rax+11ch], 2
+	je  NtMapViewOfSection_SystemCall_6_2_XXXX
+	cmp dword ptr [rax+11ch], 2
+	je  NtMapViewOfSection_SystemCall_6_3_XXXX
+	jmp NtMapViewOfSection_SystemCall_Unknown
+NtMapViewOfSection_Check_6_0_XXXX:               ; Check build number for Windows Vista.
+	cmp dword ptr [rax+120h], 6000
+	je  NtMapViewOfSection_SystemCall_6_0_6000
+	cmp dword ptr [rax+120h], 6001
+	je  NtMapViewOfSection_SystemCall_6_0_6001
+	cmp dword ptr [rax+120h], 6002
+	je  NtMapViewOfSection_SystemCall_6_0_6002
+	jmp NtMapViewOfSection_SystemCall_Unknown
+NtMapViewOfSection_Check_6_1_XXXX:               ; Check build number for Windows 7.
+	cmp dword ptr [rax+120h], 7600
+	je  NtMapViewOfSection_SystemCall_6_1_7600
+	cmp dword ptr [rax+120h], 7601
+	je  NtMapViewOfSection_SystemCall_6_1_7601
+	jmp NtMapViewOfSection_SystemCall_Unknown
+NtMapViewOfSection_Check_10_0_XXXX:              ; Check build number for Windows 10.
+	cmp dword ptr [rax+120h], 10240
+	je  NtMapViewOfSection_SystemCall_10_0_10240
+	cmp dword ptr [rax+120h], 10586
+	je  NtMapViewOfSection_SystemCall_10_0_10586
+	cmp dword ptr [rax+120h], 14393
+	je  NtMapViewOfSection_SystemCall_10_0_14393
+	cmp dword ptr [rax+120h], 15063
+	je  NtMapViewOfSection_SystemCall_10_0_15063
+	cmp dword ptr [rax+120h], 16299
+	je  NtMapViewOfSection_SystemCall_10_0_16299
+	cmp dword ptr [rax+120h], 17134
+	je  NtMapViewOfSection_SystemCall_10_0_17134
+	cmp dword ptr [rax+120h], 17763
+	je  NtMapViewOfSection_SystemCall_10_0_17763
+	cmp dword ptr [rax+120h], 18362
+	je  NtMapViewOfSection_SystemCall_10_0_18362
+	cmp dword ptr [rax+120h], 18363
+	je  NtMapViewOfSection_SystemCall_10_0_18363
+	jmp NtMapViewOfSection_SystemCall_Unknown
+NtMapViewOfSection_SystemCall_5_X_XXXX:          ; Windows XP and Server 2003
+	mov eax, 0025h
+	jmp NtMapViewOfSection_Epilogue
+NtMapViewOfSection_SystemCall_6_0_6000:          ; Windows Vista SP0
+	mov eax, 0025h
+	jmp NtMapViewOfSection_Epilogue
+NtMapViewOfSection_SystemCall_6_0_6001:          ; Windows Vista SP1 and Server 2008 SP0
+	mov eax, 0025h
+	jmp NtMapViewOfSection_Epilogue
+NtMapViewOfSection_SystemCall_6_0_6002:          ; Windows Vista SP2 and Server 2008 SP2
+	mov eax, 0025h
+	jmp NtMapViewOfSection_Epilogue
+NtMapViewOfSection_SystemCall_6_1_7600:          ; Windows 7 SP0
+	mov eax, 0025h
+	jmp NtMapViewOfSection_Epilogue
+NtMapViewOfSection_SystemCall_6_1_7601:          ; Windows 7 SP1 and Server 2008 R2 SP0
+	mov eax, 0025h
+	jmp NtMapViewOfSection_Epilogue
+NtMapViewOfSection_SystemCall_6_2_XXXX:          ; Windows 8 and Server 2012
+	mov eax, 0026h
+	jmp NtMapViewOfSection_Epilogue
+NtMapViewOfSection_SystemCall_6_3_XXXX:          ; Windows 8.1 and Server 2012 R2
+	mov eax, 0027h
+	jmp NtMapViewOfSection_Epilogue
+NtMapViewOfSection_SystemCall_10_0_10240:        ; Windows 10.0.10240 (1507)
+	mov eax, 0028h
+	jmp NtMapViewOfSection_Epilogue
+NtMapViewOfSection_SystemCall_10_0_10586:        ; Windows 10.0.10586 (1511)
+	mov eax, 0028h
+	jmp NtMapViewOfSection_Epilogue
+NtMapViewOfSection_SystemCall_10_0_14393:        ; Windows 10.0.14393 (1607)
+	mov eax, 0028h
+	jmp NtMapViewOfSection_Epilogue
+NtMapViewOfSection_SystemCall_10_0_15063:        ; Windows 10.0.15063 (1703)
+	mov eax, 0028h
+	jmp NtMapViewOfSection_Epilogue
+NtMapViewOfSection_SystemCall_10_0_16299:        ; Windows 10.0.16299 (1709)
+	mov eax, 0028h
+	jmp NtMapViewOfSection_Epilogue
+NtMapViewOfSection_SystemCall_10_0_17134:        ; Windows 10.0.17134 (1803)
+	mov eax, 0028h
+	jmp NtMapViewOfSection_Epilogue
+NtMapViewOfSection_SystemCall_10_0_17763:        ; Windows 10.0.17763 (1809)
+	mov eax, 0028h
+	jmp NtMapViewOfSection_Epilogue
+NtMapViewOfSection_SystemCall_10_0_18362:        ; Windows 10.0.18362 (1903)
+	mov eax, 0028h
+	jmp NtMapViewOfSection_Epilogue
+NtMapViewOfSection_SystemCall_10_0_18363:        ; Windows 10.0.18363 (1909)
+	mov eax, 0028h
+	jmp NtMapViewOfSection_Epilogue
+NtMapViewOfSection_SystemCall_Unknown:           ; Unknown/unsupported version.
+	ret
+NtMapViewOfSection_Epilogue:
+	mov r10, rcx
+	syscall
+	ret
+NtMapViewOfSection ENDP
+
+// ...</code></pre>
+        </div><h3 id="explanation" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Explanation</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The PEB structure contains three members that can be used to determine the Windows OS version:</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">OSBuildNumber</code></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">OSMajorVersion</code></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">OSMinorVersion</code></span></div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The 64-bit assembly functions generated by SysWhispers use these members to jump to the location where the correct SSN is located as a hardcoded value. The logic being utilized is essentially several if &amp; else if statements. For example, if the target machine is Windows 10 1809 then the following logic occurs:</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Since the <em>major version</em> member of the PEB is equal to 10, the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtMapViewOfSection_Check_10_0_XXXX</code> label is executed.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>This label then checks the <em>build number</em> of the system. In this example, that number is 1809 which makes it jump to the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtMapViewOfSection_SystemCall_10_0_17763</code> label.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>The SSN is then set to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">0028h</code></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>A final jump happens to the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtMapViewOfSection_Epilogue</code> label where the remaining syscall instructions are executed. Recall that a syscall function has the following format:</span></div>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">ASM / x64</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-nasm">mov r10, rcx
+mov eax, SSN
+syscall
+ret</code></pre>
+        </div><h3 id="syswhispers2" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>SysWhispers2</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><a href="https://github.com/jthuraisamy/SysWhispers2" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">SysWhispers2</a> shares the same concept as its previous version with the main difference being that SysWhispers2 does not require the user to specify which Windows versions to support in the Python generator. This is because SysWhispers2 no longer relies on the Windows X86-64 System Call Table for the SSNs and instead uses a method called <em>Sorting By System Call Address</em>. This method eliminates the need to have the assembly instructions manually choose the SSN at runtime, resulting in smaller syscalls stubs.</p><h3 id="sorting-by-system-call-address" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Sorting By System Call Address</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Sorting by system call address is a method to retrieve the SSN of a syscall during runtime. This is done by finding all syscalls starting with <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Zw</code> and then saving their address in an array and sorting them in ascending order (smallest to biggest addresses). The SSN will become the index of the system call stored in the array.</p><h3 id="syswhispers2-implementation" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>SysWhispers2 Implementation</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Sorting by system call address is done via Syswhispers2&#x27;s <a href="https://github.com/jthuraisamy/SysWhispers2/blob/main/example-output/Syscalls.c#L32" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">SW2_PopulateSyscallList</a> function which <a href="https://github.com/jthuraisamy/SysWhispers2/blob/main/example-output/Syscalls.c#L49" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">fetches NTDLL&#x27;s base address</a> and its export directory. Using that information it <a href="https://github.com/jthuraisamy/SysWhispers2/blob/main/example-output/Syscalls.c#L77" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">calculates the RVAs</a> of the exported functions (addresses, names, ordinals). Recall the <em>IAT Hiding &amp; Obfuscation - Replacing GetProcAddress</em> module where this was performed.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Next, SysWhispers2 checks the exported function names for ones prefixed with <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Zw</code>. Those function names are hashed and saved into an <a href="https://github.com/jthuraisamy/SysWhispers2/blob/main/example-output/Syscalls.c#L92" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">array</a> along with their addresses. After that, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SW2_PopulateSyscallList</code> sorts the addresses collected in <a href="https://github.com/jthuraisamy/SysWhispers2/blob/main/example-output/Syscalls.c#L104" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">ascending order</a>.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">To find a syscall&#x27;s SSN, the <a href="https://github.com/jthuraisamy/SysWhispers2/blob/main/example-output/Syscalls.c#L128" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">SW2_GetSyscallNumber</a> function takes the hash of the target syscall name and <a href="https://github.com/jthuraisamy/SysWhispers2/blob/main/example-output/Syscalls.c#L137" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">returns the index</a> where this syscall hash is found in the array. The index value is the SSN of the syscall.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">A visual example of the implementation is shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/syswhipsers2-syscall-search.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="syswhispers2-sample-output" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>SysWhispers2 Sample Output</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">SysWhispers2 is used to generate a direct syscall for <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtMapViewOfSection</code>.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">ASM / x64</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-nasm">.data
+currentHash DWORD 0
+
+.code
+EXTERN SW2_GetSyscallNumber: PROC
+
+WhisperMain PROC
+    pop rax
+    mov [rsp+ 8], rcx              ; Save registers.
+    mov [rsp+16], rdx
+    mov [rsp+24], r8
+    mov [rsp+32], r9
+    sub rsp, 28h
+    mov ecx, currentHash
+    call SW2_GetSyscallNumber
+    add rsp, 28h
+    mov rcx, [rsp+ 8]              ; Restore registers.
+    mov rdx, [rsp+16]
+    mov r8, [rsp+24]
+    mov r9, [rsp+32]
+    mov r10, rcx
+    syscall                        ; Issue syscall
+    ret
+WhisperMain ENDP
+
+NtMapViewOfSection PROC
+    mov currentHash, 060C9AE95h    ; Load function hash into global variable.
+    call WhisperMain               ; Resolve function hash into syscall number and make the call
+NtMapViewOfSection ENDP
+
+end</code></pre>
+        </div><h3 id="explanation" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Explanation</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">060C9AE95h</code> is the hash value in hex for the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ZwMapViewOfSection</code> string. Calling <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtMapViewOfSection</code> will first load the hash value into the global variable <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">currentHash</code>, and call <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">WhisperMain</code>. <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">WhisperMain</code> is the function responsible for calling the previously explained <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SW2_GetSyscallNumber</code> C function that will return the SSN using the syscall&#x27;s hash value, which in this case is <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">currentHash</code>.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">mov [rsp+XX], XXX</code> instructions are used to save the registers to the stack before calling <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SW2_GetSyscallNumber</code>, and the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">mov XXX, [rsp+ XX]</code> instructions are used to restore the registers to what they were before the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SW2_GetSyscallNumber</code> call. This is needed because calling <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SW2_GetSyscallNumber</code> will change these registers&#x27; values. Finally, at the end of the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">WhisperMain</code> function, the usual syscall instructions are there present:</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">ASM / x64</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-nasm">mov r10, rcx
+syscall
+ret</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Notice how the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">mov eax, SSN</code> instruction is missing. This is because when a function is called, its returned output is stored in the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">eax</code> register. Since <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SW2_GetSyscallNumber</code> was called before these instructions, this means that the SSN is already stored in the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">eax</code> register.</p><h3 id="syswhispers3" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>SysWhispers3</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Recall that <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">syscall</code> is responsible for shifting the execution flow from user mode to kernel mode. Legitimate <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">syscall</code> instructions should always be executed from within the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ntdll.dll</code> address space. Therefore, when the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">syscall</code> instruction is included in the binary, as was the case with SysWhispers and SysWhispers2, the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">syscall</code> instruction occurs from outside of that address space. Therefore, a binary performing a <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">syscall</code> instruction can be an indicator of malicious intent.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The updates in Syswhispers3 are found in the <a href="https://klezvirus.github.io/RedTeaming/AV_Evasion/NoSysWhisper/" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">SysWhispers is dead, long live SysWhispers!</a> blog post. The summary of changes is shown below.</p><h3 id="changes-to-syswhispers3" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Changes To SysWhispers3</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Instead of calling the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">syscall</code> instruction directly from within the assembly functions, SysWhispers3 will search for the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">syscall</code> instruction in <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ntdll.dll</code>&#x27;s address space, perform a jump instruction and execute the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">syscall</code> instruction. This method is utilizing the indirect syscall technique which is discussed later.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Furthermore, Syswhispers3 comes with a <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">jumper_randomized</code> option that will perform a jump to the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">syscall</code> instruction that belongs to a random function. For example, when calling <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtAllocateVirtualMemory</code> with this option, the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">syscall</code> instruction that will be jumped to, doesn&#x27;t belong to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtAllocateVirtualMemory</code> in <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ntdll.dll</code>. Instead, the instruction belongs to another syscall like the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtTestAlert</code> function.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Similar to the previous version, Syswhispers3 uses the sorting by system call address method to find a syscall.</p><h3 id="syswhispers3-sample-output" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>SysWhispers3 Sample Output</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">SysWhispers3 is used to generate a syscall calling stub for the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtMapViewOfSection</code> function. <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Syswhispers3</code> output looks similar to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Syswhispers2</code> with the main difference being the additional <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SW3_GetRandomSyscallAddress</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SW3_GetSyscallNumber</code> function calls, which are shown and explained below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/syswhispers-314041015-7c969ae9-8b74-46a5-bf36-2c6bbedad332.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>Syscalls-asm.x64.asm</strong></p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">ASM / x64</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-nasm">.code
+
+EXTERN SW3_GetSyscallNumber: PROC
+
+EXTERN SW3_GetRandomSyscallAddress: PROC
+
+NtMapViewOfSection PROC
+	mov [rsp +8], rcx                      ; Save registers.
+	mov [rsp+16], rdx
+	mov [rsp+24], r8
+	mov [rsp+32], r9
+	sub rsp, 28h
+	mov ecx, 01A80161Bh                     ; Load function hash into ECX.
+	call SW3_GetRandomSyscallAddress        ; Get a syscall offset from a different api.
+	mov r15, rax                            ; Save the address of the syscall {since SW3_GetRandomSyscallAddress will return the address of the &#x27;syscall&#x27; instruction in rax register}
+	mov ecx, 01A80161Bh                     ; Re-Load function hash into ECX (optional).
+	call SW3_GetSyscallNumber               ; Resolve function hash into syscall number. {Now, eax has the SSN}
+	add rsp, 28h
+	mov rcx, [rsp+8]                        ; Restore registers.
+	mov rdx, [rsp+16]
+	mov r8, [rsp+24]
+	mov r9, [rsp+32]
+	mov r10, rcx
+	jmp r15                                 ; Jump to -&gt; Invoke system call. {r15 is the address of a random &#x27;syscall&#x27; instruction in ntdll.dll}
+NtMapViewOfSection ENDP
+
+end</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><strong>SW3_GetSyscallNumber</strong> and <strong>SW3_GetRandomSyscallAddress</strong></p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SW3_GetSyscallNumber</code> function finds the syscall and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SW3_GetRandomSyscallAddress</code> fetches the address of the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">syscall</code> instruction of a random syscall inside of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ntdll.dll</code> because the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">jumper_randomized</code> option was used.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">ASM / x64</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-nasm">EXTERN_C DWORD SW3_GetSyscallNumber(DWORD FunctionHash)
+{
+    // Ensure SW3_SyscallList is populated.
+    if (!SW3_PopulateSyscallList()) return -1;
+
+    for (DWORD i = 0; i &lt; SW3_SyscallList.Count; i++)
+    {
+        if (FunctionHash == SW3_SyscallList.Entries[i].Hash)
+        {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+
+EXTERN_C PVOID SW3_GetRandomSyscallAddress(DWORD FunctionHash)
+{
+    // Ensure SW3_SyscallList is populated.
+    if (!SW3_PopulateSyscallList()) return NULL;
+
+    DWORD index = ((DWORD) rand()) % SW3_SyscallList.Count;
+
+    while (FunctionHash == SW3_SyscallList.Entries[index].Hash){
+        // Spoofing the syscall return address
+        index = ((DWORD) rand()) % SW3_SyscallList.Count;
+    }
+    return SW3_SyscallList.Entries[index].SyscallAddress;
+}</code></pre>
+        </div></main></body></html>

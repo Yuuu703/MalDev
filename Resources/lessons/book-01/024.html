@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Payload Obfuscation - UUIDFuscation</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+        <div id="payload-obfuscation-uuidfuscation" class="scroll-mt-24 pt-6 sm:pt-8 pb-3 border-b border-[#212b54] mt-8 sm:mt-12 mb-4 sm:mb-6 flex items-center justify-between group">
+            <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5 sm:gap-3">
+                <i data-lucide="sparkles" class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent)] flex-shrink-0"></i>
+                <span>Payload Obfuscation - UUIDFuscation</span>
+            </h2>
+            <a href="#payload-obfuscation-uuidfuscation" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition" class="opacity-0 group-hover:opacity-100 text-[#cbd5e1] hover:text-[var(--accent)] text-xs flex items-center gap-1 font-mono transition p-1.5 rounded hover:bg-[var(--accent-soft)]" title="Copy link">
+                <i data-lucide="link" class="w-4 h-4"></i>
+            </a>
+        </div><h3 id="introduction" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Introduction</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In this module, another obfuscation technique is covered which converts shellcode to a Universally Unique IDentifier (UUID) string. UUID is a 36-character alphanumeric string that can be used to identify information.</p><h3 id="uuid-structure" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>UUID Structure</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The UUID format is made up of 5 segments of different sizes which look something like this: <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">801B18F0-8320-4ADA-BB13-41EA1C886B87</code>. The image below illustrates the UUID structure.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/uuid.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Converting UUID to shellcode is a little less straightforward than the previous obfuscation methods. For example <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">FC 48 83 E4 F0 E8 C0 00 00 00 41 51 41 50 52 51</code> does <strong>not</strong> translate into <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">FC4883E4-F0E8-C000-0000-415141505251</code>, instead, it becomes <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">E48348FC-E8F0-00C0-0000-415141505251</code>.</p><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Notice that the first 3 segments are using the same bytes in our shellcode but the order is in reverse. The reason is that the first three segments use <a href="https://en.wikipedia.org/wiki/Endianness" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">little-endian</a> byte ordering. To ensure complete understanding, the segments are broken down below.</p><h3 id="little-endian" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Little Endian</span></h3><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Segment 1: <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">FC 48 83 E4</code> becomes <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">E4 83 48 FC</code> in the UUID string</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Segment 2: <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">E8 F0</code> becomes <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">F0 E8</code> in the UUID string</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Segment 3: <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">C0 00</code> becomes <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">00 C0</code> in the UUID string</span></div><h3 id="big-endian" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Big Endian</span></h3><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Segment 4: <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">00 00</code> becomes <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">00 00</code> in the UUID string</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Segment 5: <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">41 51 41 50 52 51</code> becomes <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">41 51 41 50 52 51</code> in the UUID string</span></div><h3 id="uuidfuscation-implementation" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>UUIDFuscation Implementation</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">A UUID address is made up of 16 bytes, therefore the shellcode should be a multiple of 16. UUIDFuscation will resemble IPv6Fuscation closely due to both requiring shellcode multiples of 16 bytes. Again, padding can be used if the shellcode doesn&#x27;t meet that requirement.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">// Function takes in 16 raw bytes and returns them in a UUID string format
+char* GenerateUUid(int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m, int n, int o, int p) {
+
+	// Each UUID segment is 32 bytes
+	char Output0[32], Output1[32], Output2[32], Output3[32];
+
+	// There are 4 segments in a UUID (32 * 4 = 128)
+	char result[128];
+
+	// Generating output0 from the first 4 bytes
+	sprintf(Output0, &quot;%0.2X%0.2X%0.2X%0.2X&quot;, d, c, b, a);
+
+	// Generating output1 from the second 4 bytes
+	sprintf(Output1, &quot;%0.2X%0.2X-%0.2X%0.2X&quot;, f, e, h, g);
+
+	// Generating output2 from the third 4 bytes
+	sprintf(Output2, &quot;%0.2X%0.2X-%0.2X%0.2X&quot;, i, j, k, l);
+
+	// Generating output3 from the last 4 bytes
+	sprintf(Output3, &quot;%0.2X%0.2X%0.2X%0.2X&quot;, m, n, o, p);
+
+	// Combining Output0,1,2,3 to generate the UUID
+	sprintf(result, &quot;%s-%s-%s%s&quot;, Output0, Output1, Output2, Output3);
+
+	//printf(&quot;[i] result: %s\n&quot;, (char*)result);
+	return (char*)result;
+}
+
+
+
+// Generate the UUID output representation of the shellcode
+// Function requires a pointer or base address to the shellcode buffer &amp; the size of the shellcode buffer
+BOOL GenerateUuidOutput(unsigned char* pShellcode, SIZE_T ShellcodeSize) {
+	// If the shellcode buffer is null or the size is not a multiple of 16, exit
+	if (pShellcode == NULL || ShellcodeSize == NULL || ShellcodeSize % 16 != 0) {
+		return FALSE;
+	}
+	printf(&quot;char* UuidArray[%d] = { \n\t&quot;, (int)(ShellcodeSize / 16));
+
+	// We will read one shellcode byte at a time, when the total is 16, begin generating the UUID string
+	// The variable &#x27;c&#x27; is used to store the number of bytes read. By default, starts at 16.
+	int c = 16, counter = 0;
+	char* UUID = NULL;
+
+	for (int i = 0; i &lt; ShellcodeSize; i++) {
+		// Track the number of bytes read and when they reach 16 we enter this if statement to begin generating the UUID string
+		if (c == 16) {
+			counter++;
+
+			// Generating the UUID string from 16 bytes which begin at i until [i + 15]
+			UUID = GenerateUUid(
+				pShellcode[i], pShellcode[i + 1], pShellcode[i + 2], pShellcode[i + 3],
+				pShellcode[i + 4], pShellcode[i + 5], pShellcode[i + 6], pShellcode[i + 7],
+				pShellcode[i + 8], pShellcode[i + 9], pShellcode[i + 10], pShellcode[i + 11],
+				pShellcode[i + 12], pShellcode[i + 13], pShellcode[i + 14], pShellcode[i + 15]
+			);
+			if (i == ShellcodeSize - 16) {
+
+				// Printing the last UUID string
+				printf(&quot;\&quot;%s\&quot;&quot;, UUID);
+				break;
+			}
+			else {
+				// Printing the UUID string
+				printf(&quot;\&quot;%s\&quot;, &quot;, UUID);
+			}
+			c = 1;
+			// Optional: To beautify the output on the console
+			if (counter % 3 == 0) {
+				printf(&quot;\n\t&quot;);
+			}
+		}
+		else {
+			c++;
+		}
+	}
+	printf(&quot;\n};\n\n&quot;);
+	return TRUE;
+}</code></pre>
+        </div><h3 id="uuid-deobfuscation-implementation" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>UUID Deobfuscation Implementation</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Although different segments have different endianness, that will not affect the deobfuscation process because the <a href="https://learn.microsoft.com/en-us/windows/win32/api/rpcdce/nf-rpcdce-uuidfromstringa" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition">UuidFromStringA</a> WinAPI takes care of this.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">typedef RPC_STATUS (WINAPI* fnUuidFromStringA)(
+	RPC_CSTR	StringUuid,
+	UUID*		Uuid
+);
+
+BOOL UuidDeobfuscation(IN CHAR* UuidArray[], IN SIZE_T NmbrOfElements, OUT PBYTE* ppDAddress, OUT SIZE_T* pDSize) {
+
+        PBYTE          pBuffer         = NULL,
+                       TmpBuffer       = NULL;
+
+        SIZE_T         sBuffSize       = NULL;
+
+        RPC_STATUS     STATUS          = NULL;
+
+	// Getting UuidFromStringA address from Rpcrt4.dll
+	fnUuidFromStringA pUuidFromStringA = (fnUuidFromStringA)GetProcAddress(LoadLibrary(TEXT(&quot;RPCRT4&quot;)), &quot;UuidFromStringA&quot;);
+	if (pUuidFromStringA == NULL) {
+		printf(&quot;[!] GetProcAddress Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	// Getting the real size of the shellcode which is the number of UUID strings * 16
+	sBuffSize = NmbrOfElements * 16;
+
+	// Allocating memory which will hold the deobfuscated shellcode
+	pBuffer = (PBYTE)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sBuffSize);
+	if (pBuffer == NULL) {
+		printf(&quot;[!] HeapAlloc Failed With Error : %d \n&quot;, GetLastError());
+		return FALSE;
+	}
+
+	// Setting TmpBuffer to be equal to pBuffer
+	TmpBuffer = pBuffer;
+
+	// Loop through all the UUID strings saved in UuidArray
+	for (int i = 0; i &lt; NmbrOfElements; i++) {
+
+		// Deobfuscating one UUID string at a time
+		// UuidArray[i] is a single UUID string from the array UuidArray
+		if ((STATUS = pUuidFromStringA((RPC_CSTR)UuidArray[i], (UUID*)TmpBuffer)) != RPC_S_OK) {
+			// if it failed
+			printf(&quot;[!] UuidFromStringA Failed At [%s] With Error 0x%0.8X&quot;, UuidArray[i], STATUS);
+			return FALSE;
+		}
+
+		// 16 bytes are written to TmpBuffer at a time
+		// Therefore Tmpbuffer will be incremented by 16 to store the upcoming 16 bytes
+		TmpBuffer = (PBYTE)(TmpBuffer + 16);
+
+	}
+
+	*ppDAddress = pBuffer;
+	*pDSize     = sBuffSize;
+
+	return TRUE;
+}</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The image below shows the deobfuscation process successfully running.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/uuidfuscation.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div></main></body></html>

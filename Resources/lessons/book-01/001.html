@@ -1,0 +1,774 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Offensive Engineering Field Manual &amp; Research Roadmap</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="space-y-6">
+        <!-- Master Roadmap Header -->
+        <div id="roadmap-overview" class="p-5 sm:p-7 rounded-3xl bg-[#0c1022] border border-[#212b54] text-white space-y-3 shadow-2xl scroll-mt-24">
+            <div class="flex items-center gap-2 text-[var(--accent)] font-bold text-xs sm:text-sm uppercase tracking-wider">
+                <i data-lucide="milestone" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+                <h2 id="overview-heading" class="text-xs sm:text-sm font-bold text-[var(--accent)] inline">Interactive Master Research Roadmap (91 Modules + 48 Video Labs)</h2>
+            </div>
+            <p class="text-xs sm:text-sm text-[#e2e8f0] leading-relaxed">
+                Step-by-step engineering curriculum covering Windows Internals, PE Parsing, Direct Syscalls, API Hooking, EDR Unhooking, AMSI/ETW Patching, and 48 Live Field Laboratory Demonstrations. Click any phase below to jump to that volume.
+            </p>
+            <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5 my-6">
+        <a href="#phase-1" class="p-3 sm:p-4 rounded-2xl bg-[#0c1022] hover:bg-[#121936] border border-[#212b54] hover:border-[var(--accent)] transition-all duration-200 group flex flex-col justify-between shadow-lg active:scale-95">
+            <div class="flex items-center justify-between gap-1 mb-2">
+                <span class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-[11px] sm:text-xs flex items-center justify-center flex-shrink-0">01</span>
+                <span class="text-[9px] sm:text-[10px] font-mono font-bold px-1.5 sm:px-2 py-0.5 rounded-md bg-[rgba(122,162,255,0.18)] text-[#9fc0f5] border-[rgba(122,162,255,0.35)] truncate">Modules 1 - 7</span>
+            </div>
+            <div class="font-bold text-white text-xs leading-snug group-hover:text-[var(--accent)] transition line-clamp-2 min-h-[2rem] flex items-center">Foundations & Architecture</div>
+            <div class="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-[#cbd5e1] font-mono mt-2 pt-2 border-t border-[#1c2547]">
+                <i data-lucide="layers" class="w-3 h-3 text-[var(--accent2)] flex-shrink-0"></i>
+                <span class="truncate">3 Core Lessons</span>
+            </div>
+        </a>
+        <a href="#phase-2" class="p-3 sm:p-4 rounded-2xl bg-[#0c1022] hover:bg-[#121936] border border-[#212b54] hover:border-[var(--accent)] transition-all duration-200 group flex flex-col justify-between shadow-lg active:scale-95">
+            <div class="flex items-center justify-between gap-1 mb-2">
+                <span class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-[11px] sm:text-xs flex items-center justify-center flex-shrink-0">02</span>
+                <span class="text-[9px] sm:text-[10px] font-mono font-bold px-1.5 sm:px-2 py-0.5 rounded-md bg-[rgba(67,209,122,0.18)] text-[#9ff0d0] border-[rgba(67,209,122,0.35)] truncate">Modules 8 - 15</span>
+            </div>
+            <div class="font-bold text-white text-xs leading-snug group-hover:text-[var(--accent)] transition line-clamp-2 min-h-[2rem] flex items-center">PE Format & Payload Placement</div>
+            <div class="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-[#cbd5e1] font-mono mt-2 pt-2 border-t border-[#1c2547]">
+                <i data-lucide="layers" class="w-3 h-3 text-[var(--accent2)] flex-shrink-0"></i>
+                <span class="truncate">3 Core Lessons</span>
+            </div>
+        </a>
+        <a href="#phase-3" class="p-3 sm:p-4 rounded-2xl bg-[#0c1022] hover:bg-[#121936] border border-[#212b54] hover:border-[var(--accent)] transition-all duration-200 group flex flex-col justify-between shadow-lg active:scale-95">
+            <div class="flex items-center justify-between gap-1 mb-2">
+                <span class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-[11px] sm:text-xs flex items-center justify-center flex-shrink-0">03</span>
+                <span class="text-[9px] sm:text-[10px] font-mono font-bold px-1.5 sm:px-2 py-0.5 rounded-md bg-[rgba(255,207,107,0.18)] text-[#ffd79a] border-[rgba(255,207,107,0.35)] truncate">Modules 16 - 25</span>
+            </div>
+            <div class="font-bold text-white text-xs leading-snug group-hover:text-[var(--accent)] transition line-clamp-2 min-h-[2rem] flex items-center">Payload Encryption & Obfuscation</div>
+            <div class="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-[#cbd5e1] font-mono mt-2 pt-2 border-t border-[#1c2547]">
+                <i data-lucide="layers" class="w-3 h-3 text-[var(--accent2)] flex-shrink-0"></i>
+                <span class="truncate">2 Core Lessons</span>
+            </div>
+        </a>
+        <a href="#phase-4" class="p-3 sm:p-4 rounded-2xl bg-[#0c1022] hover:bg-[#121936] border border-[#212b54] hover:border-[var(--accent)] transition-all duration-200 group flex flex-col justify-between shadow-lg active:scale-95">
+            <div class="flex items-center justify-between gap-1 mb-2">
+                <span class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-[11px] sm:text-xs flex items-center justify-center flex-shrink-0">04</span>
+                <span class="text-[9px] sm:text-[10px] font-mono font-bold px-1.5 sm:px-2 py-0.5 rounded-md bg-[rgba(255,122,217,0.18)] text-[#ff9ed6] border-[rgba(255,122,217,0.35)] truncate">Modules 26 - 40</span>
+            </div>
+            <div class="font-bold text-white text-xs leading-snug group-hover:text-[var(--accent)] transition line-clamp-2 min-h-[2rem] flex items-center">Payload Execution & Process Injection</div>
+            <div class="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-[#cbd5e1] font-mono mt-2 pt-2 border-t border-[#1c2547]">
+                <i data-lucide="layers" class="w-3 h-3 text-[var(--accent2)] flex-shrink-0"></i>
+                <span class="truncate">5 Core Lessons</span>
+            </div>
+        </a>
+        <a href="#phase-5" class="p-3 sm:p-4 rounded-2xl bg-[#0c1022] hover:bg-[#121936] border border-[#212b54] hover:border-[var(--accent)] transition-all duration-200 group flex flex-col justify-between shadow-lg active:scale-95">
+            <div class="flex items-center justify-between gap-1 mb-2">
+                <span class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-[11px] sm:text-xs flex items-center justify-center flex-shrink-0">05</span>
+                <span class="text-[9px] sm:text-[10px] font-mono font-bold px-1.5 sm:px-2 py-0.5 rounded-md bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)] truncate">Modules 41 - 57</span>
+            </div>
+            <div class="font-bold text-white text-xs leading-snug group-hover:text-[var(--accent)] transition line-clamp-2 min-h-[2rem] flex items-center">Advanced Injection & IAT Hiding</div>
+            <div class="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-[#cbd5e1] font-mono mt-2 pt-2 border-t border-[#1c2547]">
+                <i data-lucide="layers" class="w-3 h-3 text-[var(--accent2)] flex-shrink-0"></i>
+                <span class="truncate">3 Core Lessons</span>
+            </div>
+        </a>
+        <a href="#phase-6" class="p-3 sm:p-4 rounded-2xl bg-[#0c1022] hover:bg-[#121936] border border-[#212b54] hover:border-[var(--accent)] transition-all duration-200 group flex flex-col justify-between shadow-lg active:scale-95">
+            <div class="flex items-center justify-between gap-1 mb-2">
+                <span class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-[11px] sm:text-xs flex items-center justify-center flex-shrink-0">06</span>
+                <span class="text-[9px] sm:text-[10px] font-mono font-bold px-1.5 sm:px-2 py-0.5 rounded-md bg-[rgba(122,162,255,0.18)] text-[#9fc0f5] border-[rgba(122,162,255,0.35)] truncate">Modules 58 - 69</span>
+            </div>
+            <div class="font-bold text-white text-xs leading-snug group-hover:text-[var(--accent)] transition line-clamp-2 min-h-[2rem] flex items-center">API Hooking & Direct Syscalls</div>
+            <div class="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-[#cbd5e1] font-mono mt-2 pt-2 border-t border-[#1c2547]">
+                <i data-lucide="layers" class="w-3 h-3 text-[var(--accent2)] flex-shrink-0"></i>
+                <span class="truncate">2 Core Lessons</span>
+            </div>
+        </a>
+        <a href="#phase-7" class="p-3 sm:p-4 rounded-2xl bg-[#0c1022] hover:bg-[#121936] border border-[#212b54] hover:border-[var(--accent)] transition-all duration-200 group flex flex-col justify-between shadow-lg active:scale-95">
+            <div class="flex items-center justify-between gap-1 mb-2">
+                <span class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-[11px] sm:text-xs flex items-center justify-center flex-shrink-0">07</span>
+                <span class="text-[9px] sm:text-[10px] font-mono font-bold px-1.5 sm:px-2 py-0.5 rounded-md bg-[rgba(255,207,107,0.18)] text-[#ffd79a] border-[rgba(255,207,107,0.35)] truncate">Modules 70 - 80</span>
+            </div>
+            <div class="font-bold text-white text-xs leading-snug group-hover:text-[var(--accent)] transition line-clamp-2 min-h-[2rem] flex items-center">Anti-Analysis & Defense Evasion</div>
+            <div class="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-[#cbd5e1] font-mono mt-2 pt-2 border-t border-[#1c2547]">
+                <i data-lucide="layers" class="w-3 h-3 text-[var(--accent2)] flex-shrink-0"></i>
+                <span class="truncate">2 Core Lessons</span>
+            </div>
+        </a>
+        <a href="#phase-8" class="p-3 sm:p-4 rounded-2xl bg-[#0c1022] hover:bg-[#121936] border border-[#212b54] hover:border-[var(--accent)] transition-all duration-200 group flex flex-col justify-between shadow-lg active:scale-95">
+            <div class="flex items-center justify-between gap-1 mb-2">
+                <span class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-[11px] sm:text-xs flex items-center justify-center flex-shrink-0">08</span>
+                <span class="text-[9px] sm:text-[10px] font-mono font-bold px-1.5 sm:px-2 py-0.5 rounded-md bg-[rgba(255,122,217,0.18)] text-[#ff9ed6] border-[rgba(255,122,217,0.35)] truncate">Modules 81 - 91</span>
+            </div>
+            <div class="font-bold text-white text-xs leading-snug group-hover:text-[var(--accent)] transition line-clamp-2 min-h-[2rem] flex items-center">EDR Evasion & NTDLL Unhooking</div>
+            <div class="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-[#cbd5e1] font-mono mt-2 pt-2 border-t border-[#1c2547]">
+                <i data-lucide="layers" class="w-3 h-3 text-[var(--accent2)] flex-shrink-0"></i>
+                <span class="truncate">2 Core Lessons</span>
+            </div>
+        </a></div>
+        </div>
+
+        
+        <div id="phase-1" class="scroll-mt-24 my-8 p-5 sm:p-7 rounded-3xl bg-[#0c1022] border border-[#212b54] shadow-2xl space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#1f284d] pb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] flex items-center justify-center text-[var(--accent)] shadow-md flex-shrink-0">
+                        <i data-lucide="cpu" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-mono font-bold text-[var(--accent2)]">PHASE 01</span>
+                            <span class="px-2 py-0.2 rounded text-[10px] font-mono font-semibold bg-[rgba(122,162,255,0.18)] text-[#9fc0f5] border-[rgba(122,162,255,0.35)]">Modules 1 - 7</span>
+                        </div>
+                        <h2 id="phase-heading-1" class="text-lg sm:text-xl font-bold text-white tracking-tight">Foundations & Architecture</h2>
+                    </div>
+                </div>
+                <a href="#mainScroll" class="text-xs text-[#cbd5e1] hover:text-white flex items-center gap-1 font-mono transition">
+                    <i data-lucide="arrow-up" class="w-3.5 h-3.5"></i>
+                    <span>Top</span>
+                </a>
+            </div>
+            <div class="grid grid-cols-1 gap-3.5 mt-4">
+            <div class="p-4 sm:p-5 rounded-2xl bg-[#080c1d] border border-[#1f284d] hover:border-[var(--accent)] transition-all duration-200 group shadow-md flex flex-col justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-6 h-6 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                        </span>
+                        <span class="font-mono text-xs font-bold text-[var(--accent)] flex-shrink-0">Lesson 01:</span>
+                        <h4 class="font-bold text-white text-xs sm:text-sm tracking-wide truncate">Welcome & Malware Development Life Cycle (MDLC)</h4>
+                    </div>
+                    <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#121936] text-[#cbd5e1] border border-[#212b54] flex-shrink-0">Modules 1 & 2</span>
+                </div>
+                <div class="space-y-1.5 mt-3 pt-3 border-t border-[#1a2242] text-xs text-[#cbd5e1]"><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>High vs Low-level languages (C/C++ vs C#/Python)</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>The 5 Stages of MDLC (Dev -> Testing -> Offline AV -> Online EDR -> IoC Analysis)</span></div></div>
+                <div class="mt-3.5 pt-2.5 border-t border-[#141b38] flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[10px] font-mono text-[#cbd5e1]">Includes interactive code &amp; defense evasion analysis</span>
+                    <a class="lesson-jump" href="../../index.html?book=book-01&lesson=1" target="_top">
+                        <span>Open Research Note</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="p-4 sm:p-5 rounded-2xl bg-[#080c1d] border border-[#1f284d] hover:border-[var(--accent)] transition-all duration-200 group shadow-md flex flex-col justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-6 h-6 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                        </span>
+                        <span class="font-mono text-xs font-bold text-[var(--accent)] flex-shrink-0">Lesson 02:</span>
+                        <h4 class="font-bold text-white text-xs sm:text-sm tracking-wide truncate">Required Tools & C Coding Basics</h4>
+                    </div>
+                    <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#121936] text-[#cbd5e1] border border-[#212b54] flex-shrink-0">Modules 3 & 4</span>
+                </div>
+                <div class="space-y-1.5 mt-3 pt-3 border-t border-[#1a2242] text-xs text-[#cbd5e1]"><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Setting up Visual Studio, x64 Native Tools, x64dbg</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>C Pointers, Data Types, Win32 Data Types (<code>DWORD</code>, <code>HANDLE</code>, <code>PBYTE</code>, <code>LPCSTR</code>)</span></div></div>
+                <div class="mt-3.5 pt-2.5 border-t border-[#141b38] flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[10px] font-mono text-[#cbd5e1]">Includes interactive code &amp; defense evasion analysis</span>
+                    <a class="lesson-jump" href="../../index.html?book=book-01&lesson=3" target="_top">
+                        <span>Open Research Note</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="p-4 sm:p-5 rounded-2xl bg-[#080c1d] border border-[#1f284d] hover:border-[var(--accent)] transition-all duration-200 group shadow-md flex flex-col justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-6 h-6 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                        </span>
+                        <span class="font-mono text-xs font-bold text-[var(--accent)] flex-shrink-0">Lesson 03:</span>
+                        <h4 class="font-bold text-white text-xs sm:text-sm tracking-wide truncate">Windows Architecture & Memory Management</h4>
+                    </div>
+                    <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#121936] text-[#cbd5e1] border border-[#212b54] flex-shrink-0">Modules 5, 6 & 7</span>
+                </div>
+                <div class="space-y-1.5 mt-3 pt-3 border-t border-[#1a2242] text-xs text-[#cbd5e1]"><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>User Mode (Ring 3) vs Kernel Mode (Ring 0)</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Subsystem DLLs (<code>kernel32.dll</code>, <code>user32.dll</code>) vs Native API (<code>ntdll.dll</code>)</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Virtual Memory allocation (<code>VirtualAlloc</code>, <code>VirtualProtect</code>, <code>VirtualFree</code>) & Page Flags</span></div></div>
+                <div class="mt-3.5 pt-2.5 border-t border-[#141b38] flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[10px] font-mono text-[#cbd5e1]">Includes interactive code &amp; defense evasion analysis</span>
+                    <a class="lesson-jump" href="../../index.html?book=book-01&lesson=5" target="_top">
+                        <span>Open Research Note</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                </div>
+            </div></div>
+        </div>
+        <div id="phase-2" class="scroll-mt-24 my-8 p-5 sm:p-7 rounded-3xl bg-[#0c1022] border border-[#212b54] shadow-2xl space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#1f284d] pb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] flex items-center justify-center text-[var(--accent)] shadow-md flex-shrink-0">
+                        <i data-lucide="binary" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-mono font-bold text-[#43d17a]">PHASE 02</span>
+                            <span class="px-2 py-0.2 rounded text-[10px] font-mono font-semibold bg-[rgba(67,209,122,0.18)] text-[#9ff0d0] border-[rgba(67,209,122,0.35)]">Modules 8 - 15</span>
+                        </div>
+                        <h2 id="phase-heading-2" class="text-lg sm:text-xl font-bold text-white tracking-tight">PE Format & Payload Placement</h2>
+                    </div>
+                </div>
+                <a href="#mainScroll" class="text-xs text-[#cbd5e1] hover:text-white flex items-center gap-1 font-mono transition">
+                    <i data-lucide="arrow-up" class="w-3.5 h-3.5"></i>
+                    <span>Top</span>
+                </a>
+            </div>
+            <div class="grid grid-cols-1 gap-3.5 mt-4">
+            <div class="p-4 sm:p-5 rounded-2xl bg-[#080c1d] border border-[#1f284d] hover:border-[var(--accent)] transition-all duration-200 group shadow-md flex flex-col justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-6 h-6 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                        </span>
+                        <span class="font-mono text-xs font-bold text-[var(--accent)] flex-shrink-0">Lesson 04:</span>
+                        <h4 class="font-bold text-white text-xs sm:text-sm tracking-wide truncate">Portable Executable (PE) Structure & DLLs</h4>
+                    </div>
+                    <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#121936] text-[#cbd5e1] border border-[#212b54] flex-shrink-0">Modules 8 & 9</span>
+                </div>
+                <div class="space-y-1.5 mt-3 pt-3 border-t border-[#1a2242] text-xs text-[#cbd5e1]"><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>DOS Header (<code>IMAGE_DOS_HEADER</code>), NT Headers (<code>IMAGE_NT_HEADERS</code>), Section Headers</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Dynamic-Link Libraries (<code>DllMain</code>, <code>DLL_PROCESS_ATTACH</code>, Exported Functions)</span></div></div>
+                <div class="mt-3.5 pt-2.5 border-t border-[#141b38] flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[10px] font-mono text-[#cbd5e1]">Includes interactive code &amp; defense evasion analysis</span>
+                    <a class="lesson-jump" href="../../index.html?book=book-01&lesson=8" target="_top">
+                        <span>Open Research Note</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="p-4 sm:p-5 rounded-2xl bg-[#080c1d] border border-[#1f284d] hover:border-[var(--accent)] transition-all duration-200 group shadow-md flex flex-col justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-6 h-6 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                        </span>
+                        <span class="font-mono text-xs font-bold text-[var(--accent)] flex-shrink-0">Lesson 05:</span>
+                        <h4 class="font-bold text-white text-xs sm:text-sm tracking-wide truncate">Detection Mechanisms & Undocumented Structures</h4>
+                    </div>
+                    <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#121936] text-[#cbd5e1] border border-[#212b54] flex-shrink-0">Modules 10, 11 & 12</span>
+                </div>
+                <div class="space-y-1.5 mt-3 pt-3 border-t border-[#1a2242] text-xs text-[#cbd5e1]"><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Static Signatures vs Dynamic Behavior EDR Monitoring</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Windows Process Internals: TEB (Thread Environment Block), PEB (Process Environment Block)</span></div></div>
+                <div class="mt-3.5 pt-2.5 border-t border-[#141b38] flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[10px] font-mono text-[#cbd5e1]">Includes interactive code &amp; defense evasion analysis</span>
+                    <a class="lesson-jump" href="../../index.html?book=book-01&lesson=10" target="_top">
+                        <span>Open Research Note</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="p-4 sm:p-5 rounded-2xl bg-[#080c1d] border border-[#1f284d] hover:border-[var(--accent)] transition-all duration-200 group shadow-md flex flex-col justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-6 h-6 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                        </span>
+                        <span class="font-mono text-xs font-bold text-[var(--accent)] flex-shrink-0">Lesson 06:</span>
+                        <h4 class="font-bold text-white text-xs sm:text-sm tracking-wide truncate">Payload Placement in Binary Sections</h4>
+                    </div>
+                    <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#121936] text-[#cbd5e1] border border-[#212b54] flex-shrink-0">Modules 13, 14 & 15</span>
+                </div>
+                <div class="space-y-1.5 mt-3 pt-3 border-t border-[#1a2242] text-xs text-[#cbd5e1]"><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span><code>.data</code> & <code>.rdata</code> section placement</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span><code>.text</code> code section injection & RWX risk</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span><code>.rsrc</code> resource section embedding (<code>FindResource</code>, <code>LoadResource</code>, <code>LockResource</code>)</span></div></div>
+                <div class="mt-3.5 pt-2.5 border-t border-[#141b38] flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[10px] font-mono text-[#cbd5e1]">Includes interactive code &amp; defense evasion analysis</span>
+                    <a class="lesson-jump" href="../../index.html?book=book-01&lesson=13" target="_top">
+                        <span>Open Research Note</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                </div>
+            </div></div>
+        </div>
+        <div id="phase-3" class="scroll-mt-24 my-8 p-5 sm:p-7 rounded-3xl bg-[#0c1022] border border-[#212b54] shadow-2xl space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#1f284d] pb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] flex items-center justify-center text-[var(--accent)] shadow-md flex-shrink-0">
+                        <i data-lucide="lock-keyhole" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-mono font-bold text-[#ffcf6b]">PHASE 03</span>
+                            <span class="px-2 py-0.2 rounded text-[10px] font-mono font-semibold bg-[rgba(255,207,107,0.18)] text-[#ffd79a] border-[rgba(255,207,107,0.35)]">Modules 16 - 25</span>
+                        </div>
+                        <h2 id="phase-heading-3" class="text-lg sm:text-xl font-bold text-white tracking-tight">Payload Encryption & Obfuscation</h2>
+                    </div>
+                </div>
+                <a href="#mainScroll" class="text-xs text-[#cbd5e1] hover:text-white flex items-center gap-1 font-mono transition">
+                    <i data-lucide="arrow-up" class="w-3.5 h-3.5"></i>
+                    <span>Top</span>
+                </a>
+            </div>
+            <div class="grid grid-cols-1 gap-3.5 mt-4">
+            <div class="p-4 sm:p-5 rounded-2xl bg-[#080c1d] border border-[#1f284d] hover:border-[var(--accent)] transition-all duration-200 group shadow-md flex flex-col justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-6 h-6 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                        </span>
+                        <span class="font-mono text-xs font-bold text-[var(--accent)] flex-shrink-0">Lesson 07:</span>
+                        <h4 class="font-bold text-white text-xs sm:text-sm tracking-wide truncate">Payload Encryption (XOR, RC4, AES)</h4>
+                    </div>
+                    <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#121936] text-[#cbd5e1] border border-[#212b54] flex-shrink-0">Modules 16, 17, 18, 19 & 20</span>
+                </div>
+                <div class="space-y-1.5 mt-3 pt-3 border-t border-[#1a2242] text-xs text-[#cbd5e1]"><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>XOR byte masking & multi-byte keys</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>RC4 stream cipher via <code>SystemFunction032</code> / <code>SystemFunction033</code></span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>AES-CBC & AES-GCM via Windows CryptoAPI & BCrypt APIs</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Evading Microsoft Defender static analysis via encrypted payloads</span></div></div>
+                <div class="mt-3.5 pt-2.5 border-t border-[#141b38] flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[10px] font-mono text-[#cbd5e1]">Includes interactive code &amp; defense evasion analysis</span>
+                    <a class="lesson-jump" href="../../index.html?book=book-01&lesson=16" target="_top">
+                        <span>Open Research Note</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="p-4 sm:p-5 rounded-2xl bg-[#080c1d] border border-[#1f284d] hover:border-[var(--accent)] transition-all duration-200 group shadow-md flex flex-col justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-6 h-6 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                        </span>
+                        <span class="font-mono text-xs font-bold text-[var(--accent)] flex-shrink-0">Lesson 08:</span>
+                        <h4 class="font-bold text-white text-xs sm:text-sm tracking-wide truncate">Payload Obfuscation & De-Entropy Tools</h4>
+                    </div>
+                    <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#121936] text-[#cbd5e1] border border-[#212b54] flex-shrink-0">Modules 21, 22, 23, 24 & 25</span>
+                </div>
+                <div class="space-y-1.5 mt-3 pt-3 border-t border-[#1a2242] text-xs text-[#cbd5e1]"><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>IPv4 / IPv6 Fuscation (<code>RtlIpv4StringToAddressA</code>)</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>MAC Address Fuscation (<code>RtlEthernetStringToAddressA</code>)</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>UUID Fuscation (<code>UuidFromStringA</code>)</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>HellShell & MiniShell automation</span></div></div>
+                <div class="mt-3.5 pt-2.5 border-t border-[#141b38] flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[10px] font-mono text-[#cbd5e1]">Includes interactive code &amp; defense evasion analysis</span>
+                    <a class="lesson-jump" href="../../index.html?book=book-01&lesson=21" target="_top">
+                        <span>Open Research Note</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                </div>
+            </div></div>
+        </div>
+        <div id="phase-4" class="scroll-mt-24 my-8 p-5 sm:p-7 rounded-3xl bg-[#0c1022] border border-[#212b54] shadow-2xl space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#1f284d] pb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] flex items-center justify-center text-[var(--accent)] shadow-md flex-shrink-0">
+                        <i data-lucide="zap" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-mono font-bold text-[#ff7ad9]">PHASE 04</span>
+                            <span class="px-2 py-0.2 rounded text-[10px] font-mono font-semibold bg-[rgba(255,122,217,0.18)] text-[#ff9ed6] border-[rgba(255,122,217,0.35)]">Modules 26 - 40</span>
+                        </div>
+                        <h2 id="phase-heading-4" class="text-lg sm:text-xl font-bold text-white tracking-tight">Payload Execution & Process Injection</h2>
+                    </div>
+                </div>
+                <a href="#mainScroll" class="text-xs text-[#cbd5e1] hover:text-white flex items-center gap-1 font-mono transition">
+                    <i data-lucide="arrow-up" class="w-3.5 h-3.5"></i>
+                    <span>Top</span>
+                </a>
+            </div>
+            <div class="grid grid-cols-1 gap-3.5 mt-4">
+            <div class="p-4 sm:p-5 rounded-2xl bg-[#080c1d] border border-[#1f284d] hover:border-[var(--accent)] transition-all duration-200 group shadow-md flex flex-col justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-6 h-6 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                        </span>
+                        <span class="font-mono text-xs font-bold text-[var(--accent)] flex-shrink-0">Lesson 09:</span>
+                        <h4 class="font-bold text-white text-xs sm:text-sm tracking-wide truncate">Local Payload Execution</h4>
+                    </div>
+                    <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#121936] text-[#cbd5e1] border border-[#212b54] flex-shrink-0">Modules 26 & 27</span>
+                </div>
+                <div class="space-y-1.5 mt-3 pt-3 border-t border-[#1a2242] text-xs text-[#cbd5e1]"><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Direct pointer casting & execution (<code>((void(*)())pPayload)()</code>)</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Thread creation (<code>CreateThread</code>, <code>WaitForSingleObject</code>)</span></div></div>
+                <div class="mt-3.5 pt-2.5 border-t border-[#141b38] flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[10px] font-mono text-[#cbd5e1]">Includes interactive code &amp; defense evasion analysis</span>
+                    <a class="lesson-jump" href="../../index.html?book=book-01&lesson=26" target="_top">
+                        <span>Open Research Note</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="p-4 sm:p-5 rounded-2xl bg-[#080c1d] border border-[#1f284d] hover:border-[var(--accent)] transition-all duration-200 group shadow-md flex flex-col justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-6 h-6 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                        </span>
+                        <span class="font-mono text-xs font-bold text-[var(--accent)] flex-shrink-0">Lesson 10:</span>
+                        <h4 class="font-bold text-white text-xs sm:text-sm tracking-wide truncate">Classic Process Injection</h4>
+                    </div>
+                    <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#121936] text-[#cbd5e1] border border-[#212b54] flex-shrink-0">Modules 28 & 29</span>
+                </div>
+                <div class="space-y-1.5 mt-3 pt-3 border-t border-[#1a2242] text-xs text-[#cbd5e1]"><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Cross-process: <code>OpenProcess</code> -> <code>VirtualAllocEx</code> -> <code>WriteProcessMemory</code> -> <code>CreateRemoteThread</code></span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Remote DLL Injection vs Remote Shellcode Injection</span></div></div>
+                <div class="mt-3.5 pt-2.5 border-t border-[#141b38] flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[10px] font-mono text-[#cbd5e1]">Includes interactive code &amp; defense evasion analysis</span>
+                    <a class="lesson-jump" href="../../index.html?book=book-01&lesson=28" target="_top">
+                        <span>Open Research Note</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="p-4 sm:p-5 rounded-2xl bg-[#080c1d] border border-[#1f284d] hover:border-[var(--accent)] transition-all duration-200 group shadow-md flex flex-col justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-6 h-6 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                        </span>
+                        <span class="font-mono text-xs font-bold text-[var(--accent)] flex-shrink-0">Lesson 11:</span>
+                        <h4 class="font-bold text-white text-xs sm:text-sm tracking-wide truncate">Payload Staging & Binary Signing</h4>
+                    </div>
+                    <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#121936] text-[#cbd5e1] border border-[#212b54] flex-shrink-0">Modules 30, 31 & 32</span>
+                </div>
+                <div class="space-y-1.5 mt-3 pt-3 border-t border-[#1a2242] text-xs text-[#cbd5e1]"><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>WinINet HTTP/HTTPS payload staging (<code>InternetOpen</code>, <code>InternetOpenUrl</code>, <code>InternetReadFile</code>)</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Registry payload staging (<code>RegOpenKeyEx</code>, <code>RegQueryValueEx</code>)</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Digital Certificate signing & Authenticode spoofing</span></div></div>
+                <div class="mt-3.5 pt-2.5 border-t border-[#141b38] flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[10px] font-mono text-[#cbd5e1]">Includes interactive code &amp; defense evasion analysis</span>
+                    <a class="lesson-jump" href="../../index.html?book=book-01&lesson=30" target="_top">
+                        <span>Open Research Note</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="p-4 sm:p-5 rounded-2xl bg-[#080c1d] border border-[#1f284d] hover:border-[var(--accent)] transition-all duration-200 group shadow-md flex flex-col justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-6 h-6 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                        </span>
+                        <span class="font-mono text-xs font-bold text-[var(--accent)] flex-shrink-0">Lesson 12:</span>
+                        <h4 class="font-bold text-white text-xs sm:text-sm tracking-wide truncate">Process Enumeration & Thread Hijacking</h4>
+                    </div>
+                    <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#121936] text-[#cbd5e1] border border-[#212b54] flex-shrink-0">Modules 33, 34, 35, 36, 37 & 38</span>
+                </div>
+                <div class="space-y-1.5 mt-3 pt-3 border-t border-[#1a2242] text-xs text-[#cbd5e1]"><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Process snapshotting (<code>CreateToolhelp32Snapshot</code>, <code>Process32First/Next</code>)</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span><code>NtQuerySystemInformation</code> enumeration</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Thread Context manipulation (<code>SuspendThread</code>, <code>GetThreadContext</code>, <code>RIP</code> modification, <code>SetThreadContext</code>, <code>ResumeThread</code>)</span></div></div>
+                <div class="mt-3.5 pt-2.5 border-t border-[#141b38] flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[10px] font-mono text-[#cbd5e1]">Includes interactive code &amp; defense evasion analysis</span>
+                    <a class="lesson-jump" href="../../index.html?book=book-01&lesson=33" target="_top">
+                        <span>Open Research Note</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="p-4 sm:p-5 rounded-2xl bg-[#080c1d] border border-[#1f284d] hover:border-[var(--accent)] transition-all duration-200 group shadow-md flex flex-col justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-6 h-6 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                        </span>
+                        <span class="font-mono text-xs font-bold text-[var(--accent)] flex-shrink-0">Lesson 13:</span>
+                        <h4 class="font-bold text-white text-xs sm:text-sm tracking-wide truncate">APC (Asynchronous Procedure Call) Injection</h4>
+                    </div>
+                    <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#121936] text-[#cbd5e1] border border-[#212b54] flex-shrink-0">Modules 39 & 40</span>
+                </div>
+                <div class="space-y-1.5 mt-3 pt-3 border-t border-[#1a2242] text-xs text-[#cbd5e1]"><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Alertable threads & <code>QueueUserAPC</code></span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Early Bird APC injection via <code>CreateProcessA</code> with <code>CREATE_SUSPENDED</code></span></div></div>
+                <div class="mt-3.5 pt-2.5 border-t border-[#141b38] flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[10px] font-mono text-[#cbd5e1]">Includes interactive code &amp; defense evasion analysis</span>
+                    <a class="lesson-jump" href="../../index.html?book=book-01&lesson=39" target="_top">
+                        <span>Open Research Note</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                </div>
+            </div></div>
+        </div>
+        <div id="phase-5" class="scroll-mt-24 my-8 p-5 sm:p-7 rounded-3xl bg-[#0c1022] border border-[#212b54] shadow-2xl space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#1f284d] pb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] flex items-center justify-center text-[var(--accent)] shadow-md flex-shrink-0">
+                        <i data-lucide="crosshair" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-mono font-bold text-[var(--accent)]">PHASE 05</span>
+                            <span class="px-2 py-0.2 rounded text-[10px] font-mono font-semibold bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]">Modules 41 - 57</span>
+                        </div>
+                        <h2 id="phase-heading-5" class="text-lg sm:text-xl font-bold text-white tracking-tight">Advanced Injection & IAT Hiding</h2>
+                    </div>
+                </div>
+                <a href="#mainScroll" class="text-xs text-[#cbd5e1] hover:text-white flex items-center gap-1 font-mono transition">
+                    <i data-lucide="arrow-up" class="w-3.5 h-3.5"></i>
+                    <span>Top</span>
+                </a>
+            </div>
+            <div class="grid grid-cols-1 gap-3.5 mt-4">
+            <div class="p-4 sm:p-5 rounded-2xl bg-[#080c1d] border border-[#1f284d] hover:border-[var(--accent)] transition-all duration-200 group shadow-md flex flex-col justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-6 h-6 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                        </span>
+                        <span class="font-mono text-xs font-bold text-[var(--accent)] flex-shrink-0">Lesson 14:</span>
+                        <h4 class="font-bold text-white text-xs sm:text-sm tracking-wide truncate">Mapping Injection & Function Stomping</h4>
+                    </div>
+                    <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#121936] text-[#cbd5e1] border border-[#212b54] flex-shrink-0">Modules 41, 42, 43, 44 & 45</span>
+                </div>
+                <div class="space-y-1.5 mt-3 pt-3 border-t border-[#1a2242] text-xs text-[#cbd5e1]"><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Callback Execution (<code>EnumWindows</code>, <code>EnumChildWindows</code>, <code>SymEnumProcesses</code>)</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Section Mapping Injection (<code>NtCreateSection</code>, <code>NtMapViewOfSection</code>)</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Function Stomping / Overwriting exported DLL functions</span></div></div>
+                <div class="mt-3.5 pt-2.5 border-t border-[#141b38] flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[10px] font-mono text-[#cbd5e1]">Includes interactive code &amp; defense evasion analysis</span>
+                    <a class="lesson-jump" href="../../index.html?book=book-01&lesson=41" target="_top">
+                        <span>Open Research Note</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="p-4 sm:p-5 rounded-2xl bg-[#080c1d] border border-[#1f284d] hover:border-[var(--accent)] transition-all duration-200 group shadow-md flex flex-col justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-6 h-6 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                        </span>
+                        <span class="font-mono text-xs font-bold text-[var(--accent)] flex-shrink-0">Lesson 15:</span>
+                        <h4 class="font-bold text-white text-xs sm:text-sm tracking-wide truncate">Execution Control & Process Argument Spoofing</h4>
+                    </div>
+                    <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#121936] text-[#cbd5e1] border border-[#212b54] flex-shrink-0">Modules 46, 47, 48 & 49</span>
+                </div>
+                <div class="space-y-1.5 mt-3 pt-3 border-t border-[#1a2242] text-xs text-[#cbd5e1]"><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Mutexes & Payload execution control (<code>CreateMutexA</code>)</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Parent Process ID (PPID) Spoofing via <code>STARTUPINFOEX</code> & <code>UpdateProcThreadAttribute</code></span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Process Argument Spoofing via PEB <code>ProcessParameters->CommandLine</code></span></div></div>
+                <div class="mt-3.5 pt-2.5 border-t border-[#141b38] flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[10px] font-mono text-[#cbd5e1]">Includes interactive code &amp; defense evasion analysis</span>
+                    <a class="lesson-jump" href="../../index.html?book=book-01&lesson=46" target="_top">
+                        <span>Open Research Note</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="p-4 sm:p-5 rounded-2xl bg-[#080c1d] border border-[#1f284d] hover:border-[var(--accent)] transition-all duration-200 group shadow-md flex flex-col justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-6 h-6 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                        </span>
+                        <span class="font-mono text-xs font-bold text-[var(--accent)] flex-shrink-0">Lesson 16:</span>
+                        <h4 class="font-bold text-white text-xs sm:text-sm tracking-wide truncate">PE Parsing & Import Address Table (IAT) Hiding</h4>
+                    </div>
+                    <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#121936] text-[#cbd5e1] border border-[#212b54] flex-shrink-0">Modules 50, 51, 52, 53, 54, 55, 56 & 57</span>
+                </div>
+                <div class="space-y-1.5 mt-3 pt-3 border-t border-[#1a2242] text-xs text-[#cbd5e1]"><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Parsing PE Export Directory (<code>IMAGE_EXPORT_DIRECTORY</code>)</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Custom <code>GetModuleHandle</code> via PEB <code>InLoadOrderModuleList</code></span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Custom <code>GetProcAddress</code> via EAT parsing</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>String Hashing (djb2, Jenkins, MurmurHash, CRC32) & API Hashing</span></div></div>
+                <div class="mt-3.5 pt-2.5 border-t border-[#141b38] flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[10px] font-mono text-[#cbd5e1]">Includes interactive code &amp; defense evasion analysis</span>
+                    <a class="lesson-jump" href="../../index.html?book=book-01&lesson=50" target="_top">
+                        <span>Open Research Note</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                </div>
+            </div></div>
+        </div>
+        <div id="phase-6" class="scroll-mt-24 my-8 p-5 sm:p-7 rounded-3xl bg-[#0c1022] border border-[#212b54] shadow-2xl space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#1f284d] pb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] flex items-center justify-center text-[var(--accent)] shadow-md flex-shrink-0">
+                        <i data-lucide="terminal" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-mono font-bold text-[var(--accent2)]">PHASE 06</span>
+                            <span class="px-2 py-0.2 rounded text-[10px] font-mono font-semibold bg-[rgba(122,162,255,0.18)] text-[#9fc0f5] border-[rgba(122,162,255,0.35)]">Modules 58 - 69</span>
+                        </div>
+                        <h2 id="phase-heading-6" class="text-lg sm:text-xl font-bold text-white tracking-tight">API Hooking & Direct Syscalls</h2>
+                    </div>
+                </div>
+                <a href="#mainScroll" class="text-xs text-[#cbd5e1] hover:text-white flex items-center gap-1 font-mono transition">
+                    <i data-lucide="arrow-up" class="w-3.5 h-3.5"></i>
+                    <span>Top</span>
+                </a>
+            </div>
+            <div class="grid grid-cols-1 gap-3.5 mt-4">
+            <div class="p-4 sm:p-5 rounded-2xl bg-[#080c1d] border border-[#1f284d] hover:border-[var(--accent)] transition-all duration-200 group shadow-md flex flex-col justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-6 h-6 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                        </span>
+                        <span class="font-mono text-xs font-bold text-[var(--accent)] flex-shrink-0">Lesson 17:</span>
+                        <h4 class="font-bold text-white text-xs sm:text-sm tracking-wide truncate">API Hooking (Detours, MinHook, Custom Trampoline)</h4>
+                    </div>
+                    <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#121936] text-[#cbd5e1] border border-[#212b54] flex-shrink-0">Modules 58, 59, 60, 61 & 62</span>
+                </div>
+                <div class="space-y-1.5 mt-3 pt-3 border-t border-[#1a2242] text-xs text-[#cbd5e1]"><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Inline Hooking & JMP 5-byte stubs</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Microsoft Detours & MinHook libraries</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Building a Custom Trampoline hook in C</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Windows API hooking via Hardware Breakpoints</span></div></div>
+                <div class="mt-3.5 pt-2.5 border-t border-[#141b38] flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[10px] font-mono text-[#cbd5e1]">Includes interactive code &amp; defense evasion analysis</span>
+                    <a class="lesson-jump" href="../../index.html?book=book-01&lesson=58" target="_top">
+                        <span>Open Research Note</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="p-4 sm:p-5 rounded-2xl bg-[#080c1d] border border-[#1f284d] hover:border-[var(--accent)] transition-all duration-200 group shadow-md flex flex-col justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-6 h-6 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                        </span>
+                        <span class="font-mono text-xs font-bold text-[var(--accent)] flex-shrink-0">Lesson 18:</span>
+                        <h4 class="font-bold text-white text-xs sm:text-sm tracking-wide truncate">Direct Syscalls (SysWhispers & Hell's Gate)</h4>
+                    </div>
+                    <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#121936] text-[#cbd5e1] border border-[#212b54] flex-shrink-0">Modules 63, 64, 65, 66, 67, 68 & 69</span>
+                </div>
+                <div class="space-y-1.5 mt-3 pt-3 border-t border-[#1a2242] text-xs text-[#cbd5e1]"><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Understanding Userland EDR Hooking in <code>ntdll.dll</code></span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>SysWhispers & static syscall stubs in MASM (<code>.asm</code>)</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Hell's Gate: Dynamic SSN extraction from memory</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Reimplementing Injection techniques via raw Syscalls</span></div></div>
+                <div class="mt-3.5 pt-2.5 border-t border-[#141b38] flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[10px] font-mono text-[#cbd5e1]">Includes interactive code &amp; defense evasion analysis</span>
+                    <a class="lesson-jump" href="../../index.html?book=book-01&lesson=63" target="_top">
+                        <span>Open Research Note</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                </div>
+            </div></div>
+        </div>
+        <div id="phase-7" class="scroll-mt-24 my-8 p-5 sm:p-7 rounded-3xl bg-[#0c1022] border border-[#212b54] shadow-2xl space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#1f284d] pb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] flex items-center justify-center text-[var(--accent)] shadow-md flex-shrink-0">
+                        <i data-lucide="eye-off" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-mono font-bold text-[#ffcf6b]">PHASE 07</span>
+                            <span class="px-2 py-0.2 rounded text-[10px] font-mono font-semibold bg-[rgba(255,207,107,0.18)] text-[#ffd79a] border-[rgba(255,207,107,0.35)]">Modules 70 - 80</span>
+                        </div>
+                        <h2 id="phase-heading-7" class="text-lg sm:text-xl font-bold text-white tracking-tight">Anti-Analysis & Defense Evasion</h2>
+                    </div>
+                </div>
+                <a href="#mainScroll" class="text-xs text-[#cbd5e1] hover:text-white flex items-center gap-1 font-mono transition">
+                    <i data-lucide="arrow-up" class="w-3.5 h-3.5"></i>
+                    <span>Top</span>
+                </a>
+            </div>
+            <div class="grid grid-cols-1 gap-3.5 mt-4">
+            <div class="p-4 sm:p-5 rounded-2xl bg-[#080c1d] border border-[#1f284d] hover:border-[var(--accent)] transition-all duration-200 group shadow-md flex flex-col justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-6 h-6 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                        </span>
+                        <span class="font-mono text-xs font-bold text-[var(--accent)] flex-shrink-0">Lesson 19:</span>
+                        <h4 class="font-bold text-white text-xs sm:text-sm tracking-wide truncate">Anti-Debugging & Anti-Virtualization</h4>
+                    </div>
+                    <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#121936] text-[#cbd5e1] border border-[#212b54] flex-shrink-0">Modules 70, 71, 72, 73, 74 & 75</span>
+                </div>
+                <div class="space-y-1.5 mt-3 pt-3 border-t border-[#1a2242] text-xs text-[#cbd5e1]"><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span><code>IsDebuggerPresent</code>, <code>CheckRemoteDebuggerPresent</code>, <code>BeingDebugged</code> PEB flag</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Hardware Breakpoints detection via <code>GetThreadContext</code> (<code>Dr0</code>-<code>Dr3</code>)</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Self-Deletion via <code>FILE_DISPOSITION_INFO</code> and ADS (<code>:delete</code>)</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Anti-VM checks (RAM, CPU cores, screen resolution, MAC address OUI, running drivers)</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Execution Delay via <code>WaitForSingleObject</code>, <code>NtDelayExecution</code>, API Hammering</span></div></div>
+                <div class="mt-3.5 pt-2.5 border-t border-[#141b38] flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[10px] font-mono text-[#cbd5e1]">Includes interactive code &amp; defense evasion analysis</span>
+                    <a class="lesson-jump" href="../../index.html?book=book-01&lesson=70" target="_top">
+                        <span>Open Research Note</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="p-4 sm:p-5 rounded-2xl bg-[#080c1d] border border-[#1f284d] hover:border-[var(--accent)] transition-all duration-200 group shadow-md flex flex-col justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-6 h-6 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                        </span>
+                        <span class="font-mono text-xs font-bold text-[var(--accent)] flex-shrink-0">Lesson 20:</span>
+                        <h4 class="font-bold text-white text-xs sm:text-sm tracking-wide truncate">Entropy Reduction & Binary Camouflage</h4>
+                    </div>
+                    <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#121936] text-[#cbd5e1] border border-[#212b54] flex-shrink-0">Modules 76, 77, 78, 79 & 80</span>
+                </div>
+                <div class="space-y-1.5 mt-3 pt-3 border-t border-[#1a2242] text-xs text-[#cbd5e1]"><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Shannon Entropy calculation & padding with English words / resources</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>KeyGuard: Brute force key decryption on execution</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>CRT Library Removal: Compiling without C Runtime (<code>/NODEFAULTLIB</code>)</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>IAT Camouflage: Forcing benign Win32 imports to defeat static heuristics</span></div></div>
+                <div class="mt-3.5 pt-2.5 border-t border-[#141b38] flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[10px] font-mono text-[#cbd5e1]">Includes interactive code &amp; defense evasion analysis</span>
+                    <a class="lesson-jump" href="../../index.html?book=book-01&lesson=76" target="_top">
+                        <span>Open Research Note</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                </div>
+            </div></div>
+        </div>
+        <div id="phase-8" class="scroll-mt-24 my-8 p-5 sm:p-7 rounded-3xl bg-[#0c1022] border border-[#212b54] shadow-2xl space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#1f284d] pb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] flex items-center justify-center text-[var(--accent)] shadow-md flex-shrink-0">
+                        <i data-lucide="shield-alert" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-mono font-bold text-[#ff7ad9]">PHASE 08</span>
+                            <span class="px-2 py-0.2 rounded text-[10px] font-mono font-semibold bg-[rgba(255,122,217,0.18)] text-[#ff9ed6] border-[rgba(255,122,217,0.35)]">Modules 81 - 91</span>
+                        </div>
+                        <h2 id="phase-heading-8" class="text-lg sm:text-xl font-bold text-white tracking-tight">EDR Evasion & NTDLL Unhooking</h2>
+                    </div>
+                </div>
+                <a href="#mainScroll" class="text-xs text-[#cbd5e1] hover:text-white flex items-center gap-1 font-mono transition">
+                    <i data-lucide="arrow-up" class="w-3.5 h-3.5"></i>
+                    <span>Top</span>
+                </a>
+            </div>
+            <div class="grid grid-cols-1 gap-3.5 mt-4">
+            <div class="p-4 sm:p-5 rounded-2xl bg-[#080c1d] border border-[#1f284d] hover:border-[var(--accent)] transition-all duration-200 group shadow-md flex flex-col justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-6 h-6 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                        </span>
+                        <span class="font-mono text-xs font-bold text-[var(--accent)] flex-shrink-0">Lesson 21:</span>
+                        <h4 class="font-bold text-white text-xs sm:text-sm tracking-wide truncate">NTDLL Unhooking (Full Evasion)</h4>
+                    </div>
+                    <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#121936] text-[#cbd5e1] border border-[#212b54] flex-shrink-0">Modules 81, 82, 83, 84, 85, 86 & 87</span>
+                </div>
+                <div class="space-y-1.5 mt-3 pt-3 border-t border-[#1a2242] text-xs text-[#cbd5e1]"><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>How EDRs hook native APIs in memory</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Unhooking from Disk: Reading clean <code>.text</code> section from <code>\System32\ntdll.dll</code></span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Unhooking from <code>\KnownDlls\ntdll.dll</code> Section Object</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Unhooking from Suspended Process & External Web Server</span></div></div>
+                <div class="mt-3.5 pt-2.5 border-t border-[#141b38] flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[10px] font-mono text-[#cbd5e1]">Includes interactive code &amp; defense evasion analysis</span>
+                    <a class="lesson-jump" href="../../index.html?book=book-01&lesson=81" target="_top">
+                        <span>Open Research Note</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="p-4 sm:p-5 rounded-2xl bg-[#080c1d] border border-[#1f284d] hover:border-[var(--accent)] transition-all duration-200 group shadow-md flex flex-col justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-6 h-6 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)] text-[var(--accent)] font-mono font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                        </span>
+                        <span class="font-mono text-xs font-bold text-[var(--accent)] flex-shrink-0">Lesson 22:</span>
+                        <h4 class="font-bold text-white text-xs sm:text-sm tracking-wide truncate">Indirect Syscalls & BlockDLL Policy</h4>
+                    </div>
+                    <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#121936] text-[#cbd5e1] border border-[#212b54] flex-shrink-0">Modules 88, 89, 90 & 91</span>
+                </div>
+                <div class="space-y-1.5 mt-3 pt-3 border-t border-[#1a2242] text-xs text-[#cbd5e1]"><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Halo's Gate & HellsHall: Handling hooked neighboring stubs</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Indirect Syscalls: Jumping to legitimate <code>syscall; ret</code> instructions inside <code>ntdll.dll</code> to preserve call stack legitimacy</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Block DLL Policy (<code>PROCESS_CREATION_MITIGATION_POLICY_BLOCK_NON_MICROSOFT_BINARIES_ALWAYS_ON</code>)</span></div><div class="flex items-start gap-2 leading-relaxed"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-[var(--accent2)] flex-shrink-0 mt-0.5"></i><span>Diving into <code>NtCreateUserProcess</code> for low-level process creation</span></div></div>
+                <div class="mt-3.5 pt-2.5 border-t border-[#141b38] flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[10px] font-mono text-[#cbd5e1]">Includes interactive code &amp; defense evasion analysis</span>
+                    <a class="lesson-jump" href="../../index.html?book=book-01&lesson=88" target="_top">
+                        <span>Open Research Note</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                </div>
+            </div></div>
+        </div>
+
+        
+    <div id="methodology-framework" class="scroll-mt-24 my-8 p-6 sm:p-8 rounded-3xl bg-[#0c1022] border border-[#212b54] shadow-2xl space-y-4">
+        <div class="flex items-center gap-3 border-b border-[#1f284d] pb-4">
+            <div class="w-10 h-10 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] flex items-center justify-center text-[var(--accent)] flex-shrink-0">
+                <i data-lucide="brain" class="w-5 h-5"></i>
+            </div>
+            <div>
+                <div class="text-xs font-mono font-bold text-[var(--accent)] uppercase tracking-wider">Engineering Methodology</div>
+                <h2 id="methodology-heading" class="text-lg sm:text-xl font-bold text-white">6-Pillar Practical Learning Framework</h2>
+            </div>
+        </div>
+        <p class="text-xs sm:text-sm text-[#e2e8f0] leading-relaxed">
+            Every research note in this handbook is engineered according to a 6-layer practical model designed for rapid comprehension, code execution, and evasion testing:
+        </p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
+            <div class="p-3.5 rounded-2xl bg-[#080c1d] border border-[#1f284d] space-y-1">
+                <div class="flex items-center gap-2 text-xs font-bold text-[var(--accent)]">
+                    <span class="w-5 h-5 rounded-md bg-[var(--accent-soft)] flex items-center justify-center text-[10px] font-mono">1</span>
+                    <span>Mental Model</span>
+                </div>
+                <div class="text-xs text-[#cbd5e1] leading-relaxed">High-level visual architecture, memory layout diagrams, and state progression flowcharts.</div>
+            </div>
+            <div class="p-3.5 rounded-2xl bg-[#080c1d] border border-[#1f284d] space-y-1">
+                <div class="flex items-center gap-2 text-xs font-bold text-[#43d17a]">
+                    <span class="w-5 h-5 rounded-md bg-[rgba(67,209,122,0.15)] flex items-center justify-center text-[10px] font-mono">2</span>
+                    <span>Technical Breakdown</span>
+                </div>
+                <div class="text-xs text-[#cbd5e1] leading-relaxed">In-depth internal analysis of PE structures, TEB/PEB, undocumented NTAPIs, and syscall stub mechanics.</div>
+            </div>
+            <div class="p-3.5 rounded-2xl bg-[#080c1d] border border-[#1f284d] space-y-1">
+                <div class="flex items-center gap-2 text-xs font-bold text-[var(--accent2)]">
+                    <span class="w-5 h-5 rounded-md bg-[rgba(122,162,255,0.15)] flex items-center justify-center text-[10px] font-mono">3</span>
+                    <span>Functional Code</span>
+                </div>
+                <div class="text-xs text-[#cbd5e1] leading-relaxed">Production-ready C/C++, MASM assembly, and Nim implementations with syntax highlighting and 1-click copy.</div>
+            </div>
+            <div class="p-3.5 rounded-2xl bg-[#080c1d] border border-[#1f284d] space-y-1">
+                <div class="flex items-center gap-2 text-xs font-bold text-[#ffcf6b]">
+                    <span class="w-5 h-5 rounded-md bg-[rgba(255,207,107,0.15)] flex items-center justify-center text-[10px] font-mono">4</span>
+                    <span>OPSEC &amp; Telemetry</span>
+                </div>
+                <div class="text-xs text-[#cbd5e1] leading-relaxed">Analysis of kernel callbacks, ETW event IDs, memory heuristics (RWX scanner), and IoC minimization.</div>
+            </div>
+            <div class="p-3.5 rounded-2xl bg-[#080c1d] border border-[#1f284d] space-y-1">
+                <div class="flex items-center gap-2 text-xs font-bold text-[#ff7ad9]">
+                    <span class="w-5 h-5 rounded-md bg-[rgba(255,122,217,0.15)] flex items-center justify-center text-[10px] font-mono">5</span>
+                    <span>Interactive Self-Check</span>
+                </div>
+                <div class="text-xs text-[#cbd5e1] leading-relaxed">Hands-on exercises and edge case debugging to verify understanding of memory protections and hooking.</div>
+            </div>
+            <div class="p-3.5 rounded-2xl bg-[#080c1d] border border-[#1f284d] space-y-1">
+                <div class="flex items-center gap-2 text-xs font-bold text-[#9ff0d0]">
+                    <span class="w-5 h-5 rounded-md bg-[rgba(67,209,122,0.15)] flex items-center justify-center text-[10px] font-mono">6</span>
+                    <span>Quick Cheat Sheet</span>
+                </div>
+                <div class="text-xs text-[#cbd5e1] leading-relaxed">Concise API tables, function signatures, and assembly registers for rapid reference during operations.</div>
+            </div>
+        </div>
+    </div>
+    </div>
+    </main></body></html>

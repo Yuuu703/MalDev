@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Linux malware development 1: Intro to kernel hacking. Simple</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #54</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">Linux malware development 1: Intro to kernel hacking. Simple</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">C example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In fact, this post could be called something else like “Malware development trick part 41”, but here I again answer many questions that my readers ask me. How can I develop malware for linux? Perhaps this post will be the beginning and also the starting point for a series of posts (those who have been reading me for a long time have probably noticed that I have many different series of posts that I started but have not yet brought these series to their logical end). To be honest, my last experience of programming for Linux kernel was at the university about 10+ years ago, since then a lot has changed, so I decided to try to write something interesting like malware: linux rootkit, stealer, etc…. First of all, I installed a linux virtual machine - xubuntu 20.04 so as not to break anything in my system. I think you can install a more recent version of Ubuntu (Xubuntu, Lubuntu), but version 20.04 is quite suitable for experiments:</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">For example if we need create a malware, like a kernel rootkit, the code we develop will have the ability to execute with kernel level privileges (ring 0) using the kernel modules we create. Working in this role can have its challenges. On one hand, our work goes unnoticed by the user and userspace tools. However, if we make a mistake, it can have serious consequences. The kernel is unable to protect us from its own flaws, which means we risk crashing the entire system. Using VM will help alleviate the challenges of developing in our xubuntu, making it a much more manageable requirement. Let’s start from import modules:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">#include &lt;linux/init.h&gt;
+#include &lt;linux/module.h&gt;
+#include &lt;linux/kernel.h&gt;
+These #include statements include the necessary header files for kernel module programming: - linux/init.h - contains macros and functions for module initialization
+and cleanup.
+- linux/module.h - contains macros and functions for module programming.
+- linux/kernel.h - provides various functions and macros for kernel development.
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("cocomelonc");
+MODULE_DESCRIPTION("kernel-test-01");
+MODULE_VERSION("0.001");
+These macros define metadata about the module:
+• MODULE_LICENSE("GPL") - specifies the license under which the module is
+released. Here, it’s the GNU General Public License.
+• MODULE_AUTHOR("cocomelonc") - specifies the author of the module.
+
+• MODULE_DESCRIPTION("kernel-test-01") - Provides a description of the
+module.
+• MODULE_VERSION("0.001") - specifies the version of the module.</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">At the next few lines we are define initialization function: static int __init hack_init(void) { printk(KERN_INFO "Meow-meow!\n");</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This function is the initialization function for the module:</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>static int __init hack_init(void) - defines the function as a static function</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">(local to this file) and marks it as an initialization function using the __init macro.</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>printk(KERN_INFO "Meow-meow!\n") - prints the message "Meow-meow!" to the</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">kernel log with an informational log level. - return 0 - returns 0 to indicate successful initialization. Next one is the hack_exit function: static void __exit hack_exit(void) { printk(KERN_INFO "Meow-bow!\n");</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This function is the cleanup function for the module:</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>static void __exit hack_exit(void) - defines the function as a static</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">function and marks it as an exit (cleanup) function using the __exit macro.</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>printk(KERN_INFO "Meow-bow!\n") - prints the message "Meow-bow!" to</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">the kernel log with an informational log level. Then, registering the initialization and cleanup functions: module_init(hack_init); module_exit(hack_exit); So, the full source code is looks like this hack.c:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>C / C++ Source</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-c">/*
+* hack.c
+* introduction to linux kernel hacking
+* author @cocomelonc
+* https://cocomelonc.github.io/linux/2024/06/20/kernel-hacking-1.html
+*/
+#include &lt;linux/init.h&gt;
+#include &lt;linux/module.h&gt;
+#include &lt;linux/kernel.h&gt;
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("cocomelonc");
+
+MODULE_DESCRIPTION("kernel-test-01");
+MODULE_VERSION("0.001");
+static int __init hack_init(void) {
+printk(KERN_INFO "Meow-meow!\n");
+return 0;
+}
+static void __exit hack_exit(void) {
+printk(KERN_INFO "Meow-bow!\n");
+}
+module_init(hack_init);
+module_exit(hack_exit);
+This code demonstrates the basic structure of a Linux kernel module, including how
+to define initialization and cleanup functions and how to provide metadata about the
+module.
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see this module in action. Before compiling you need install: $ apt update $ apt install build-essential linux-headers-$(uname -r) For compiling create Makefile file with the following content: obj-m += hack.o all: make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules clean: make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean The provided Makefile is used to compile and clean a Linux kernel module. obj-m variable is used to list the object files to be built as kernel modules. hack.o is the object file that will be built from the hack.c source file. The += operator adds hack.o to the list of object files to be compiled as modules. make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules This command invokes make to compile the module. -C /lib/modules/$(shell uname -r)/build changes the directory to the build directory of the currently running kernel. $(shell uname -r) gets the version of the currently running kernel, and /lib/modules/$(shell uname -r)/build is where the kernel build directory is located.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">M=$(PWD) sets the M variable to the current working directory $(PWD), which is where your module source code is located. This tells the kernel build system to look in the current directory for the module source files. and modules this target in the kernel build system compiles the modules listed in obj-m. make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean - this command cleans up the module build files. Open a terminal, navigate to the directory containing hack.c and Makefile:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">and run the following command to compile the module: make</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As a result, after running the make command, you will find several new intermediate binaries. However, the most significant addition will be the presence of a new hack.ko file. So, what’s next. Run dmesg command in new terminal: dmesg</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then run the following command from our hack.ko dir for load this module into running kernel: sudo insmod hack.ko Now, if you check dmesg again from new terminal, you should see a Meow-meow! line:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">For deleting our module from running kernel just run: sudo rmmod hack</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, Meow-bow! message in kernel buffer, so everything is worked perfectly as expected! =.. = There are one more caveat of course. When building a Linux kernel module, it is important to note that it belongs to the specific kernel version it was built on. If you attempt to load a module onto a system with a different kernel, it is highly probable that it will fail to load. I think we’ll take a break here, we’ll look at rootkits and stealers in the following posts. I hope this post with practical example is useful for malware researchers, linux programmers and everyone who interested on linux kernel programming techniques. source code in github</p></main></body></html>

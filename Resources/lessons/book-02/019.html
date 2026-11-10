@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Malware development trick. Hunting RWX - part 2. Target</title><link rel="stylesheet" href="../../content.css"><script src="../../content.js" defer></script></head><body><main class="lesson">
+    <div class="p-4 sm:p-5 my-6 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)] text-[#f0f3ff] flex items-start gap-3 shadow-2xl">
+        <i data-lucide="book-marked" class="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5"></i>
+        <div class="text-xs sm:text-sm leading-relaxed space-y-1">
+            <div class="font-bold text-[var(--accent)] uppercase tracking-wide">MD-MZ Research Field Note #18</div>
+            <div class="text-[#e2e8f0]">Technical research note on <strong class="text-white">Malware development trick. Hunting RWX - part 2. Target</strong> covering source code implementations, evasion mechanics, and practical attack surface analysis.</div>
+        </div>
+    </div>
+    <p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">process investigation tricks. Simple C/C++ example.</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">In one of my previous posts, I described a process injection method using <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">RWX</code>-memory searching logic. Today, I will apply the same logic, but with a new trick. As you remember, the method is simple: we enumerate the presently running target processes on the victim’s system, scan through their allocated memory blocks to see if any are protected with <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">RWX</code>, and then write our payload to this memory block.</p>
+
+            <div id="practical-example" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Today I will use a little bit different trick. Let’s say we are search specific process in the victim’s machine (for injection or for something else). Let’s go to use a separate function for hunting <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">RWX</code>-memory region from the victim process, something like this: int findRWX(HANDLE h) { MEMORY_BASIC_INFORMATION mbi = {};</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">LPVOID addr = 0;
+// query remote process memory information
+while (VirtualQueryEx(h, addr, &amp;mbi, sizeof(mbi))) {
+addr = (LPVOID)((DWORD_PTR) mbi.BaseAddress + mbi.RegionSize);
+// look for RWX memory regions which are not backed by an image
+if (mbi.Protect == PAGE_EXECUTE_READWRITE
+&amp;&amp; mbi.State == MEM_COMMIT
+&amp;&amp; mbi.Type == MEM_PRIVATE)
+
+printf("found RWX memory: 0x%x - %#7llu bytes region\n",
+mbi.BaseAddress, mbi.RegionSize);
+}
+return 0;
+}
+Also a little bit update for our main logic: first of all, we are search specific process’
+handle by it’s name:
+typedef NTSTATUS (NTAPI * fNtGetNextProcess)(
+_In_ HANDLE ProcessHandle,
+_In_ ACCESS_MASK DesiredAccess,
+_In_ ULONG HandleAttributes,
+_In_ ULONG Flags,
+_Out_ PHANDLE NewProcessHandle
+);
+int findMyProc(const char * procname) {
+int pid = 0;
+HANDLE current = NULL;
+char procName[MAX_PATH];
+// resolve function address
+fNtGetNextProcess myNtGetNextProcess =
+(fNtGetNextProcess) GetProcAddress(GetModuleHandle("ntdll.dll"), "NtGetNextProcess");
+// loop through all processes
+while (!myNtGetNextProcess(current, MAXIMUM_ALLOWED, 0, 0, &amp;current)) {
+GetProcessImageFileNameA(current, procName, MAX_PATH);
+if (lstrcmpiA(procname, PathFindFileName((LPCSTR) procName)) == 0) {
+pid = GetProcessId(current);
+break;
+}
+}
+return current;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, we use NtGetNextProcess API for enumerating processes. So the final source code is looks like this (hack.c):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">/*
+* hack.c - hunting RWX memory
+* @cocomelonc
+* https://cocomelonc.github.io/malware/2024/05/01/malware-trick-38.html
+
+*/
+#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;psapi.h&gt;
+#include &lt;shlwapi.h&gt;
+#include &lt;strsafe.h&gt;
+#include &lt;winternl.h&gt;
+typedef NTSTATUS (NTAPI * fNtGetNextProcess)(
+_In_ HANDLE ProcessHandle,
+_In_ ACCESS_MASK DesiredAccess,
+_In_ ULONG HandleAttributes,
+_In_ ULONG Flags,
+_Out_ PHANDLE NewProcessHandle
+);
+int findMyProc(const char * procname) {
+int pid = 0;
+HANDLE current = NULL;
+char procName[MAX_PATH];
+// resolve function address
+fNtGetNextProcess myNtGetNextProcess =
+(fNtGetNextProcess) GetProcAddress(GetModuleHandle("ntdll.dll"), "NtGetNextProcess");
+// loop through all processes
+while (!myNtGetNextProcess(current, MAXIMUM_ALLOWED, 0, 0, &amp;current)) {
+GetProcessImageFileNameA(current, procName, MAX_PATH);
+if (lstrcmpiA(procname, PathFindFileName((LPCSTR) procName)) == 0) {
+pid = GetProcessId(current);
+break;
+}
+}
+return current;
+}
+
+int findRWX(HANDLE h) {
+MEMORY_BASIC_INFORMATION mbi = {};
+LPVOID addr = 0;
+// query remote process memory information
+while (VirtualQueryEx(h, addr, &amp;mbi, sizeof(mbi))) {
+addr = (LPVOID)((DWORD_PTR) mbi.BaseAddress + mbi.RegionSize);
+
+// look for RWX memory regions which are not backed by an image
+if (mbi.Protect == PAGE_EXECUTE_READWRITE
+&amp;&amp; mbi.State == MEM_COMMIT
+&amp;&amp; mbi.Type == MEM_PRIVATE)
+printf("found RWX memory: 0x%x - %#7llu bytes region\n",
+mbi.BaseAddress, mbi.RegionSize);
+}
+return 0;
+}
+
+int main(int argc, char* argv[]) {
+char procNameTemp[MAX_PATH];
+HANDLE h = NULL;
+int pid = 0;
+h = findMyProc(argv[1]);
+if (h) GetProcessImageFileNameA(h, procNameTemp, MAX_PATH);
+pid = GetProcessId(h);
+printf("%s%d\n", pid &gt; 0 ? "process found at pid = " :
+"process not found. pid = ", pid);
+findRWX(h);
+CloseHandle(h);
+return 0;
+}
+demo</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see everything in action. Compile our malware source code: x86_64-w64-mingw32-g++ hack.c -o hack.exe \ -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ -static-libgcc -fpermissive \ -w -lpsapi -lshlwapi</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">And run it at the victim’s machine (Windows 11 x64 in my case):</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Try on another target process, for example OneDrive.exe:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Our logic is worked, <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">RWX</code>-memory successfully founded! As you can see, everything is worked perfectly! =.. =</p>
+
+            <div id="practical-example-2" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example 2</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">But there are the caveats. Sometimes we need to know is this process is .NET process or Java or something else (is it really OneDrive.exe process)? For .NET process we need interesting trick, if we open powershell.exe via Process Hacker 2:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, in the Handles tab we can find interesting section with name \BaseNamedObjects\Cor_Private_IPCBlock_v4_<PID>" in our case PID = 3156, so our string is equal \BaseNamedObjects\\Cor_Private_IPCBlock_v4_3156. So, let’s update our function findMyProc, like this:</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">HANDLE findMyProc(const char * procname) {
+int pid = 0;
+HANDLE current = NULL;
+char procName[MAX_PATH];
+// resolve function addresses
+fNtGetNextProcess_t myNtGetNextProcess =
+(fNtGetNextProcess_t) GetProcAddress(GetModuleHandle("ntdll.dll"), "NtGetNextProcess");
+fNtOpenSection_t myNtOpenSection =
+(fNtOpenSection_t) GetProcAddress(GetModuleHandle("ntdll.dll"), "NtOpenSection");
+// loop through all processes
+while (!myNtGetNextProcess(current, MAXIMUM_ALLOWED, 0, 0, &amp;current)) {
+GetProcessImageFileNameA(current, procName, MAX_PATH);
+if (lstrcmpiA(procname, PathFindFileNameA(procName)) == 0) {
+pid = GetProcessId(current);
+
+// Check for "\\BaseNamedObjects\\Cor_Private_IPCBlock_v4_&lt;PID&gt;" section
+UNICODE_STRING sName;
+OBJECT_ATTRIBUTES oa;
+HANDLE sHandle = NULL;
+WCHAR procNumber[32];
+WCHAR objPath[] = L"\\BaseNamedObjects\\Cor_Private_IPCBlock_v4_";
+sName.Buffer = (PWSTR) malloc(500);
+// convert INT to WCHAR
+swprintf_s(procNumber, L"%d", pid);
+// and fill out UNICODE_STRING structure
+ZeroMemory(sName.Buffer, 500);
+memcpy(sName.Buffer, objPath, wcslen(objPath) * 2);
+// add section name "prefix"
+StringCchCatW(sName.Buffer, 500, procNumber);
+// and append with process ID
+sName.Length = wcslen(sName.Buffer) * 2;
+// finally, adjust the string size
+sName.MaximumLength = sName.Length + 1;
+InitializeObjectAttributes(&amp;oa, &amp;sName, OBJ_CASE_INSENSITIVE, NULL, NULL);
+NTSTATUS status = myNtOpenSection(&amp;sHandle, SECTION_QUERY, &amp;oa);
+if (NT_SUCCESS(status)) {
+CloseHandle(sHandle);
+break;
+}
+}
+}
+return current;
+}
+Just convert process id int to UNICODE STRING and concat, then try to find section
+logic.
+Here, NtOpenSection API use for opens a handle for an existing section object:
+typedef NTSTATUS (NTAPI * fNtOpenSection)(
+PHANDLE
+SectionHandle,
+ACCESS_MASK
+DesiredAccess,
+POBJECT_ATTRIBUTES ObjectAttributes
+);
+So, the full source code for this logic (finding .NET processes in the victim’s system)
+looks like this:
+/*
+* hack2.c - hunting RWX memory
+
+* detect .NET process
+* @cocomelonc
+* https://cocomelonc.github.io/malware/2024/05/01/malware-trick-38.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;psapi.h&gt;
+#include &lt;shlwapi.h&gt;
+#include &lt;strsafe.h&gt;
+#include &lt;winternl.h&gt;
+typedef NTSTATUS (NTAPI * fNtGetNextProcess_t)(
+_In_ HANDLE ProcessHandle,
+_In_ ACCESS_MASK DesiredAccess,
+_In_ ULONG HandleAttributes,
+_In_ ULONG Flags,
+_Out_ PHANDLE NewProcessHandle
+);
+typedef NTSTATUS (NTAPI * fNtOpenSection_t)(
+PHANDLE
+SectionHandle,
+ACCESS_MASK
+DesiredAccess,
+POBJECT_ATTRIBUTES ObjectAttributes
+);
+HANDLE findMyProc(const char * procname) {
+int pid = 0;
+HANDLE current = NULL;
+char procName[MAX_PATH];
+// resolve function addresses
+fNtGetNextProcess_t myNtGetNextProcess = (fNtGetNextProcess_t)
+GetProcAddress(GetModuleHandle("ntdll.dll"), "NtGetNextProcess");
+fNtOpenSection_t myNtOpenSection = (fNtOpenSection_t)
+GetProcAddress(GetModuleHandle("ntdll.dll"), "NtOpenSection");
+// loop through all processes
+while (!myNtGetNextProcess(current, MAXIMUM_ALLOWED, 0, 0, &amp;current)) {
+GetProcessImageFileNameA(current, procName, MAX_PATH);
+if (lstrcmpiA(procname, PathFindFileNameA(procName)) == 0) {
+pid = GetProcessId(current);
+// check for "\\BaseNamedObjects\\Cor_Private_IPCBlock_v4_&lt;PID&gt;" section
+UNICODE_STRING sName;
+OBJECT_ATTRIBUTES oa;
+HANDLE sHandle = NULL;
+
+WCHAR procNumber[32];
+WCHAR objPath[] = L"\\BaseNamedObjects\\Cor_Private_IPCBlock_v4_";
+sName.Buffer = (PWSTR) malloc(500);
+// convert INT to WCHAR
+swprintf_s(procNumber, L"%d", pid);
+// and fill out UNICODE_STRING structure
+ZeroMemory(sName.Buffer, 500);
+// add section name "prefix"
+memcpy(sName.Buffer, objPath, wcslen(objPath) * 2);
+StringCchCatW(sName.Buffer, 500, procNumber);
+// and append with process ID
+sName.Length = wcslen(sName.Buffer) * 2;
+// finally, adjust the string size
+sName.MaximumLength = sName.Length + 1;
+InitializeObjectAttributes(&amp;oa, &amp;sName, OBJ_CASE_INSENSITIVE, NULL, NULL);
+NTSTATUS status = myNtOpenSection(&amp;sHandle, SECTION_QUERY, &amp;oa);
+if (NT_SUCCESS(status)) {
+CloseHandle(sHandle);
+break;
+}
+}
+}
+return current;
+}
+
+int findRWX(HANDLE h) {
+MEMORY_BASIC_INFORMATION mbi = {};
+LPVOID addr = 0;
+// query remote process memory information
+while (VirtualQueryEx(h, addr, &amp;mbi, sizeof(mbi))) {
+addr = (LPVOID)((DWORD_PTR) mbi.BaseAddress + mbi.RegionSize);
+// look for RWX memory regions which are not backed by an image
+if (mbi.Protect == PAGE_EXECUTE_READWRITE
+&amp;&amp; mbi.State == MEM_COMMIT
+&amp;&amp; mbi.Type == MEM_PRIVATE)
+
+printf("found RWX memory: 0x%x - %#7llu bytes region\n", mbi.BaseAddress, mbi.RegionSi
+}
+
+return 0;
+}
+
+int main(int argc, char* argv[]) {
+char procNameTemp[MAX_PATH];
+HANDLE h = NULL;
+int pid = 0;
+h = findMyProc(argv[1]);
+if (h) GetProcessImageFileNameA(h, procNameTemp, MAX_PATH);
+pid = GetProcessId(h);
+printf("%s%d\n", pid &gt; 0 ? "process found at pid = " :
+"process not found. pid = ", pid);
+findRWX(h);
+CloseHandle(h);
+return 0;
+}
+demo 2</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see second example in action. Compile it: x86_64-w64-mingw32-g++ hack2.c -o hack2.exe \ -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ -static-libgcc -fpermissive \ -lpsapi -lshlwapi -w</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then just run it. Check on powershell.exe: .\hack2.exe powershell.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Now, second practical example worked as expected! Great! =.. =</p>
+
+            <div id="practical-example-3" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Practical example 3</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Ok, so what about previous question? How we can check if the victim process is really OneDrive.exe process? It’s just in case, for example. Let’s check OneDrive.exe process properties via Process Hacker 2:</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see we can use the same trick: check section by it’s name: \Sessions\1\BaseNamedObjects\UrlZonesSM_t Of course, I could be wrong and the presence of this string does not guarantee that this</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">is OneDrive.exe process. I just want to show that you can examine any process and try to find some indicators in the section names. So, I updated my function again and full source code of my third example (hack3.c):</p>
+
+            <div class="my-6 rounded-2xl overflow-hidden border border-[#26335e] bg-[#070b1c] shadow-2xl font-mono text-xs">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-[#0d1430] border-b border-[#212b54]">
+                    <div class="flex items-center gap-2 text-[var(--accent)] font-semibold text-xs tracking-wider uppercase">
+                        <i data-lucide="code-xml" class="w-3.5 h-3.5"></i>
+                        <span>Python 3</span>
+                    </div>
+                    <button onclick="copyCode(this)" class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--accent-soft)] hover:opacity-90 border border-[var(--accent)] text-[var(--accent)] font-semibold text-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <pre class="p-4 overflow-x-auto text-[#f8fafc] leading-relaxed font-mono"><code class="language-python">/*
+* hack.c - hunting RWX memory
+* @cocomelonc
+* https://cocomelonc.github.io/malware/2024/05/01/malware-trick-38.html
+*/
+#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;psapi.h&gt;
+#include &lt;shlwapi.h&gt;
+#include &lt;strsafe.h&gt;
+#include &lt;winternl.h&gt;
+typedef NTSTATUS (NTAPI * fNtGetNextProcess_t)(
+_In_ HANDLE ProcessHandle,
+_In_ ACCESS_MASK DesiredAccess,
+_In_ ULONG HandleAttributes,
+_In_ ULONG Flags,
+_Out_ PHANDLE NewProcessHandle
+);
+typedef NTSTATUS (NTAPI * fNtOpenSection_t)(
+PHANDLE
+SectionHandle,
+ACCESS_MASK
+DesiredAccess,
+POBJECT_ATTRIBUTES ObjectAttributes
+);
+HANDLE findMyProc(const char *procname) {
+HANDLE current = NULL;
+char procName[MAX_PATH];
+// resolve function addresses
+fNtGetNextProcess_t myNtGetNextProcess =
+(fNtGetNextProcess_t)GetProcAddress(GetModuleHandle("ntdll.dll"), "NtGetNextProcess");
+fNtOpenSection_t myNtOpenSection =
+(fNtOpenSection_t)GetProcAddress(GetModuleHandle("ntdll.dll"), "NtOpenSection");
+// loop through all processes
+while (!myNtGetNextProcess(current, MAXIMUM_ALLOWED, 0, 0, &amp;current)) {
+GetProcessImageFileNameA(current, procName, MAX_PATH);
+if (lstrcmpiA(procname, PathFindFileNameA(procName)) == 0) {
+// check for "\Sessions\1\BaseNamedObjects\UrlZonesSM_test1" section
+UNICODE_STRING sName;
+
+OBJECT_ATTRIBUTES oa;
+HANDLE sHandle = NULL;
+WCHAR objPath[] = L"\\Sessions\\1\\BaseNamedObjects\\UrlZonesSM_test1";
+sName.Buffer = (PWSTR)objPath;
+sName.Length = wcslen(objPath) * sizeof(WCHAR);
+sName.MaximumLength = sName.Length + sizeof(WCHAR);
+InitializeObjectAttributes(&amp;oa, &amp;sName, OBJ_CASE_INSENSITIVE, NULL, NULL);
+NTSTATUS status = myNtOpenSection(&amp;sHandle, SECTION_QUERY, &amp;oa);
+if (NT_SUCCESS(status)) {
+CloseHandle(sHandle);
+break;
+}
+}
+}
+return current;
+}
+int findRWX(HANDLE h) {
+MEMORY_BASIC_INFORMATION mbi = {};
+LPVOID addr = 0;
+// query remote process memory information
+while (VirtualQueryEx(h, addr, &amp;mbi, sizeof(mbi))) {
+addr = (LPVOID)((DWORD_PTR) mbi.BaseAddress + mbi.RegionSize);
+// look for RWX memory regions which are not backed by an image
+if (mbi.Protect == PAGE_EXECUTE_READWRITE
+&amp;&amp; mbi.State == MEM_COMMIT
+&amp;&amp; mbi.Type == MEM_PRIVATE)
+
+printf("found RWX memory: 0x%x - %#7llu bytes region\n", mbi.BaseAddress, mbi.RegionSi
+}
+return 0;
+}
+
+int main(int argc, char* argv[]) {
+char procNameTemp[MAX_PATH];
+HANDLE h = NULL;
+int pid = 0;
+h = findMyProc(argv[1]);
+if (h) GetProcessImageFileNameA(h, procNameTemp, MAX_PATH);
+
+pid = GetProcessId(h);
+printf("%s%d\n", pid &gt; 0 ? "process found at pid = " :
+"process not found. pid = ", pid);
+findRWX(h);
+CloseHandle(h);
+return 0;
+}</code></pre>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, the logic is simple: check section name and try to open it.</p>
+
+            <div id="demo-3" class="scroll-mt-24 pt-6 pb-2 border-b border-[#212b54] mt-8 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--accent)] flex-shrink-0"></i>
+                    <span>Demo 3</span>
+                </h3>
+            </div>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Let’s go to see third example in action. Compile it: x86_64-w64-mingw32-g++ hack3.c -o hack3.exe \ -I/usr/share/mingw-w64/include/ -s \ -ffunction-sections -fdata-sections -Wno-write-strings -fno-exceptions \ -fmerge-all-constants -static-libstdc++ -static-libgcc -fpermissive \ -lpsapi -lshlwapi -w</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">Then, run it on the victim’s machine: .\hack3.exe OneDrive.exe</p>
+<p class="my-3 sm:my-4 text-[#e2e8f0] leading-relaxed text-sm sm:text-base">As you can see, everything is worked perfectly again! If anyone has seen a similar trick in real malware and APT, please write to me, maybe I didn’t look well, it seems to me that this is a technique already known to attackers. I hope this post spreads awareness to the blue teamers of this interesting process investigation technique, and adds a weapon to the red teamers arsenal. Process injection via <code class="px-1.5 py-0.5 rounded bg-[#101738] border border-[#2c3a6e] text-[var(--accent)] font-mono text-xs font-semibold">RWX</code>-memory hunting. Simple C++ example. Malware development trick - part 30: Find PID via NtGetNextProcess. Simple C++ example. source code in github</p></main></body></html>
