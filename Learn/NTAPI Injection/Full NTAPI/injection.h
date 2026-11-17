@@ -22,7 +22,7 @@ typedef struct _OBJECT_ATTRIBUTES
 } _OBJECT_ATTRIBUTES, *POBJECT_ATTRIBUTES;
 
 #define InitializeObjectAttributes(p, n, a, r, s) { \
-    (p)->Length = sizeof(OBJECT_ATTRIBUTES); \
+    (p)->Length = sizeof(_OBJECT_ATTRIBUTES); \
     (p)->RootDirectory = r; \
     (p)->Attributes = a; \
     (p)->ObjectName = n; \
@@ -64,7 +64,7 @@ typedef NTSTATUS(NTAPI* fn_NtOpenProcess)(
 
 typedef NTSTATUS(NTAPI* fn_NtAllocateVirtualMemory)(
     _In_ HANDLE ProcessHandle,
-    _Inout_ _At_(*BaseAddress, _Readable_bytes_(*RegionSize) _Writable_bytes_(*RegionSize) _Post_readable_byte_size_(*RegionSize)) PVOID *BaseAddress,
+    _Inout_ PVOID *BaseAddress,
     _In_ ULONG_PTR ZeroBits,
     _Inout_ PSIZE_T RegionSize,
     _In_ ULONG AllocationType,
@@ -124,14 +124,14 @@ typedef struct _PEB_LDR_DATA{
     LIST_ENTRY InMemoryOrderModuleList;
 } PEB_LDR_DATA, *PPEB_LDR_DATA;
 
-typedef struct _LDR_DATA_TABLE_ENTRY{
-    PVOID Reserved1[2];
-    LIST_ENTRY InMemoryOrderLinks;
-    PVOID Reserved2[2];
-    PVOID DllBase; // <--- this is what we need (Base Address of the module(ntdll.dll))
-    PVOID Reserved3[2];
-    PUNICODE_STRING FullDllName;
-    // ... other fields, but we don't need them for this purpose
+typedef struct _LDR_DATA_TABLE_ENTRY {
+    LIST_ENTRY InMemoryOrderLinks;   
+    PVOID Reserved2[2];             
+    PVOID DllBase;                  
+    PVOID EntryPoint;
+    ULONG SizeOfImage;
+    _UNICODE_STRING FullDllName;
+    _UNICODE_STRING BaseDllName;
 } LDR_DATA_TABLE_ENTRY, *PLDR_DATA_TABLE_ENTRY;
 
 typedef struct _PEB{
@@ -201,5 +201,5 @@ PVOID GetNtDllBaseAddress(void);
  * @return 
  *  Bool
  */
-BOOL Injection(_In_ CONST DWORD PID, _In_ LPCWSTR DLLPath, _In_ CONST SIZE_T PathSize);
+BOOL Injection(_In_ CONST DWORD PID, _In_ LPCWSTR DLLPath, _In_  SIZE_T CONST PathSize);
 

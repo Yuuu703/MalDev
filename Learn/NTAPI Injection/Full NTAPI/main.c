@@ -8,13 +8,13 @@ unsigned long find_pid(const char* process_name) {
     HMODULE hNtdll = GetNtDllBaseAddress();
     
     fn_NtQuerySystemInformation pNtQuerySystemInformation = 
-        (fn_NtQuerySystemInformation)GetProcAddressByHash(hNtdll, 0x8E2C1AA0); // "ntquerysysteminformation"
+        (fn_NtQuerySystemInformation)GetProcAddressByHash(hNtdll, 0x27DA8C28); // "ntquerysysteminformation"
     
     fn_NtAllocateVirtualMemory pNtAllocateVirtualMemory = 
         (fn_NtAllocateVirtualMemory)GetProcAddressByHash(hNtdll, 0xc66d2fcc); // "ntallocatevirtualmemory"
         
     fn_NtFreeVirtualMemory pNtFreeVirtualMemory = 
-        (fn_NtFreeVirtualMemory)GetProcAddressByHash(hNtdll, 0x0c6a2f1b); // "ntfreevirtualmemory"
+        (fn_NtFreeVirtualMemory)GetProcAddressByHash(hNtdll, 0xF429F469); // "ntfreevirtualmemory"
 
     if (!pNtQuerySystemInformation || !pNtAllocateVirtualMemory || !pNtFreeVirtualMemory) {
         printf("[-] Failed to resolve NTAPI functions for process enumeration\n");
@@ -90,9 +90,7 @@ unsigned long find_pid(const char* process_name) {
 
 
 int main(void) {
-    // ImageName in NtQuerySystemInformation usually does not include .exe
-    // (Different from tlhelp32). So we search for "Notepad" instead of "Notepad.exe".
-    unsigned long pid = find_pid("Notepad"); 
+    unsigned long pid = find_pid("Notepad.exe"); 
     
     if (pid == 0) {
         printf("[-] Process Notepad not found.\n");

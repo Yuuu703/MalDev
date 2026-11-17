@@ -20,7 +20,9 @@ targets = [
     "NtOpenProcess",
     "NtWriteVirtualMemory",
     "NtClose",
-    "NtQuerySystemInformation"
+    "NtQuerySystemInformation",
+    "NtWaitForSingleObject",
+    "NtFreeVirtualMemory"
 ]
 
 for target in targets:
