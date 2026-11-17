@@ -8,9 +8,6 @@ I use this repository to keep track of concepts and exercises as I learn C/C++, 
 
 This repository is a work in progress. Code and notes may be incomplete, experimental, or specific to the environment in which I studied them. The projects are inspired by publicly available research, educational material, and my own experiments. They are not intended to be production-ready tools or malware.
 
-## Architecture
-These exercises are developed and tested on Windows 11 x64, 26H2.
-
 ## Repository map
 
 | Path | What it contains |
@@ -34,7 +31,7 @@ Folder names describe study topics, not production-ready tools. Refer to each so
 - Learn to identify and analyze malware techniques, including injection, shellcode execution, and API hooking.
 - Research and develop new techniques to serve the defensive community, including detection and mitigation strategies.
 
-## Lab safety and intended use
+## Safety and intended use
 
 All material is for education and authorized research in an isolated lab or other environment where you have explicit permission. Do not run experiments on systems, accounts, networks, or data that you do not own or have permission to test. Do not use this repository to compromise systems, steal data, evade security controls, or deploy malware.
 
